@@ -20,7 +20,7 @@
 //       profile: "<the track profile, printed verbatim>",
 //       registerPaths: ["docs/internal/docs-register.md#..."],   // what every agent reads
 //       valeErrorRules: "<the error-tier rule list, verbatim>",
-//       drafterModel: "sonnet",            // optional
+//       drafterModel: "claude-opus-5-5",   // optional; published pages draft on Opus 5.5 (2026-09-22)
 //       reviewModel: "claude-opus-5-5",      // optional
 //       pages: [
 //         {
@@ -113,7 +113,7 @@ const WT = a.worktree;
 const GATE = a.gate;
 const LANE = a.gateLane === "light" ? "CAIRN_GATE_LANE=light " : "";
 const IN_FLIGHT = Number.isInteger(a.inFlight) && a.inFlight > 0 ? a.inFlight : 3;
-const DRAFTER = a.drafterModel || "sonnet";
+const DRAFTER = a.drafterModel || "claude-opus-5-5";
 const DRAFTER_TYPE = a.drafterType || "cairn-implementer";
 const TOOL_GATE = a.toolGate || null;   // appended for a page carrying `pinned`, e.g. "make -C <wt>/tool check"
 const REVIEWER = a.reviewModel || "claude-opus-5-5";
