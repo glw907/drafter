@@ -24,7 +24,8 @@
 //       gate: "npm run check:docs-gate -- --page {page} --brief {brief}",   // {page}/{brief} substituted per page
 //       gateLane: "light",                 // optional; "light" prefixes CAIRN_GATE_LANE=light
 //       inFlight: 3,                       // optional; pages drafted at once, default 3
-//       toolGate: "make -C <worktree>/tool check",   // optional; appended for a page with `pinned`
+//       toolGate: "make -C <worktree>/tool check",   // optional; appended for a page with `pinned`;
+//                                                     // defaults to `make -C <worktree>/tool check`
 //       drafterType: "cairn-docs-drafter", // optional; the drafter's agent type (this is the default)
 //       pageInputsType: "general-purpose", // optional; needs WebFetch and Edit (this is the default)
 //       bothReviewers: false,              // optional; true re-reads every reviewer after a redraft
@@ -139,7 +140,7 @@ const LANE = a.gateLane === "light" ? "CAIRN_GATE_LANE=light " : "";
 const IN_FLIGHT = Number.isInteger(a.inFlight) && a.inFlight > 0 ? a.inFlight : 3;
 const DRAFTER = a.drafterModel || "claude-opus-5-5";
 const DRAFTER_TYPE = a.drafterType || "cairn-docs-drafter";
-const TOOL_GATE = a.toolGate || null;   // appended for a page carrying `pinned`, e.g. "make -C <wt>/tool check"
+const TOOL_GATE = a.toolGate || `make -C ${WT}/tool check`;   // appended for a page carrying `pinned`
 const REVIEWER = a.reviewModel || "claude-opus-5-5";
 const PAGE_INPUTS_TYPE = a.pageInputsType || "general-purpose";
 const PAGE_INPUTS_MODEL = a.pageInputsModel || REVIEWER;
@@ -267,9 +268,12 @@ ${inventory || "(the page is new; no prior claims to carry)"}
 ${p.pinned && p.pinned.length ? `Pinned heading slugs this page must keep, verbatim: ${p.pinned.join(", ")}` : ""}
 ${round > 1 ? `\nCombined findings from the reads:\n${findings}\n` : ""}
 Write the page's sentence-to-fact brief alongside the page at ${briefPathFor(p)}, citing only the
-fact ids above or "no-claim". File no fact yourself, new or retagged; something no source can
-supply goes to docs/internal/docs-friction-log.md (name it in frictionFiled). Commit nothing;
-leave the tree with your edits in place.
+fact ids above or "no-claim". File no fact yourself, new or retagged. A claim the page needs whose
+fact is not among the ids above is a couldNotDo naming the missing fact; do not draft that claim
+and do not file its fact yourself, since the conductor re-runs page inputs for it. Something no
+source can supply at all, a genuine design gap rather than a missing fact, goes to
+docs/internal/docs-friction-log.md (name it in frictionFiled). Commit nothing; leave the tree with
+your edits in place.
 
 ${gateLine(p)}
 
@@ -365,7 +369,7 @@ function deriveCrossRegression(record, bothReviewers) {
 // === END CROSS-REGRESSION DERIVATION ===
 
 async function chain(p) {
-  const record = { id: p.id, path: p.path, rounds: [] };
+  const record = { id: p.id, path: p.path, brief: briefPathFor(p), rounds: [] };
   const pageInputs = await agent(pageInputsPrompt(p), { label: `inputs:${p.id}`, phase: "Page inputs", schema: PAGE_INPUTS_SCHEMA, model: PAGE_INPUTS_MODEL, agentType: PAGE_INPUTS_TYPE });
   if (!pageInputs) return { ...record, status: "escalate", reason: "page-inputs step returned nothing" };
   record.pageInputs = pageInputs;

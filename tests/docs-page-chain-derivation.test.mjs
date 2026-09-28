@@ -145,6 +145,18 @@ check("the drafter definition names no grader or v2 chain, and runs its own gate
   assert.doesNotMatch(DRAFTER_SRC, /\[candidate\]/);
 });
 
+check("the per-page record carries its brief path from the start, on every return path", () => {
+  assert.match(RUNNER_SRC, /const record = \{ id: p\.id, path: p\.path, brief: briefPathFor\(p\), rounds: \[\] \};/);
+});
+
+check("a missing fact is a couldNotDo, not a friction-log entry", () => {
+  assert.match(RUNNER_SRC, /couldNotDo naming the missing fact/);
+});
+
+check("the tool gate defaults to make -C <worktree>/tool check", () => {
+  assert.match(RUNNER_SRC, /a\.toolGate \|\| `make -C \$\{WT\}\/tool check`/);
+});
+
 console.log("");
 if (failures.length) {
   console.log(`${failures.length} FAILING: ${failures.join(", ")}`);
