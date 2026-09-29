@@ -160,13 +160,14 @@ const REGISTER = a.registerPath || "docs/internal/docs-register.md";
  * @throws {Error} on a track with no register track section
  */
 function registerSectionsFor(track, role) {
+  const frontDoor = "## The front door (`docs/README.md`, `docs/why-cairn.md`, and the root `README.md`)";
   const trackHeadings = {
     editors: "### The editor track (`docs/editors/`)",
     admin: "### The admin track (`docs/admin/`)",
     extend: "### The extend track (`docs/extend/`)",
     reference: "## The reference (`docs/reference/`), a shared instrument",
-    "front-door": "## The front door (`docs/README.md`, `docs/why-cairn.md`, and the root `README.md`)",
-    readme: "## The front door (`docs/README.md`, `docs/why-cairn.md`, and the root `README.md`)"
+    "front-door": frontDoor,
+    readme: frontDoor
   };
   if (!Object.hasOwn(trackHeadings, track)) throw new Error(`unknown track "${track}": no register track section`);
   const brief = track === "editors" ? "## Drafting brief: editor docs" : "## Drafting brief: developer docs";
@@ -182,6 +183,7 @@ function registerSectionsFor(track, role) {
 }
 // === END REGISTER SECTIONS ===
 
+// Fail on an unknown track before any agent runs.
 for (const p of PAGES) registerSectionsFor(p.track, "drafter");
 
 /**
@@ -197,18 +199,13 @@ The Names convention is enforced by Vale (Cairn.Names, Cairn.NamesRetired); use 
 for every part.`;
 }
 
-/**
- * The preamble every stage shares: the worktree and the error-tier Vale rules.
- * @returns {string}
- */
-function common() {
-  return `Work only in the worktree ${WT}; run every command from there and never cd to another checkout.
+// The preamble every stage shares: the worktree and the error-tier Vale rules.
+const common = `Work only in the worktree ${WT}; run every command from there and never cd to another checkout.
 
 Error-tier Vale rules, verbatim:
 
 ${a.valeErrorRules || "(run `npm run check:vale` and fix every error-tier finding)"}
 `;
-}
 
 /**
  * The page's fact-file base name: its own file name without the `.md` extension.
@@ -256,7 +253,7 @@ function pageInputsPrompt(p) {
   return `Page inputs for ${p.path} in ${WT}. You are step 1 of the docs page chain: you do not
 draft the page and you do not run a gate.
 
-${common()}
+${common}
 This page's job, from the stage outline, verbatim:
 
 ${p.job}
@@ -294,7 +291,7 @@ function draftPrompt(p, pageInputs, round, findings) {
     .join("\n");
   return `${head}
 
-${common()}
+${common}
 ${registerLine(p, "drafter")}
 The brief is the source of the page's structure and voice.
 
@@ -326,7 +323,7 @@ Return the structured report only.`;
 function editorPrompt(p) {
   return `Adversarial register edit of ${p.path} in ${WT}.
 
-${common()}
+${common}
 ${registerLine(p, "editor")}
 
 Run plain \`vale ${p.path}\` from the worktree, never the docs gate, and read every alert it
