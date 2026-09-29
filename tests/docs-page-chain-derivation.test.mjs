@@ -119,6 +119,91 @@ check("both reviewers re-read and neither regresses: flag set false", () => {
 });
 
 // ---------------------------------------------------------------------------------------------
+// The register sections each track reads, named by exact heading. The block is extracted from the
+// runner the same way as the derivation above.
+// ---------------------------------------------------------------------------------------------
+
+const SECTIONS_START = "// === REGISTER SECTIONS (docs-page-chain-derivation.test.mjs extracts this block) ===";
+const SECTIONS_END = "// === END REGISTER SECTIONS ===";
+const sectionsStartAt = RUNNER_SRC.indexOf(SECTIONS_START);
+const sectionsEndAt = RUNNER_SRC.indexOf(SECTIONS_END);
+
+check("the register-sections markers are both present, in order", () => {
+  assert.notEqual(sectionsStartAt, -1, "start marker missing");
+  assert.notEqual(sectionsEndAt, -1, "end marker missing");
+  assert.ok(sectionsStartAt < sectionsEndAt, "markers out of order");
+});
+
+let registerSectionsFor = () => {
+  throw new Error("register-sections markers missing; function was not extracted");
+};
+if (sectionsStartAt !== -1 && sectionsEndAt !== -1) {
+  const block = RUNNER_SRC.slice(sectionsStartAt, sectionsEndAt);
+  // eslint-disable-next-line no-new-func -- same extraction pattern as the derivation above.
+  registerSectionsFor = new Function(`${block}\nreturn registerSectionsFor;`)();
+}
+
+const COMMON_HEADINGS = [
+  "## Names",
+  "## Visuals (every page that carries one)",
+  "## The page anatomies"
+];
+const DEV_BRIEF = "## Drafting brief: developer docs";
+const EDITOR_BRIEF = "## Drafting brief: editor docs";
+const TRACK_HEADING = {
+  editors: "### The editor track (`docs/editors/`)",
+  admin: "### The admin track (`docs/admin/`)",
+  extend: "### The extend track (`docs/extend/`)",
+  reference: "## The reference (`docs/reference/`), a shared instrument",
+  "front-door": "## The front door (`docs/README.md`, `docs/why-cairn.md`, and the root `README.md`)",
+  readme: "## The front door (`docs/README.md`, `docs/why-cairn.md`, and the root `README.md`)"
+};
+
+for (const [track, trackHeading] of Object.entries(TRACK_HEADING)) {
+  check(`track ${track}: the drafter reads its brief, Names, Visuals, anatomies, and its own section`, () => {
+    const brief = track === "editors" ? EDITOR_BRIEF : DEV_BRIEF;
+    assert.deepEqual(registerSectionsFor(track, "drafter"), [brief, ...COMMON_HEADINGS, trackHeading]);
+  });
+}
+
+check("the editor reads the same sections, plus the deviations only for the editors track", () => {
+  for (const [track, trackHeading] of Object.entries(TRACK_HEADING)) {
+    const brief = track === "editors" ? EDITOR_BRIEF : DEV_BRIEF;
+    const expected = [brief, ...COMMON_HEADINGS, trackHeading];
+    if (track === "editors") expected.push("## Deviations from the base guides");
+    assert.deepEqual(registerSectionsFor(track, "editor"), expected, track);
+  }
+});
+
+check("an unknown track throws", () => {
+  assert.throws(() => registerSectionsFor("nonsense", "drafter"), /unknown track/);
+  assert.throws(() => registerSectionsFor(undefined, "editor"), /unknown track/);
+});
+
+// ---------------------------------------------------------------------------------------------
+// The prompts carry no dispatch-side extraction, layering, or provenance machinery.
+// ---------------------------------------------------------------------------------------------
+
+check("no extraction script, q: id, guide source, or universal-contract reference remains", () => {
+  for (const src of [RUNNER_SRC, DRAFTER_SRC]) {
+    assert.doesNotMatch(src, /docs-chain-render/);
+    assert.doesNotMatch(src, /\bq:[a-z0-9]/);
+    assert.doesNotMatch(src, /source: guide/);
+    assert.doesNotMatch(src, /universal\s+contract/);
+  }
+});
+
+check("the drafter reads exemplar sources whole; page inputs no longer trims excerpts", () => {
+  assert.doesNotMatch(RUNNER_SRC, /exemplarExcerpts/);
+  assert.match(RUNNER_SRC, /read each in full/);
+});
+
+check("the editor runs plain vale and grades checklist, tells, and alerts together", () => {
+  assert.match(RUNNER_SRC, /vale \$\{p\.path\}/);
+  assert.match(RUNNER_SRC, /never the docs gate/);
+});
+
+// ---------------------------------------------------------------------------------------------
 // Static guards for the removed profile/grader/v2 machinery: the acceptance's grep bullet, made
 // a durable regression instead of a one-time manual check.
 // ---------------------------------------------------------------------------------------------

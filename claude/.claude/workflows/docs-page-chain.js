@@ -1,13 +1,14 @@
 // Runs the draft-docs page chain (docs/superpowers/specs/2026-09-26-draft-docs-approach-design.md,
 // "The page chain" and "Scoped re-review") over a list of pages, a few pages in flight at once.
 //
-// Per page: a page-inputs agent writes the page's job, its type, two trimmed exemplar excerpts,
-// the fact ids the drafter should draw on, and a claim inventory with a disposition per claim
+// Per page: a page-inputs agent writes the page's job, its type, the fact ids the drafter should
+// draw on, and a claim inventory with a disposition per claim
 // (carried by a cited fact, newly filed, or cut with a reason), filing any new fact itself with
 // the Edit tool as `[verified]` (a `Source:` line) or `[external]` (the vendor URL), never
 // `[candidate]`. The drafter (`cairn-docs-drafter` by default) writes the page and its
 // sentence-to-fact brief from that record and files no fact of its own; it runs the docs gate
-// itself as its last act and reports the result. The register editor and a fact read run in
+// itself as its last act and reports the result; it reads the page's exemplar sources whole. The
+// register editor and a fact read run in
 // parallel, both Opus 5.5, plus a figure-verifier read for a page carrying a figure. One redraft
 // round on the combined findings, gated and re-read; by default only the reviewer(s) that
 // returned "fix" re-read (`args.bothReviewers` re-reads every reviewer instead and the record
@@ -29,7 +30,7 @@
 //       drafterType: "cairn-docs-drafter", // optional; the drafter's agent type (this is the default)
 //       pageInputsType: "general-purpose", // optional; needs WebFetch and Edit (this is the default)
 //       bothReviewers: false,              // optional; true re-reads every reviewer after a redraft
-//       registerPaths: ["docs/internal/docs-register.md#..."],   // what the register editor reads
+//       registerPath: "docs/internal/docs-register.md",   // optional; the register file, this is the default
 //       valeErrorRules: "<the error-tier rule list, verbatim>",
 //       drafterModel: "claude-opus-5-5",   // optional; default
 //       reviewModel: "claude-opus-5-5",    // optional; default, also the page-inputs step's model
@@ -38,10 +39,11 @@
 //         {
 //           id: "is-it-working",
 //           path: "docs/admin/is-it-working.md",
-//           track: "admin",                // the page's docs track; locates its brief file
+//           track: "admin",                // editors | admin | extend | reference | front-door | readme;
+//                                          // locates its brief file and its register sections
 //           job: "<the page's job and type, from the stage outline, verbatim>",
 //           pageType: "how-to",            // optional hint; the page-inputs agent may confirm or correct it
-//           exemplarSources: ["docs/admin/x.md", "docs/editors/y.md"],  // two full pages to excerpt
+//           exemplarSources: ["docs/admin/x.md", "docs/editors/y.md"],  // full pages the drafter reads whole
 //           inputs: ["docs/superpowers/plans/<plan>.mining.md#is-it-working", "..."],
 //           pinned: ["#slug-one", "#slug-two"],   // optional; slugs the page must keep
 //           extraChecks: ["<a sentence the fact read must also verify>"],   // optional
@@ -59,7 +61,7 @@ export const meta = {
   description: "Drafts docs pages through page inputs, drafter, gate, register editor, fact read, and one scoped redraft.",
   whenToUse: "A draft-docs pass plan names this workflow for its page tasks.",
   phases: [
-    { title: "Page inputs", detail: "one agent per page: job, type, exemplar excerpts, fact ids, claim inventory" },
+    { title: "Page inputs", detail: "one agent per page: job, type, fact ids, claim inventory" },
     { title: "Draft", detail: "the drafter writes the page and runs the docs gate itself" },
     { title: "Read", detail: "register editor and fact read in parallel, both Opus, plus a figure read when the page carries one" },
     { title: "Redraft", detail: "one round on the combined findings; only the reviewer(s) that returned fix re-read by default" },
@@ -83,20 +85,12 @@ const PAGE_INPUTS_SCHEMA = {
   properties: {
     job: { type: "string" },
     pageType: { type: "string" },
-    exemplarExcerpts: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: { source: { type: "string" }, excerpt: { type: "string" } },
-        required: ["source", "excerpt"]
-      }
-    },
     factIds: { type: "array", items: { type: "string" } },
     claimInventory: { type: "array", items: CLAIM },
     factsFiled: { type: "array", items: { type: "string" } },
     couldNotDo: { type: "array", items: { type: "string" } }
   },
-  required: ["job", "pageType", "exemplarExcerpts", "factIds", "claimInventory"]
+  required: ["job", "pageType", "factIds", "claimInventory"]
 };
 
 const DRAFT_SCHEMA = {
@@ -151,16 +145,70 @@ if (!WT || !GATE || !PAGES.length) {
   throw new Error("docs-page-chain needs args.worktree, args.gate, and args.pages");
 }
 
-const common = `Work only in the worktree ${WT}; run every command from there and never cd to another checkout.
-The register is ${(a.registerPaths || ["docs/internal/docs-register.md"]).join(", ")}: read the universal
-contract and the track section before anything else. The Names convention in that file's "Names"
-section is enforced by Vale (Cairn.Names, Cairn.NamesRetired); use the sanctioned name for every
-part.
+const REGISTER = a.registerPath || "docs/internal/docs-register.md";
+
+// === REGISTER SECTIONS (docs-page-chain-derivation.test.mjs extracts this block) ===
+/**
+ * The register sections one page's agent reads from the register file, each named by its exact
+ * heading: the track's drafting brief, the shared Names, Visuals, and page-anatomy sections, and
+ * the track's own section. The editor also reads the recorded deviations from the base guides
+ * when the track is the editors', the one track graded against a different guide. Pure and
+ * self-contained so the test can extract it verbatim without the workflow runtime.
+ * @param {string} track - editors | admin | extend | reference | front-door | readme
+ * @param {"drafter" | "editor"} role
+ * @returns {string[]}
+ * @throws {Error} on a track with no register track section
+ */
+function registerSectionsFor(track, role) {
+  const trackHeadings = {
+    editors: "### The editor track (`docs/editors/`)",
+    admin: "### The admin track (`docs/admin/`)",
+    extend: "### The extend track (`docs/extend/`)",
+    reference: "## The reference (`docs/reference/`), a shared instrument",
+    "front-door": "## The front door (`docs/README.md`, `docs/why-cairn.md`, and the root `README.md`)",
+    readme: "## The front door (`docs/README.md`, `docs/why-cairn.md`, and the root `README.md`)"
+  };
+  if (!Object.hasOwn(trackHeadings, track)) throw new Error(`unknown track "${track}": no register track section`);
+  const brief = track === "editors" ? "## Drafting brief: editor docs" : "## Drafting brief: developer docs";
+  const sections = [
+    brief,
+    "## Names",
+    "## Visuals (every page that carries one)",
+    "## The page anatomies",
+    trackHeadings[track]
+  ];
+  if (role === "editor" && track === "editors") sections.push("## Deviations from the base guides");
+  return sections;
+}
+// === END REGISTER SECTIONS ===
+
+for (const p of PAGES) registerSectionsFor(p.track, "drafter");
+
+/**
+ * The instruction that names the register sections one role reads for a page.
+ * @param {{ track: string }} p
+ * @param {"drafter" | "editor"} role
+ * @returns {string}
+ */
+function registerLine(p, role) {
+  return `Read these sections of ${REGISTER}, each by its exact heading, before anything else:
+${registerSectionsFor(p.track, role).map((h) => `- ${h}`).join("\n")}
+The Names convention is enforced by Vale (Cairn.Names, Cairn.NamesRetired); use the sanctioned name
+for every part.`;
+}
+
+/**
+ * The preamble every stage shares: the worktree and the error-tier Vale rules.
+ * @returns {string}
+ */
+function common() {
+  return `Work only in the worktree ${WT}; run every command from there and never cd to another checkout.
 
 Error-tier Vale rules, verbatim:
 
 ${a.valeErrorRules || "(run `npm run check:vale` and fix every error-tier finding)"}
 `;
+}
 
 /**
  * The page's fact-file base name: its own file name without the `.md` extension.
@@ -208,7 +256,7 @@ function pageInputsPrompt(p) {
   return `Page inputs for ${p.path} in ${WT}. You are step 1 of the docs page chain: you do not
 draft the page and you do not run a gate.
 
-${common}
+${common()}
 This page's job, from the stage outline, verbatim:
 
 ${p.job}
@@ -229,38 +277,33 @@ when that fails, retag it [candidate] and do not cite it. Never file a fact tagg
 [docs-drift] yourself, and never retag any fact except that one narrow case; the independent fact
 read does the rest of the retagging, not you.
 
-Read these two exemplar sources in full and trim each to the excerpt this page's type should
-imitate for anatomy, register, and per-step detail, never the exemplar's own content, terms, or
-product names:
-${(p.exemplarSources || []).map((e) => `- ${e}`).join("\n")}
-
 Inputs to trace claims against (read each in full; the only source of a command, a transcript, a
 JSON example, or a fact; never open the old page's own prose for a claim's wording):
 ${(p.inputs || []).map((i) => `- ${i}`).join("\n")}
 
-Return the structured report only: the page's job (one paragraph), its page type, the two trimmed
-exemplar excerpts (with their source path), every fact id the drafter should draw on, the full
-claim inventory, and any new fact id you filed.`;
+Return the structured report only: the page's job (one paragraph), its page type, every fact id
+the drafter should draw on, the full claim inventory, and any new fact id you filed.`;
 }
 
 function draftPrompt(p, pageInputs, round, findings) {
   const head = round === 1
     ? `Draft the page ${p.path} at its final path, from the page inputs below and nothing else.`
     : `Redraft ${p.path} once, on the combined findings below. Fix every blocking finding; take a non-blocking one when it is right. Do not widen the page.`;
-  const excerpts = (pageInputs.exemplarExcerpts || [])
-    .map((e) => `<example source="${e.source}">\n${e.excerpt}\n</example>`)
-    .join("\n\n");
   const inventory = (pageInputs.claimInventory || [])
     .map((c) => `- [${c.disposition}] ${c.claim}${c.factId ? ` (${c.factId})` : ""}${c.reason ? ` -- ${c.reason}` : ""}`)
     .join("\n");
   return `${head}
 
-${common}
+${common()}
+${registerLine(p, "drafter")}
+The brief is the source of the page's structure and voice.
+
 The page's job: ${pageInputs.job}
 Page type: ${pageInputs.pageType}
 
-Exemplars to imitate for anatomy and register, never their content, terms, or product names:
-${excerpts || "(none named; follow the register's anatomy)"}
+Exemplar sources: read each in full, and imitate its anatomy and rhythm, never its wording, terms,
+or product names:
+${(p.exemplarSources || []).map((e) => `- ${e}`).join("\n") || "(none named; follow the register's anatomy)"}
 
 Fact ids to draw on: ${(pageInputs.factIds || []).join(", ") || "(none)"}
 Claim inventory, one disposition per claim:
@@ -281,10 +324,15 @@ Return the structured report only.`;
 }
 
 function editorPrompt(p) {
-  return `Adversarial register edit of ${p.path} in ${WT}. Read the page, then the register's
-universal contract and its track section, then grade. Apply the tell catalogue, the Names
-section, logic, and facts-adjacent phrasing. Return ranked findings with a proposed rewrite each,
-and a verdict: "fix" if any finding is blocking.`;
+  return `Adversarial register edit of ${p.path} in ${WT}.
+
+${common()}
+${registerLine(p, "editor")}
+
+Run plain \`vale ${p.path}\` from the worktree, never the docs gate, and read every alert it
+prints. Read the page, then grade the brief's structure checklist, the brief's tells, and Vale's
+alerts together, with the Names section, logic, and facts-adjacent phrasing. Return ranked
+findings with a proposed rewrite each, and a verdict: "fix" if any finding is blocking.`;
 }
 
 function factPrompt(p, pageInputs) {
