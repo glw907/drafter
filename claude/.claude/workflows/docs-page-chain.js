@@ -152,7 +152,7 @@ const REGISTER = a.registerPath || "docs/internal/docs-register.md";
  * The register sections one page's agent reads from the register file, each named by its exact
  * heading: the track's drafting brief, the shared Names, Visuals, and page-anatomy sections, and
  * the track's own section. The editor also reads the recorded deviations from the base guides
- * when the track is the editors', the one track graded against a different guide. Pure and
+ * on every track, since a reviewer tells a recorded departure from a defect by them. Pure and
  * self-contained so the test can extract it verbatim without the workflow runtime.
  * @param {string} track - editors | admin | extend | reference | front-door | readme
  * @param {"drafter" | "editor"} role
@@ -177,7 +177,7 @@ function registerSectionsFor(track, role) {
     "## The page anatomies",
     trackHeadings[track]
   ];
-  if (role === "editor" && track === "editors") sections.push("## Deviations from the base guides");
+  if (role === "editor") sections.push("## Deviations from the base guides");
   return sections;
 }
 // === END REGISTER SECTIONS ===

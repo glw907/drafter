@@ -166,13 +166,16 @@ for (const [track, trackHeading] of Object.entries(TRACK_HEADING)) {
   });
 }
 
-check("the editor reads the same sections, plus the deviations only for the editors track", () => {
+check("the editor reads the same sections plus the deviations, on every track", () => {
   for (const [track, trackHeading] of Object.entries(TRACK_HEADING)) {
     const brief = track === "editors" ? EDITOR_BRIEF : DEV_BRIEF;
-    const expected = [brief, ...COMMON_HEADINGS, trackHeading];
-    if (track === "editors") expected.push("## Deviations from the base guides");
+    const expected = [brief, ...COMMON_HEADINGS, trackHeading, "## Deviations from the base guides"];
     assert.deepEqual(registerSectionsFor(track, "editor"), expected, track);
   }
+});
+
+check("the drafter never reads the deviations, including on a non-editors track", () => {
+  assert.ok(!registerSectionsFor("extend", "drafter").includes("## Deviations from the base guides"));
 });
 
 check("an unknown track throws", () => {
