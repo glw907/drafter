@@ -195,8 +195,8 @@ function gateFor(p) {
 function gateLine(p) {
   return `Run the docs gate through the gate runner, exactly:
   ${LANE}cairn-run-gate '${gateFor(p)}'
-On exit 75, re-issue the same command until it prints \`gate exit:\`; never poll a log. Report
-the exact command and the last twenty lines as your report's gate fields. A red whole-tree
+Follow cairn-run-gate's own output for whether to re-issue and for the result; report the exact
+command and the last twenty lines as your report's gate fields. A red whole-tree
 component (one the --page/--brief scoping does not narrow) that names another in-flight page's
 file does not count against this page; report it as "fail" with the failing rule and the other
 page named, and do not edit that page. A gate red on a rule the plan says a later task closes (for
