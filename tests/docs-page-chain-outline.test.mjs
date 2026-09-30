@@ -5,7 +5,8 @@
 // prompts, against a temp worktree, so a dry run proves the prompts carry a runnable command.
 // Run with: node tests/docs-page-chain-outline.test.mjs
 // Exits 0 with "ALL PASS" on success; prints failures and exits 1 otherwise.
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, existsSync, readdirSync, utimesSync } from "node:fs";
+import * as fs from "node:fs";
 import { execSync, spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -52,8 +53,9 @@ const OUTLINE = {
     {
       slug: "architecture", path: "docs/extend/architecture.md", group: "start", order: 1,
       job: "Learn where cairn ends and your site begins.", pageType: "concept",
-      exemplars: [{ source: "core/rust-analyzer-architecture/", take: "t" }, { source: "evaluators/litestream/" }],
-      figure: true, factIds: ["f:a7qx4m", "f:0duu5p"], covers: ["The export map."],
+      exemplars: [{ source: "core/rust-analyzer-architecture/", take: "Take the code map." }, { source: "evaluators/litestream/" }],
+      figure: true, figureNote: "One diagram of the write path.", absorbs: ["docs/extend/data-tiers.md"],
+      factIds: ["f:a7qx4m", "f:0duu5p"], covers: ["The export map."],
       outOfScope: ["Security properties (security-model)."], pinned: []
     },
     {
@@ -169,7 +171,7 @@ const endAt = RUNNER_SRC.indexOf(END);
 let runnerMerge = null;
 if (startAt !== -1 && endAt > startAt) {
   // eslint-disable-next-line no-new-func -- same extraction pattern as the derivation test.
-  runnerMerge = new Function(`${RUNNER_SRC.slice(startAt, endAt)}\nreturn { canonicalEntry, checksumOf, mergeOutline };`)();
+  runnerMerge = new Function(`${RUNNER_SRC.slice(startAt, endAt)}\nreturn { canonicalEntry, fnv, checksumOf, probeChecksum, mergeOutline };`)();
 }
 
 check("the merge markers are present, in order", () => {
@@ -186,6 +188,9 @@ check("the runner and the helper hash every entry identically", () => {
   }
   assert.equal(runnerMerge.canonicalEntry.toString(), helper.canonicalEntry.toString());
   assert.equal(runnerMerge.checksumOf.toString(), helper.checksumOf.toString());
+  assert.equal(runnerMerge.fnv.toString(), helper.fnv.toString());
+  assert.equal(runnerMerge.probeChecksum.toString(), helper.probeChecksum.toString());
+  assert.equal(runnerMerge.probeChecksum(r), r.checksum);
 });
 
 // -------------------------------------------------------------------------------------------
@@ -205,6 +210,14 @@ check("resolve returns the matching entry with exemplar captures mapped to page.
   assert.equal(e.figure, true);
   assert.equal(e.job, "Learn where cairn ends and your site begins.");
   assert.equal(e.pageType, "concept");
+});
+
+check("resolve carries each exemplar's take line, the figure note, and the absorbed pages", () => {
+  const r = helper.resolveEntries(OUTLINE, ["docs/extend/architecture.md"], { exemplarRoot: "/ex", exists: () => true });
+  const e = r.entries[0];
+  assert.deepEqual(e.exemplarTakes, ["Take the code map.", ""]);
+  assert.equal(e.figureNote, "One diagram of the write path.");
+  assert.deepEqual(e.absorbs, ["docs/extend/data-tiers.md"]);
 });
 
 check("resolve names a path the outline does not carry and is not ok", () => {
@@ -290,6 +303,51 @@ check("four link processes at once leave all four links, in outline order", asyn
   assert.match(index, /- \[Upgrade cairn\]\(\.\/upgrade-cairn\.md\)\n- \[Debug your site\]\(\.\/debug-your-site\.md\)\n$/);
 });
 
+function staleLock() {
+  const dir = tempDir("dpc-lock-");
+  const lock = join(dir, "x.lock");
+  writeFileSync(lock, "");
+  const old = new Date(Date.now() - 5 * 60_000);
+  utimesSync(lock, old, old);
+  return { dir, lock };
+}
+
+check("a stale lock is broken once: the first breaker wins, a second finds nothing to break", () => {
+  const { dir, lock } = staleLock();
+  assert.equal(helper.breakStaleLock(lock, 60_000), true);
+  assert.equal(existsSync(lock), false);
+  assert.equal(helper.breakStaleLock(lock, 60_000), false);
+  assert.deepEqual(readdirSync(dir), []);
+});
+
+check("a fresh lock is never broken", () => {
+  const dir = tempDir("dpc-lock-");
+  const lock = join(dir, "x.lock");
+  writeFileSync(lock, "live");
+  assert.equal(helper.breakStaleLock(lock, 60_000), false);
+  assert.equal(readFileSync(lock, "utf8"), "live");
+});
+
+check("a live lock taken between the stale check and the rename is restored, not broken", () => {
+  const { dir, lock } = staleLock();
+  let swapped = false;
+  const racing = {
+    ...fs,
+    statSync: (p, ...rest) => {
+      const st = fs.statSync(p, ...rest);
+      if (!swapped && p === lock) {
+        swapped = true;
+        rmSync(lock);
+        writeFileSync(lock, "live");
+      }
+      return st;
+    }
+  };
+  assert.equal(helper.breakStaleLock(lock, 60_000, racing), false);
+  assert.equal(readFileSync(lock, "utf8"), "live");
+  assert.deepEqual(readdirSync(dir), ["x.lock"]);
+});
+
 // -------------------------------------------------------------------------------------------
 // The runner's merge.
 // -------------------------------------------------------------------------------------------
@@ -299,7 +357,7 @@ function probeFor(paths) {
 }
 
 check("an inline field overrides the outline's; an absent one comes from the outline", () => {
-  const [p] = runnerMerge.mergeOutline(
+  const { pages: [p] } = runnerMerge.mergeOutline(
     [{ id: "architecture", path: "docs/extend/architecture.md", track: "extend", figure: false, job: "inline job" }],
     probeFor(["docs/extend/architecture.md"]), "o.json");
   assert.equal(p.figure, false);
@@ -314,6 +372,38 @@ check("a page the probe reports no entry for fails, named, even when the probe s
   assert.throws(
     () => runnerMerge.mergeOutline([{ path: "docs/extend/architecture.md" }, { path: "docs/extend/gone.md" }], probe, "o.json"),
     /not in the outline o\.json: docs\/extend\/gone\.md/);
+});
+
+for (const [field, value] of [["exemplarTakes", ["x", ""]], ["figureNote", "other"], ["absorbs", []]]) {
+  check(`the entry checksum covers ${field}`, () => {
+    const probe = probeFor(["docs/extend/architecture.md"]);
+    probe.entries[0][field] = value;
+    assert.throws(() => runnerMerge.mergeOutline([{ path: "docs/extend/architecture.md" }], probe, "o.json"), /mistranscribed docs\/extend\/architecture\.md/);
+  });
+}
+
+check("a probe that drops the index fails the run", () => {
+  const probe = probeFor(["docs/extend/architecture.md"]);
+  probe.index = "";
+  assert.throws(() => runnerMerge.mergeOutline([{ path: "docs/extend/architecture.md" }], probe, "o.json"), /mistranscribed its report/);
+});
+
+check("a probe that flips ok and drops its error fails the run", () => {
+  const probe = helper.resolveEntries(OUTLINE, ["docs/extend/architecture.md"], { exemplarRoot: "/ex", exists: () => false });
+  assert.equal(probe.ok, false);
+  probe.ok = true;
+  delete probe.error;
+  assert.throws(() => runnerMerge.mergeOutline([{ path: "docs/extend/architecture.md" }], probe, "o.json"), /mistranscribed its report/);
+});
+
+check("the merge returns the verified index", () => {
+  assert.equal(runnerMerge.mergeOutline([{ path: "docs/extend/architecture.md" }], probeFor(["docs/extend/architecture.md"]), "o.json").index, "docs/extend/README.md");
+});
+
+check("inline exemplar sources drop the outline's take lines", () => {
+  const { pages: [p] } = runnerMerge.mergeOutline([{ path: "docs/extend/architecture.md", exemplarSources: ["/x/page.md"] }], probeFor(["docs/extend/architecture.md"]), "o.json");
+  assert.deepEqual(p.exemplarSources, ["/x/page.md"]);
+  assert.deepEqual(p.exemplarTakes, []);
 });
 
 check("a mistranscribed entry fails its checksum, naming the page", () => {
@@ -344,7 +434,19 @@ check("dry run: one outline page resolves its entry, feeds the prompts, and link
   assert.match(inputs, /- The export map\./);
   assert.match(inputs, /- Security properties \(security-model\)\./);
 
+  assert.match(inputs, /rust-analyzer-architecture\/page\.md\n  Take: Take the code map\./);
+
   const draft = calls.find((c) => c.label.startsWith("draft:")).prompt;
+  assert.match(draft, /rust-analyzer-architecture\/page\.md\n  Take: Take the code map\.\n- \S+litestream\/page\.md\n/);
+  assert.match(draft, /Figure note, from the outline: One diagram of the write path\./);
+
+  const facts = calls.find((c) => c.label.startsWith("facts:")).prompt;
+  assert.match(facts, /The outline's fact ids for this page: f:a7qx4m, f:0duu5p/);
+  assert.match(facts, /## docs\/extend\/data-tiers\.md/);
+
+  const figure = calls.find((c) => c.label.startsWith("figure:")).prompt;
+  assert.match(figure, /Figure note, from the outline: One diagram of the write path\./);
+
   assert.ok(draft.includes(`- ${join(home, ".local/share/cairn/exemplars/core/rust-analyzer-architecture/page.md")}`));
   assert.match(draft, /Out of scope, owned by another page; keep it off this page:\n- Security properties/);
   assert.ok(draft.indexOf("cairn-docs-outline link") < draft.indexOf("cairn-run-gate"), "the link step precedes the gate");

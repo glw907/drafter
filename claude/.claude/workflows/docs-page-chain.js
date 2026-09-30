@@ -60,19 +60,25 @@
 //
 // The outline (`args.outline`): a stage outline JSON, repo-relative to `args.worktree`, carrying
 // top-level `index` (the arm index, repo-relative), `groups: [{ id, title, pages }]`, and
-// `pages: [{ slug, path, group, order, job, pageType, exemplars: [{ source }], figure, factIds,
-// covers, outOfScope, pinned }]`. With it, each entry in `args.pages` needs only `id`, `path`, and
-// `track`: its `job`, `pageType`, `exemplarSources`, `factIds`, `covers`, `outOfScope`, `pinned`,
-// and `figure` come from the outline page whose `path` matches, and any of those fields given
-// inline in `args.pages` overrides the outline's. An exemplar `source` is a capture directory under
-// `~/.local/share/cairn/exemplars/`, read as the `page.md` inside it. A page path the outline does
-// not carry fails the run by name before any page agent starts.
+// `pages: [{ slug, path, group, order, job, pageType, exemplars: [{ source, take }], figure,
+// figureNote, factIds, covers, outOfScope, absorbs, pinned }]`. With it, each entry in
+// `args.pages` needs only `id`, `path`, and `track`: its `job`, `pageType`, `exemplarSources`,
+// `exemplarTakes`, `factIds`, `covers`, `outOfScope`, `absorbs`, `pinned`, `figure`, and
+// `figureNote` come from the outline page whose `path` matches, and any of those fields given
+// inline in `args.pages` overrides the outline's (inline `exemplarSources` alone drops the
+// outline's take lines). An exemplar `source` is a capture directory under
+// `~/.local/share/cairn/exemplars/`, read as the `page.md` inside it; its `take` line rides beside
+// it in the drafter's and page inputs' prompts. The figure note reaches the drafter and the figure
+// read. The fact read checks the claim inventory against the outline's fact ids and the absorbed
+// pages' fact sections. A page path the outline does not carry fails the run by name before any
+// page agent starts.
 //
 // The workflow runtime has no filesystem or exec access, so the outline is read by the
 // `cairn-docs-outline` helper (`~/.local/bin`, tested by
 // `~/.dotfiles/tests/docs-page-chain-outline.test.mjs`): one probe agent runs its `resolve`
 // command before any page agent and returns the resolved entries, each with a checksum the runner
-// recomputes, so a probe that mistranscribes an entry fails the run rather than drafting from it.
+// recomputes, plus a report checksum over `ok`, `index`, `missing`, and `error`, so a probe that
+// mistranscribes an entry or its report fails the run rather than drafting from it.
 //
 // The index link: with an outline naming an `index`, the drafter runs the helper's `link` command
 // after it writes the page and before its gate, every round. The helper adds one relative link to
@@ -164,14 +170,17 @@ const OUTLINE_ENTRY = {
     job: { type: "string" },
     pageType: { type: "string" },
     exemplarSources: { type: "array", items: { type: "string" } },
+    exemplarTakes: { type: "array", items: { type: "string" } },
     factIds: { type: "array", items: { type: "string" } },
     covers: { type: "array", items: { type: "string" } },
     outOfScope: { type: "array", items: { type: "string" } },
+    absorbs: { type: "array", items: { type: "string" } },
     pinned: { type: "array", items: { type: "string" } },
     figure: { type: "boolean" },
+    figureNote: { type: "string" },
     checksum: { type: "string" }
   },
-  required: ["path", "job", "pageType", "exemplarSources", "factIds", "covers", "outOfScope", "pinned", "figure", "checksum"]
+  required: ["path", "job", "pageType", "exemplarSources", "exemplarTakes", "factIds", "covers", "outOfScope", "absorbs", "pinned", "figure", "figureNote", "checksum"]
 };
 
 const OUTLINE_PROBE_SCHEMA = {
@@ -181,9 +190,10 @@ const OUTLINE_PROBE_SCHEMA = {
     index: { type: "string" },
     missing: { type: "array", items: { type: "string" } },
     entries: { type: "array", items: OUTLINE_ENTRY },
-    error: { type: "string" }
+    error: { type: "string" },
+    checksum: { type: "string" }
   },
-  required: ["ok", "missing", "entries"]
+  required: ["ok", "index", "missing", "entries", "checksum"]
 };
 
 const READ_SCHEMA = {
@@ -271,21 +281,23 @@ function canonicalEntry(e) {
     job: String(e.job || ""),
     pageType: String(e.pageType || ""),
     exemplarSources: list(e.exemplarSources),
+    exemplarTakes: list(e.exemplarTakes),
     factIds: list(e.factIds),
     covers: list(e.covers),
     outOfScope: list(e.outOfScope),
+    absorbs: list(e.absorbs),
     pinned: list(e.pinned),
-    figure: e.figure === true
+    figure: e.figure === true,
+    figureNote: String(e.figureNote || "")
   };
 }
 
 /**
- * FNV-1a over the canonical entry's JSON, as eight hex digits.
- * @param {Record<string, unknown>} e
+ * FNV-1a over a string, as eight hex digits.
+ * @param {string} s
  * @returns {string}
  */
-function checksumOf(e) {
-  const s = JSON.stringify(canonicalEntry(e));
+function fnv(s) {
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);
@@ -295,14 +307,42 @@ function checksumOf(e) {
 }
 
 /**
+ * The checksum of one entry's canonical fields.
+ * @param {Record<string, unknown>} e
+ * @returns {string}
+ */
+function checksumOf(e) {
+  return fnv(JSON.stringify(canonicalEntry(e)));
+}
+
+/**
+ * The checksum of a whole probe report: its status, index, missing paths, error, and each
+ * entry's own checksum, so a report that drops the index or flips `ok` fails verification.
+ * @param {{ ok?: boolean, index?: string, missing?: string[], error?: string, entries?: Array<{ checksum?: string }> }} r
+ * @returns {string}
+ */
+function probeChecksum(r) {
+  return fnv(JSON.stringify({
+    ok: r.ok === true,
+    index: String(r.index || ""),
+    missing: Array.isArray(r.missing) ? r.missing.map(String) : [],
+    error: String(r.error || ""),
+    entries: (r.entries || []).map((e) => String(e.checksum || ""))
+  }));
+}
+
+/**
  * Checks the outline probe's report against the requested pages and merges each page's entry
- * under its inline fields: a field `args.pages` gives inline wins over the outline's.
+ * under its inline fields: a field `args.pages` gives inline wins over the outline's. Inline
+ * `exemplarSources` without inline `exemplarTakes` drops the outline's take lines, which describe
+ * the outline's exemplars, not the inline ones.
  * @param {Array<Record<string, any>>} pages - args.pages
  * @param {{ ok?: boolean, missing?: string[], entries?: Array<Record<string, any>>, error?: string } | null} probe
  * @param {string} outlinePath - args.outline, for the error message
- * @returns {Array<Record<string, any>>}
- * @throws {Error} naming every page path the outline does not carry, a failed probe, or an entry
- *   whose checksum does not match its fields
+ * @returns {{ pages: Array<Record<string, any>>, index: string }} the merged pages and the verified
+ *   outline index
+ * @throws {Error} naming every page path the outline does not carry, a report or an entry whose
+ *   checksum does not match its fields, or a failed probe
  */
 function mergeOutline(pages, probe, outlinePath) {
   if (!probe) throw new Error(`docs-page-chain: the outline probe for ${outlinePath} returned nothing`);
@@ -310,17 +350,22 @@ function mergeOutline(pages, probe, outlinePath) {
   const missing = pages.map((p) => p.path).filter((path) => !entries.some((e) => e.path === path));
   for (const path of probe.missing || []) if (!missing.includes(path)) missing.push(path);
   if (missing.length) throw new Error(`docs-page-chain: not in the outline ${outlinePath}: ${missing.join(", ")}`);
+  if (probeChecksum(probe) !== probe.checksum) {
+    throw new Error(`docs-page-chain: the outline probe mistranscribed its report (checksum ${probeChecksum(probe)}, reported ${probe.checksum})`);
+  }
   if (!probe.ok) throw new Error(`docs-page-chain: the outline probe failed: ${probe.error || "no error given"}`);
-  const fields = ["job", "pageType", "exemplarSources", "factIds", "covers", "outOfScope", "pinned", "figure"];
-  return pages.map((p) => {
+  const fields = ["job", "pageType", "exemplarSources", "exemplarTakes", "factIds", "covers", "outOfScope", "absorbs", "pinned", "figure", "figureNote"];
+  const merged = pages.map((p) => {
     const entry = entries.find((e) => e.path === p.path);
     if (checksumOf(entry) !== entry.checksum) {
       throw new Error(`docs-page-chain: the outline probe mistranscribed ${p.path} (checksum ${checksumOf(entry)}, reported ${entry.checksum})`);
     }
-    const merged = { ...p };
-    for (const f of fields) if (merged[f] === undefined) merged[f] = canonicalEntry(entry)[f];
-    return merged;
+    const out = { ...p };
+    if (p.exemplarSources !== undefined && p.exemplarTakes === undefined) out.exemplarTakes = [];
+    for (const f of fields) if (out[f] === undefined) out[f] = canonicalEntry(entry)[f];
+    return out;
   });
+  return { pages: merged, index: String(probe.index || "") };
 }
 // === END OUTLINE MERGE ===
 
@@ -345,7 +390,7 @@ nothing on stdout, return ok: false, missing: [], entries: [], and error: the te
 stderr. Run no other command and modify no file.`,
     { label: "outline", phase: "Outline", schema: OUTLINE_PROBE_SCHEMA, model: "sonnet", effort: "low" }
   );
-  return { pages: mergeOutline(PAGES_ARG, probe, OUTLINE), index: (probe && probe.index) || "" };
+  return mergeOutline(PAGES_ARG, probe, OUTLINE);
 }
 
 const { pages: PAGES, index: INDEX } = await resolvePages();
@@ -425,7 +470,7 @@ This page's job, from the stage outline, verbatim:
 
 ${p.job}
 ${p.pageType ? `The outline's page type: ${p.pageType}` : ""}
-${startingInventory(p)}
+${startingInventory(p)}${exemplarTakesLine(p)}
 Read the page at ${p.path} if it already exists on disk, for its claims only, never its prose or
 structure: every command, step, transcript, figure, warning, success signal, and prose assertion
 is a claim. If the page does not exist yet, there are no claims to inventory; say so and move on.
@@ -477,6 +522,30 @@ why you added it. A topic listed as out of scope stays off the page.
 }
 
 /**
+ * The exemplar files, one bullet each, with the outline's take line for that exemplar beneath it.
+ * @param {{ exemplarSources?: string[], exemplarTakes?: string[] }} p
+ * @returns {string}
+ */
+function exemplarList(p) {
+  const takes = p.exemplarTakes || [];
+  return (p.exemplarSources || [])
+    .map((e, i) => (takes[i] ? `- ${e}\n  Take: ${takes[i]}` : `- ${e}`))
+    .join("\n");
+}
+
+/**
+ * The exemplars and their take lines for the page-inputs step, which reads no exemplar itself but
+ * sees what the drafter will take from each. Empty when no exemplar carries a take line.
+ * @param {{ exemplarSources?: string[], exemplarTakes?: string[] }} p
+ * @returns {string}
+ */
+function exemplarTakesLine(p) {
+  if (!(p.exemplarTakes || []).some(Boolean)) return "";
+  return `\nThe exemplars the drafter will imitate, with what the outline takes from each (context for
+the page's shape; you do not read them):\n${exemplarList(p)}\n`;
+}
+
+/**
  * The outline's scope for the drafter: what the page covers and what another page owns, each a
  * bullet list under its own lead line. Empty when the page carries neither.
  * @param {{ covers?: string[], outOfScope?: string[] }} p
@@ -525,7 +594,8 @@ Page type: ${pageInputs.pageType}
 ${scopeLines(p)}
 Exemplar sources: read each in full, and imitate its anatomy and rhythm, never its wording, terms,
 or product names:
-${(p.exemplarSources || []).map((e) => `- ${e}`).join("\n") || "(none named; follow the register's anatomy)"}
+${exemplarList(p) || "(none named; follow the register's anatomy)"}
+${p.figure && p.figureNote ? `\nFigure note, from the outline: ${p.figureNote}\n` : ""}
 
 Fact ids to draw on: ${(pageInputs.factIds || []).join(", ") || "(none)"}
 Claim inventory, one disposition per claim:
@@ -560,11 +630,11 @@ findings with a proposed rewrite each, and a verdict: "fix" if any finding is bl
 
 function factPrompt(p, pageInputs) {
   const inventory = (pageInputs.claimInventory || [])
-    .map((c) => `- [${c.disposition}] ${c.claim}${c.factId ? ` (${c.factId})` : ""}`)
+    .map((c) => `- [${c.disposition}] ${c.claim}${c.factId ? ` (${c.factId})` : ""}${c.reason ? ` -- ${c.reason}` : ""}`)
     .join("\n");
   return `Fact read of ${p.path} in ${WT}. The page's claim inventory from its page-inputs step:
 ${inventory || "(none recorded)"}
-
+${outlineCoverage(p)}
 Check every claim on the page against its cited fact id, retrace every cited fact against its
 source and fix or retag it [docs-drift] in the same chain when it no longer matches, and confirm
 every claim the inventory marks "carried" or "filed" still appears on the page. A claim on the
@@ -574,10 +644,36 @@ wrong). Verdict "fix" if any blocking finding exists; otherwise "accept" with th
 traced.`;
 }
 
+/**
+ * The fact read's outline coverage check: every outline fact id is carried on the page or cut with
+ * a reason, and an absorbed page's facts are not silently dropped. Empty without outline ids or
+ * absorbed pages.
+ * @param {{ track: string, factIds?: string[], absorbs?: string[] }} p
+ * @returns {string}
+ */
+function outlineCoverage(p) {
+  const ids = p.factIds || [];
+  const absorbs = p.absorbs || [];
+  if (!ids.length && !absorbs.length) return "";
+  const idPart = ids.length
+    ? `The outline's fact ids for this page: ${ids.join(", ")}
+Each one must be cited on the page (see its brief, ${briefPathFor(p)}) or appear in the claim
+inventory above as "cut" with a reason. An outline id that is neither is a blocking finding.`
+    : "";
+  const absorbPart = absorbs.length
+    ? `This page absorbs these retired pages, whose facts sit in docs/internal/facts/${p.track}.md under
+a heading naming each:
+${absorbs.map((x) => `## ${x}`).join("\n")}
+Read those sections. A topic of theirs the page drops with no "cut" in the inventory is a blocking
+finding.`
+    : "";
+  return `\n${[idPart, absorbPart].filter(Boolean).join("\n\n")}\n`;
+}
+
 function figurePrompt(p) {
   return `Verify every figure on ${p.path} in ${WT} against the two figure tests and the
 2026-08-15 visual-layer rulings. A failed figure is a blocking finding. Verdict "fix" if any
-figure fails; otherwise "accept".`;
+figure fails; otherwise "accept".${p.figureNote ? `\n\nFigure note, from the outline: ${p.figureNote}` : ""}`;
 }
 
 function combined(readList) {

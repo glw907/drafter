@@ -4,11 +4,13 @@
 // into agent prompts and an agent runs them.
 //
 //   cairn-docs-outline resolve --worktree <dir> --outline <repo-relative json> --paths <p>...
-//     Prints one JSON object: { ok, index, missing, entries, error? }. Each entry is the outline
-//     page whose `path` matches, reduced to the fields the runner reads, with its exemplar capture
-//     directories mapped to the page file a drafter reads whole, plus a checksum the runner
-//     recomputes to catch a probe agent that mistranscribed the entry. A requested path the
-//     outline does not carry is listed in `missing` and makes `ok` false. Exits 0 when ok, else 1.
+//     Prints one JSON object: { ok, index, missing, entries, error?, checksum }. Each entry is
+//     the outline page whose `path` matches, reduced to the fields the runner reads, with its
+//     exemplar capture directories mapped to the page file a drafter reads whole and each
+//     exemplar's `take` line beside it, plus a checksum the runner recomputes to catch a probe
+//     agent that mistranscribed the entry. The report's own checksum covers `ok`, `index`,
+//     `missing`, `error`, and the entry checksums. A requested path the outline does not carry is
+//     listed in `missing` and makes `ok` false. Exits 0 when ok, else 1.
 //
 //   cairn-docs-outline link --worktree <dir> --outline <repo-relative json> --page <path>
 //     Adds one relative link to the page in the outline's `index`, under the heading whose text is
@@ -19,7 +21,8 @@
 //
 // `--exemplars <dir>` overrides the capture root (default ~/.local/share/cairn/exemplars).
 // Tested by ~/.dotfiles/tests/docs-page-chain-outline.test.mjs, which also requires this file
-// as a module; keep canonicalEntry and checksumOf identical to the runner's copies.
+// as a module; keep canonicalEntry, fnv, checksumOf, and probeChecksum identical to the runner's
+// copies.
 "use strict";
 
 const fs = require("node:fs");
@@ -41,27 +44,54 @@ function canonicalEntry(e) {
     job: String(e.job || ""),
     pageType: String(e.pageType || ""),
     exemplarSources: list(e.exemplarSources),
+    exemplarTakes: list(e.exemplarTakes),
     factIds: list(e.factIds),
     covers: list(e.covers),
     outOfScope: list(e.outOfScope),
+    absorbs: list(e.absorbs),
     pinned: list(e.pinned),
-    figure: e.figure === true
+    figure: e.figure === true,
+    figureNote: String(e.figureNote || "")
   };
 }
 
 /**
- * FNV-1a over the canonical entry's JSON, as eight hex digits.
- * @param {Record<string, unknown>} e
+ * FNV-1a over a string, as eight hex digits.
+ * @param {string} s
  * @returns {string}
  */
-function checksumOf(e) {
-  const s = JSON.stringify(canonicalEntry(e));
+function fnv(s) {
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);
     h = Math.imul(h, 0x01000193);
   }
   return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+/**
+ * The checksum of one entry's canonical fields.
+ * @param {Record<string, unknown>} e
+ * @returns {string}
+ */
+function checksumOf(e) {
+  return fnv(JSON.stringify(canonicalEntry(e)));
+}
+
+/**
+ * The checksum of a whole probe report: its status, index, missing paths, error, and each
+ * entry's own checksum, so a report that drops the index or flips `ok` fails verification.
+ * @param {{ ok?: boolean, index?: string, missing?: string[], error?: string, entries?: Array<{ checksum?: string }> }} r
+ * @returns {string}
+ */
+function probeChecksum(r) {
+  return fnv(JSON.stringify({
+    ok: r.ok === true,
+    index: String(r.index || ""),
+    missing: Array.isArray(r.missing) ? r.missing.map(String) : [],
+    error: String(r.error || ""),
+    entries: (r.entries || []).map((e) => String(e.checksum || ""))
+  }));
 }
 
 /**
@@ -82,7 +112,7 @@ function exemplarFile(source, root) {
  * @param {{ index?: string, pages?: Array<Record<string, any>> }} outline
  * @param {string[]} paths
  * @param {{ exemplarRoot: string, exists: (p: string) => boolean }} opts
- * @returns {{ ok: boolean, index: string, missing: string[], entries: object[], error?: string }}
+ * @returns {{ ok: boolean, index: string, missing: string[], entries: object[], error?: string, checksum: string }}
  */
 function resolveEntries(outline, paths, opts) {
   const pages = Array.isArray(outline.pages) ? outline.pages : [];
@@ -99,12 +129,14 @@ function resolveEntries(outline, paths, opts) {
     for (const f of exemplarSources) {
       if (!opts.exists(f)) errors.push(`${p}: exemplar file not found: ${f}`);
     }
-    const entry = canonicalEntry({ ...page, exemplarSources });
+    const exemplarTakes = (page.exemplars || []).map((x) => x.take || "");
+    const entry = canonicalEntry({ ...page, exemplarSources, exemplarTakes });
     entries.push({ ...entry, checksum: checksumOf(entry) });
   }
   if (missing.length) errors.unshift(`not in the outline: ${missing.join(", ")}`);
   const out = { ok: errors.length === 0, index: outline.index || "", missing, entries };
   if (errors.length) out.error = errors.join("; ");
+  out.checksum = probeChecksum(out);
   return out;
 }
 
@@ -194,29 +226,65 @@ function pageTitle(text) {
 }
 
 /**
+ * Breaks an abandoned lock without racing another waiter. The lock is renamed to a name unique to
+ * this process before it is removed, so of several waiters that judged it stale only the one whose
+ * rename succeeds breaks it. If the renamed file is not the one judged stale (a live holder took the
+ * lock between the stat and the rename), it is linked back into place and nothing is broken.
+ * @param {string} lockPath
+ * @param {number} staleMs - age past which a lock counts as abandoned
+ * @param {typeof fs} [fsImpl] - injectable so a test can stage the stat-to-rename race
+ * @returns {boolean} true when this call removed an abandoned lock
+ */
+function breakStaleLock(lockPath, staleMs, fsImpl = fs) {
+  let judged;
+  try {
+    judged = fsImpl.statSync(lockPath);
+  } catch {
+    return false;
+  }
+  if (Date.now() - judged.mtimeMs <= staleMs) return false;
+  const aside = `${lockPath}.stale-${process.pid}-${Math.random().toString(36).slice(2)}`;
+  try {
+    fsImpl.renameSync(lockPath, aside);
+  } catch {
+    return false;
+  }
+  const moved = fsImpl.statSync(aside);
+  if (moved.ino === judged.ino && moved.mtimeMs === judged.mtimeMs) {
+    fsImpl.rmSync(aside, { force: true });
+    return true;
+  }
+  try {
+    fsImpl.linkSync(aside, lockPath);
+  } catch {
+    // Another waiter created a lock in the gap; the live holder's file is lost either way.
+  }
+  fsImpl.rmSync(aside, { force: true });
+  return false;
+}
+
+/**
  * Runs `fn` holding an exclusive lock keyed by `key`, created with an exclusive-create file in the
- * temp directory. A lock older than a minute is treated as abandoned.
+ * temp directory. A lock older than a minute is treated as abandoned ({@link breakStaleLock}).
  * @param {string} key
  * @param {() => T} fn
  * @returns {T}
  * @template T
  */
 function withLock(key, fn) {
-  const hash = checksumOf({ path: key });
+  const hash = fnv(key);
   const lockPath = path.join(os.tmpdir(), `cairn-docs-outline-${hash}.lock`);
   const deadline = Date.now() + 120_000;
   const nap = new Int32Array(new SharedArrayBuffer(4));
+  let held;
   for (;;) {
     try {
       fs.closeSync(fs.openSync(lockPath, "wx"));
+      held = fs.statSync(lockPath);
       break;
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
-      try {
-        if (Date.now() - fs.statSync(lockPath).mtimeMs > 60_000) fs.rmSync(lockPath, { force: true });
-      } catch {
-        // The holder released it between the open and the stat.
-      }
+      if (breakStaleLock(lockPath, 60_000)) continue;
       if (Date.now() > deadline) throw new Error(`timed out waiting for the lock ${lockPath}`);
       Atomics.wait(nap, 0, 0, 50);
     }
@@ -224,7 +292,12 @@ function withLock(key, fn) {
   try {
     return fn();
   } finally {
-    fs.rmSync(lockPath, { force: true });
+    // Release only the lock this call took, never one a waiter took after breaking ours as stale.
+    try {
+      if (fs.statSync(lockPath).ino === held.ino) fs.rmSync(lockPath, { force: true });
+    } catch {
+      // Already gone.
+    }
   }
 }
 
@@ -301,7 +374,7 @@ function main(argv) {
   throw new Error(`unknown command "${cmd}"; expected resolve or link`);
 }
 
-module.exports = { canonicalEntry, checksumOf, exemplarFile, resolveEntries, insertIndexLink, pageTitle, linkPage };
+module.exports = { canonicalEntry, fnv, checksumOf, probeChecksum, exemplarFile, resolveEntries, insertIndexLink, pageTitle, breakStaleLock, linkPage };
 
 if (require.main === module) {
   try {
