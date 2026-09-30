@@ -100,9 +100,10 @@
 // outline page not yet drafted. A disposal files the fact, then rewrites the row with the Edit
 // tool, then lowers the constant; a stale-read failure means another page wrote the map, so the
 // agent re-reads and redoes the edit. A retag that takes a mapped fact off `[verified]` (page
-// inputs to `[candidate]`, the fact read to `[docs-drift]`) raises the constant, then rewrites
-// each of its rows to `pending <slug>`, then retags; the fact read reports each such row as a
-// blocking finding. Page inputs reports `rowsReceived` and `rowsDisposed`, carried in
+// inputs to `[candidate]`, the fact read to `[docs-drift]`) raises the constant once by the
+// number of the fact's rows, then rewrites all of them to `pending <slug>`, then retags the fact
+// once. In every round the fact read reports as blocking each row the live map still holds
+// `pending <this page's slug>`, its own retags' rows included, so an accepted page leaves none. Page inputs reports `rowsReceived` and `rowsDisposed`, carried in
 // `record.pageInputs`.
 //
 // Design friction: page inputs, the drafter, and the fact read, the agents that meet the code,
@@ -532,10 +533,10 @@ the page documents the code as it is.`;
  */
 function retagOrder(p, tag) {
   return `Before you retag a fact ${tag}, find every row in the option map ${OPTION_MAP} whose value is
-that fact id. For each such row, in this order and with the Edit tool: raise pendingCount by one,
-then rewrite the row to "pending ${slugOf(p)}", and only then retag the fact. This order keeps the
-option gate green for every page in flight; on a stale-read failure, re-read the map and redo the
-edit.`;
+that fact id; one fact may back several rows. Then, in this order and with the Edit tool: raise
+pendingCount once, by the number of those rows; then rewrite every one of those rows to
+"pending ${slugOf(p)}"; and only then retag the fact, once. This order keeps the option gate green
+for every page in flight; on a stale-read failure, re-read the map and redo the edit.`;
 }
 
 /**
@@ -784,6 +785,10 @@ claim, what is wrong).
 
 ${retagOrder(p, "[docs-drift]")} Each row you rewrote is a blocking finding, located at
 ${OPTION_MAP} and the row's key, so the page escalates unless the redraft round resolves it.
+
+Read ${OPTION_MAP} live now: every row whose value still reads "pending ${slugOf(p)}" is a blocking
+finding, located at the map and the row's key, whoever left it pending. Page inputs disposes this
+page's rows and does not re-run, so an accepted page leaves no row pending its slug.
 
 ${frictionLine()}
 

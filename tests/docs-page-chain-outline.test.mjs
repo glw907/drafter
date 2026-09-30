@@ -564,7 +564,7 @@ check("dry run: page inputs gets the map path, the page's slug, and the row sele
 
 check("dry run: page inputs and the fact read carry the retag order, the fact read's as a blocking finding", async () => {
   const { flat: prompt } = await frictionDryRun();
-  const order = /raise pendingCount by one, then rewrite the row to "pending architecture", and only then retag the fact/;
+  const order = /raise pendingCount once, by the number of those rows; then rewrite every one of those rows to "pending architecture"; and only then retag the fact, once/;
   const inputs = prompt("inputs");
   assert.match(inputs, order);
   assert.match(inputs, /retag it \[candidate\]/);
@@ -573,6 +573,21 @@ check("dry run: page inputs and the fact read carry the retag order, the fact re
   assert.match(facts, /\[docs-drift\]/);
   assert.ok(facts.includes(MAP_PATH), "the fact read names the map");
   assert.match(facts, /Each row you rewrote is a blocking finding, located at docs\/internal\/option-map\.json/);
+});
+
+check("dry run: the fact read blocks on any row still pending this page's slug in the live map, in every round", async () => {
+  const home = makeHome();
+  const wt = makeWorktree();
+  const args = baseArgs(wt, [{ id: "debug", path: "docs/extend/debug-your-site.md", track: "extend" }], { outline: "docs/internal/outlines/extend.json" });
+  let round = 0;
+  const calls = [];
+  const agent = makeAgent(wt, home, calls, { facts: async () => (++round === 1 ? FIX : ACCEPT) });
+  await runRunner(args, agent, parallel, noop, noop);
+  const factPrompts = calls.filter((c) => c.label.startsWith("facts:")).map((c) => c.prompt.replace(/\s+/g, " "));
+  assert.equal(factPrompts.length, 2);
+  for (const facts of factPrompts) {
+    assert.match(facts, /Read docs\/internal\/option-map\.json live now: every row whose value still reads "pending debug-your-site" is a blocking finding/);
+  }
 });
 
 check("dry run: the drafter, page inputs, and the fact read carry the friction smells; the editor does not", async () => {
