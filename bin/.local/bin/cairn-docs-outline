@@ -1,0 +1,313 @@
+#!/usr/bin/env node
+// cairn-docs-outline: the filesystem half of the docs-page-chain workflow's outline support.
+// The workflow runtime has no filesystem or exec access, so the runner renders these commands
+// into agent prompts and an agent runs them.
+//
+//   cairn-docs-outline resolve --worktree <dir> --outline <repo-relative json> --paths <p>...
+//     Prints one JSON object: { ok, index, missing, entries, error? }. Each entry is the outline
+//     page whose `path` matches, reduced to the fields the runner reads, with its exemplar capture
+//     directories mapped to the page file a drafter reads whole, plus a checksum the runner
+//     recomputes to catch a probe agent that mistranscribed the entry. A requested path the
+//     outline does not carry is listed in `missing` and makes `ok` false. Exits 0 when ok, else 1.
+//
+//   cairn-docs-outline link --worktree <dir> --outline <repo-relative json> --page <path>
+//     Adds one relative link to the page in the outline's `index`, under the heading whose text is
+//     the page's group title, in outline order. Prints "added ...", "present ...", or "skipped:
+//     ..." on one line. A page the index already links is left alone, so a redraft never adds a
+//     second link. The read-insert-write runs under a lock keyed by the index path, so pages
+//     drafted in parallel cannot clobber each other's link.
+//
+// `--exemplars <dir>` overrides the capture root (default ~/.local/share/cairn/exemplars).
+// Tested by ~/.dotfiles/tests/docs-page-chain-outline.test.mjs, which also requires this file
+// as a module; keep canonicalEntry and checksumOf identical to the runner's copies.
+"use strict";
+
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+
+const DEFAULT_EXEMPLARS = path.join(os.homedir(), ".local", "share", "cairn", "exemplars");
+
+/**
+ * The fields the runner reads from an outline entry, in a fixed key order with absent values
+ * normalized, so the helper and the runner hash the same string for the same entry.
+ * @param {Record<string, unknown>} e
+ * @returns {object}
+ */
+function canonicalEntry(e) {
+  const list = (v) => (Array.isArray(v) ? v.map(String) : []);
+  return {
+    path: String(e.path || ""),
+    job: String(e.job || ""),
+    pageType: String(e.pageType || ""),
+    exemplarSources: list(e.exemplarSources),
+    factIds: list(e.factIds),
+    covers: list(e.covers),
+    outOfScope: list(e.outOfScope),
+    pinned: list(e.pinned),
+    figure: e.figure === true
+  };
+}
+
+/**
+ * FNV-1a over the canonical entry's JSON, as eight hex digits.
+ * @param {Record<string, unknown>} e
+ * @returns {string}
+ */
+function checksumOf(e) {
+  const s = JSON.stringify(canonicalEntry(e));
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+/**
+ * The file a drafter reads for one exemplar capture: `page.md` inside the capture directory, or
+ * the source itself when it already names a file.
+ * @param {string} source - capture path relative to the exemplar root
+ * @param {string} root - the exemplar root
+ * @returns {string}
+ */
+function exemplarFile(source, root) {
+  const abs = path.resolve(root, source);
+  return source.endsWith(".md") ? abs : path.join(abs, "page.md");
+}
+
+/**
+ * Resolves requested page paths against a parsed outline. Pure apart from `exists`, which the
+ * caller supplies so a test can fake the exemplar tree.
+ * @param {{ index?: string, pages?: Array<Record<string, any>> }} outline
+ * @param {string[]} paths
+ * @param {{ exemplarRoot: string, exists: (p: string) => boolean }} opts
+ * @returns {{ ok: boolean, index: string, missing: string[], entries: object[], error?: string }}
+ */
+function resolveEntries(outline, paths, opts) {
+  const pages = Array.isArray(outline.pages) ? outline.pages : [];
+  const missing = [];
+  const entries = [];
+  const errors = [];
+  for (const p of paths) {
+    const page = pages.find((x) => x.path === p);
+    if (!page) {
+      missing.push(p);
+      continue;
+    }
+    const exemplarSources = (page.exemplars || []).map((x) => exemplarFile(x.source, opts.exemplarRoot));
+    for (const f of exemplarSources) {
+      if (!opts.exists(f)) errors.push(`${p}: exemplar file not found: ${f}`);
+    }
+    const entry = canonicalEntry({ ...page, exemplarSources });
+    entries.push({ ...entry, checksum: checksumOf(entry) });
+  }
+  if (missing.length) errors.unshift(`not in the outline: ${missing.join(", ")}`);
+  const out = { ok: errors.length === 0, index: outline.index || "", missing, entries };
+  if (errors.length) out.error = errors.join("; ");
+  return out;
+}
+
+const HEADING = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
+const LINK_DEST = /\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g;
+const LIST_ITEM = /^\s*[-*+]\s+/;
+const LIST_LINK = /^\s*[-*+]\s+\[[^\]]*\]\(\s*<?([^)\s>]+)/;
+
+/**
+ * Inserts one list-item link into an index's text, under the group heading, in outline order.
+ * Pure: the caller maps a link destination to a page (`isPage`) and to an outline order
+ * (`orderOf`, undefined for a page the outline does not carry, such as a kept page).
+ *
+ * Placement: before the first outline-page link in the section with a larger order; else after
+ * the last outline-page link; else after the section's last list item; else at the section's end.
+ * @param {string} text - the index file
+ * @param {{ heading: string, order: number, line: string, isPage: (dest: string) => boolean, orderOf: (dest: string) => number | undefined }} spec
+ * @returns {{ status: "added" | "present", text: string }}
+ * @throws {Error} when the index has no heading with the group's title
+ */
+function insertIndexLink(text, spec) {
+  for (const m of text.matchAll(LINK_DEST)) {
+    if (spec.isPage(m[1])) return { status: "present", text };
+  }
+  const lines = text.split("\n");
+  const at = lines.findIndex((l) => {
+    const m = HEADING.exec(l);
+    return m && m[2] === spec.heading;
+  });
+  if (at === -1) throw new Error(`the index has no heading "${spec.heading}"`);
+  const level = HEADING.exec(lines[at])[1].length;
+  let end = lines.length;
+  for (let i = at + 1; i < lines.length; i++) {
+    const m = HEADING.exec(lines[i]);
+    if (m && m[1].length <= level) {
+      end = i;
+      break;
+    }
+  }
+  // The last line of the list item starting at i: its indented continuation lines included.
+  const itemEnd = (i) => {
+    let j = i;
+    while (j + 1 < end && /^\s+\S/.test(lines[j + 1]) && !LIST_ITEM.test(lines[j + 1])) j++;
+    return j;
+  };
+  let before = -1;
+  let lastOutline = -1;
+  let lastItem = -1;
+  for (let i = at + 1; i < end; i++) {
+    if (!LIST_ITEM.test(lines[i])) continue;
+    lastItem = i;
+    const m = LIST_LINK.exec(lines[i]);
+    const order = m ? spec.orderOf(m[1]) : undefined;
+    if (order === undefined) continue;
+    if (order > spec.order && before === -1) before = i;
+    lastOutline = i;
+  }
+  if (before !== -1) {
+    lines.splice(before, 0, spec.line);
+  } else if (lastOutline !== -1) {
+    lines.splice(itemEnd(lastOutline) + 1, 0, spec.line);
+  } else if (lastItem !== -1) {
+    lines.splice(itemEnd(lastItem) + 1, 0, spec.line);
+  } else {
+    let tail = end;
+    while (tail > at + 1 && lines[tail - 1].trim() === "") tail--;
+    const block = ["", spec.line];
+    if (end < lines.length) block.push("");
+    lines.splice(tail, end - tail, ...block);
+  }
+  return { status: "added", text: lines.join("\n") };
+}
+
+/**
+ * The page's H1, skipping YAML frontmatter; null when it has none.
+ * @param {string} text
+ * @returns {string | null}
+ */
+function pageTitle(text) {
+  let body = text;
+  if (body.startsWith("---\n")) {
+    const close = body.indexOf("\n---", 4);
+    if (close !== -1) body = body.slice(close + 4);
+  }
+  const m = /^#\s+(.+?)\s*#*\s*$/m.exec(body);
+  return m ? m[1] : null;
+}
+
+/**
+ * Runs `fn` holding an exclusive lock keyed by `key`, created with an exclusive-create file in the
+ * temp directory. A lock older than a minute is treated as abandoned.
+ * @param {string} key
+ * @param {() => T} fn
+ * @returns {T}
+ * @template T
+ */
+function withLock(key, fn) {
+  const hash = checksumOf({ path: key });
+  const lockPath = path.join(os.tmpdir(), `cairn-docs-outline-${hash}.lock`);
+  const deadline = Date.now() + 120_000;
+  const nap = new Int32Array(new SharedArrayBuffer(4));
+  for (;;) {
+    try {
+      fs.closeSync(fs.openSync(lockPath, "wx"));
+      break;
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+      try {
+        if (Date.now() - fs.statSync(lockPath).mtimeMs > 60_000) fs.rmSync(lockPath, { force: true });
+      } catch {
+        // The holder released it between the open and the stat.
+      }
+      if (Date.now() > deadline) throw new Error(`timed out waiting for the lock ${lockPath}`);
+      Atomics.wait(nap, 0, 0, 50);
+    }
+  }
+  try {
+    return fn();
+  } finally {
+    fs.rmSync(lockPath, { force: true });
+  }
+}
+
+/**
+ * Adds the page's index link on disk under the lock and returns the one-line report.
+ * @param {{ worktree: string, outline: string, page: string }} opts
+ * @returns {string}
+ */
+function linkPage(opts) {
+  const outline = JSON.parse(fs.readFileSync(path.resolve(opts.worktree, opts.outline), "utf8"));
+  if (!outline.index) return "skipped: the outline names no index";
+  const pages = Array.isArray(outline.pages) ? outline.pages : [];
+  const page = pages.find((p) => p.path === opts.page);
+  if (!page) throw new Error(`not in the outline: ${opts.page}`);
+  const group = (outline.groups || []).find((g) => g.id === page.group);
+  if (!group) throw new Error(`${opts.page}: the outline has no group "${page.group}"`);
+  const indexAbs = path.resolve(opts.worktree, outline.index);
+  const indexDir = path.dirname(indexAbs);
+  const pageAbs = path.resolve(opts.worktree, page.path);
+  if (!fs.existsSync(pageAbs)) throw new Error(`the page is not on disk yet: ${page.path}`);
+  const title = pageTitle(fs.readFileSync(pageAbs, "utf8")) || page.slug || path.basename(page.path, ".md");
+  let rel = path.relative(indexDir, pageAbs).split(path.sep).join("/");
+  if (!rel.startsWith("../")) rel = `./${rel}`;
+  const targetOf = (dest) => path.resolve(indexDir, dest.split("#")[0]);
+  const orderByAbs = new Map(pages.map((p) => [path.resolve(opts.worktree, p.path), p.order]));
+  return withLock(indexAbs, () => {
+    if (!fs.existsSync(indexAbs)) throw new Error(`the index is not on disk: ${outline.index}`);
+    const result = insertIndexLink(fs.readFileSync(indexAbs, "utf8"), {
+      heading: group.title,
+      order: page.order,
+      line: `- [${title}](${rel})`,
+      isPage: (dest) => targetOf(dest) === pageAbs,
+      orderOf: (dest) => orderByAbs.get(targetOf(dest))
+    });
+    if (result.status === "added") fs.writeFileSync(indexAbs, result.text);
+    return `${result.status} ${outline.index}: ${rel} under "${group.title}"`;
+  });
+}
+
+/**
+ * Parses `--flag value` pairs; `--paths` takes every value up to the next flag.
+ * @param {string[]} argv
+ * @returns {Record<string, string | string[]>}
+ */
+function parseArgs(argv) {
+  const out = {};
+  for (let i = 0; i < argv.length; i++) {
+    const key = argv[i].replace(/^--/, "");
+    if (key === "paths") {
+      out.paths = [];
+      while (i + 1 < argv.length && !argv[i + 1].startsWith("--")) out.paths.push(argv[++i]);
+    } else {
+      out[key] = argv[++i];
+    }
+  }
+  return out;
+}
+
+function main(argv) {
+  const [cmd, ...rest] = argv;
+  const o = parseArgs(rest);
+  if (!o.worktree || !o.outline) throw new Error("usage: cairn-docs-outline resolve|link --worktree <dir> --outline <path> ...");
+  if (cmd === "resolve") {
+    const outline = JSON.parse(fs.readFileSync(path.resolve(o.worktree, o.outline), "utf8"));
+    const result = resolveEntries(outline, o.paths || [], { exemplarRoot: o.exemplars || DEFAULT_EXEMPLARS, exists: fs.existsSync });
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    return result.ok ? 0 : 1;
+  }
+  if (cmd === "link") {
+    if (!o.page) throw new Error("link needs --page <repo-relative path>");
+    process.stdout.write(`${linkPage({ worktree: o.worktree, outline: o.outline, page: o.page })}\n`);
+    return 0;
+  }
+  throw new Error(`unknown command "${cmd}"; expected resolve or link`);
+}
+
+module.exports = { canonicalEntry, checksumOf, exemplarFile, resolveEntries, insertIndexLink, pageTitle, linkPage };
+
+if (require.main === module) {
+  try {
+    process.exitCode = main(process.argv.slice(2));
+  } catch (e) {
+    process.stderr.write(`cairn-docs-outline: ${e.message}\n`);
+    process.exitCode = 2;
+  }
+}

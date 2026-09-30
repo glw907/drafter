@@ -35,7 +35,9 @@
 //       drafterModel: "claude-opus-5-5",   // optional; default
 //       reviewModel: "claude-opus-5-5",    // optional; default, also the page-inputs step's model
 //       pageInputsModel: "claude-opus-5-5", // optional; defaults to reviewModel
+//       outline: "docs/internal/outlines/extend.json",   // optional; see "The outline" below
 //       pages: [
+//         { id: "architecture", path: "docs/extend/architecture.md", track: "extend" },   // with an outline
 //         {
 //           id: "is-it-working",
 //           path: "docs/admin/is-it-working.md",
@@ -47,11 +49,39 @@
 //           inputs: ["docs/superpowers/plans/<plan>.mining.md#is-it-working", "..."],
 //           pinned: ["#slug-one", "#slug-two"],   // optional; slugs the page must keep
 //           extraChecks: ["<a sentence the fact read must also verify>"],   // optional
-//           figure: false                  // optional; true adds a figure-verifier read
+//           figure: false,                 // optional; true adds a figure-verifier read
+//           factIds: ["f:abc123"],          // optional; page inputs' starting fact ids
+//           covers: ["<a topic the page covers>"],        // optional
+//           outOfScope: ["<a topic another page owns>"]   // optional
 //         }
 //       ]
 //     }
 //   })
+//
+// The outline (`args.outline`): a stage outline JSON, repo-relative to `args.worktree`, carrying
+// top-level `index` (the arm index, repo-relative), `groups: [{ id, title, pages }]`, and
+// `pages: [{ slug, path, group, order, job, pageType, exemplars: [{ source }], figure, factIds,
+// covers, outOfScope, pinned }]`. With it, each entry in `args.pages` needs only `id`, `path`, and
+// `track`: its `job`, `pageType`, `exemplarSources`, `factIds`, `covers`, `outOfScope`, `pinned`,
+// and `figure` come from the outline page whose `path` matches, and any of those fields given
+// inline in `args.pages` overrides the outline's. An exemplar `source` is a capture directory under
+// `~/.local/share/cairn/exemplars/`, read as the `page.md` inside it. A page path the outline does
+// not carry fails the run by name before any page agent starts.
+//
+// The workflow runtime has no filesystem or exec access, so the outline is read by the
+// `cairn-docs-outline` helper (`~/.local/bin`, tested by
+// `~/.dotfiles/tests/docs-page-chain-outline.test.mjs`): one probe agent runs its `resolve`
+// command before any page agent and returns the resolved entries, each with a checksum the runner
+// recomputes, so a probe that mistranscribes an entry fails the run rather than drafting from it.
+//
+// The index link: with an outline naming an `index`, the drafter runs the helper's `link` command
+// after it writes the page and before its gate, every round. The helper adds one relative link to
+// the page, its text the page's H1, under the heading whose text is the page's group title, in outline order, and reports
+// a link already present instead of adding a second one. Its read-insert-write holds a lock keyed
+// by the index path, which serializes the link-in across in-flight pages. The link-in runs inside
+// the drafter because the drafter runs its own gate as its last act, and the index must link the
+// page before `check:arm-indexes` sees it; a runner step before the drafter would link a page not
+// yet on disk, and one after would follow the gate.
 //
 // Every agent starts with zero context. The runner renders each stage's prompt from args and
 // the page record; nothing load-bearing may live only in the conductor's conversation.
@@ -61,6 +91,7 @@ export const meta = {
   description: "Drafts docs pages through page inputs, drafter, gate, register editor, fact read, and one scoped redraft.",
   whenToUse: "A draft-docs pass plan names this workflow for its page tasks.",
   phases: [
+    { title: "Outline", detail: "with args.outline, one probe resolves every page's outline entry" },
     { title: "Page inputs", detail: "one agent per page: job, type, fact ids, claim inventory" },
     { title: "Draft", detail: "the drafter writes the page and runs the docs gate itself" },
     { title: "Read", detail: "register editor and fact read in parallel, both Opus, plus a figure read when the page carries one" },
@@ -86,6 +117,14 @@ const PAGE_INPUTS_SCHEMA = {
     job: { type: "string" },
     pageType: { type: "string" },
     factIds: { type: "array", items: { type: "string" } },
+    addedFactIds: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { factId: { type: "string" }, why: { type: "string" } },
+        required: ["factId", "why"]
+      }
+    },
     claimInventory: { type: "array", items: CLAIM },
     factsFiled: { type: "array", items: { type: "string" } },
     couldNotDo: { type: "array", items: { type: "string" } }
@@ -100,6 +139,7 @@ const DRAFT_SCHEMA = {
     gate: { type: "string", enum: ["pass", "fail", "not run"] },
     gateCommand: { type: "string" },
     gateTail: { type: "string" },
+    indexLink: { type: "string" },
     frictionFiled: { type: "array", items: { type: "string" } },
     couldNotDo: { type: "array", items: { type: "string" } }
   },
@@ -115,6 +155,35 @@ const FINDING = {
     blocking: { type: "boolean" }
   },
   required: ["location", "finding", "blocking"]
+};
+
+const OUTLINE_ENTRY = {
+  type: "object",
+  properties: {
+    path: { type: "string" },
+    job: { type: "string" },
+    pageType: { type: "string" },
+    exemplarSources: { type: "array", items: { type: "string" } },
+    factIds: { type: "array", items: { type: "string" } },
+    covers: { type: "array", items: { type: "string" } },
+    outOfScope: { type: "array", items: { type: "string" } },
+    pinned: { type: "array", items: { type: "string" } },
+    figure: { type: "boolean" },
+    checksum: { type: "string" }
+  },
+  required: ["path", "job", "pageType", "exemplarSources", "factIds", "covers", "outOfScope", "pinned", "figure", "checksum"]
+};
+
+const OUTLINE_PROBE_SCHEMA = {
+  type: "object",
+  properties: {
+    ok: { type: "boolean" },
+    index: { type: "string" },
+    missing: { type: "array", items: { type: "string" } },
+    entries: { type: "array", items: OUTLINE_ENTRY },
+    error: { type: "string" }
+  },
+  required: ["ok", "missing", "entries"]
 };
 
 const READ_SCHEMA = {
@@ -139,9 +208,10 @@ const REVIEWER = a.reviewModel || "claude-opus-5-5";
 const PAGE_INPUTS_TYPE = a.pageInputsType || "general-purpose";
 const PAGE_INPUTS_MODEL = a.pageInputsModel || REVIEWER;
 const BOTH_REVIEWERS = a.bothReviewers === true;
-const PAGES = a.pages || [];
+const PAGES_ARG = a.pages || [];
+const OUTLINE = a.outline || "";
 
-if (!WT || !GATE || !PAGES.length) {
+if (!WT || !GATE || !PAGES_ARG.length) {
   throw new Error("docs-page-chain needs args.worktree, args.gate, and args.pages");
 }
 
@@ -184,7 +254,104 @@ function registerSectionsFor(track, role) {
 // === END REGISTER SECTIONS ===
 
 // Fail on an unknown track before any agent runs.
-for (const p of PAGES) registerSectionsFor(p.track, "drafter");
+for (const p of PAGES_ARG) registerSectionsFor(p.track, "drafter");
+
+// === OUTLINE MERGE (docs-page-chain-outline.test.mjs extracts this block) ===
+/**
+ * The fields the runner reads from an outline entry, in a fixed key order with absent values
+ * normalized. Identical to the copy in the `cairn-docs-outline` helper, which the outline test
+ * pins, so both sides hash the same string for the same entry.
+ * @param {Record<string, unknown>} e
+ * @returns {object}
+ */
+function canonicalEntry(e) {
+  const list = (v) => (Array.isArray(v) ? v.map(String) : []);
+  return {
+    path: String(e.path || ""),
+    job: String(e.job || ""),
+    pageType: String(e.pageType || ""),
+    exemplarSources: list(e.exemplarSources),
+    factIds: list(e.factIds),
+    covers: list(e.covers),
+    outOfScope: list(e.outOfScope),
+    pinned: list(e.pinned),
+    figure: e.figure === true
+  };
+}
+
+/**
+ * FNV-1a over the canonical entry's JSON, as eight hex digits.
+ * @param {Record<string, unknown>} e
+ * @returns {string}
+ */
+function checksumOf(e) {
+  const s = JSON.stringify(canonicalEntry(e));
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+/**
+ * Checks the outline probe's report against the requested pages and merges each page's entry
+ * under its inline fields: a field `args.pages` gives inline wins over the outline's.
+ * @param {Array<Record<string, any>>} pages - args.pages
+ * @param {{ ok?: boolean, missing?: string[], entries?: Array<Record<string, any>>, error?: string } | null} probe
+ * @param {string} outlinePath - args.outline, for the error message
+ * @returns {Array<Record<string, any>>}
+ * @throws {Error} naming every page path the outline does not carry, a failed probe, or an entry
+ *   whose checksum does not match its fields
+ */
+function mergeOutline(pages, probe, outlinePath) {
+  if (!probe) throw new Error(`docs-page-chain: the outline probe for ${outlinePath} returned nothing`);
+  const entries = probe.entries || [];
+  const missing = pages.map((p) => p.path).filter((path) => !entries.some((e) => e.path === path));
+  for (const path of probe.missing || []) if (!missing.includes(path)) missing.push(path);
+  if (missing.length) throw new Error(`docs-page-chain: not in the outline ${outlinePath}: ${missing.join(", ")}`);
+  if (!probe.ok) throw new Error(`docs-page-chain: the outline probe failed: ${probe.error || "no error given"}`);
+  const fields = ["job", "pageType", "exemplarSources", "factIds", "covers", "outOfScope", "pinned", "figure"];
+  return pages.map((p) => {
+    const entry = entries.find((e) => e.path === p.path);
+    if (checksumOf(entry) !== entry.checksum) {
+      throw new Error(`docs-page-chain: the outline probe mistranscribed ${p.path} (checksum ${checksumOf(entry)}, reported ${entry.checksum})`);
+    }
+    const merged = { ...p };
+    for (const f of fields) if (merged[f] === undefined) merged[f] = canonicalEntry(entry)[f];
+    return merged;
+  });
+}
+// === END OUTLINE MERGE ===
+
+/**
+ * Resolves the page list: with `args.outline`, one probe agent runs the helper's `resolve` and
+ * the runner merges and verifies its report; without one, `args.pages` as given.
+ * @returns {Promise<{ pages: Array<Record<string, any>>, index: string }>}
+ */
+async function resolvePages() {
+  if (!OUTLINE) return { pages: PAGES_ARG, index: "" };
+  phase("Outline");
+  const quoted = PAGES_ARG.map((p) => `'${p.path}'`).join(" ");
+  const probe = await agent(
+    `Run exactly this command, once, from any directory:
+
+  cairn-docs-outline resolve --worktree '${WT}' --outline '${OUTLINE}' --paths ${quoted}
+
+It prints one JSON object on stdout, whatever its exit status. Return that object as your
+structured output with every field and every array element copied verbatim, character for
+character, in the same order: a changed, dropped, or reordered string fails the run. If it prints
+nothing on stdout, return ok: false, missing: [], entries: [], and error: the text it printed on
+stderr. Run no other command and modify no file.`,
+    { label: "outline", phase: "Outline", schema: OUTLINE_PROBE_SCHEMA, model: "sonnet", effort: "low" }
+  );
+  return { pages: mergeOutline(PAGES_ARG, probe, OUTLINE), index: (probe && probe.index) || "" };
+}
+
+const { pages: PAGES, index: INDEX } = await resolvePages();
+for (const p of PAGES) {
+  if (!p.job) throw new Error(`docs-page-chain: ${p.path} has no job, inline or from an outline`);
+}
 
 /**
  * The instruction that names the register sections one role reads for a page.
@@ -258,7 +425,7 @@ This page's job, from the stage outline, verbatim:
 
 ${p.job}
 ${p.pageType ? `The outline's page type: ${p.pageType}` : ""}
-
+${startingInventory(p)}
 Read the page at ${p.path} if it already exists on disk, for its claims only, never its prose or
 structure: every command, step, transcript, figure, warning, success signal, and prose assertion
 is a claim. If the page does not exist yet, there are no claims to inventory; say so and move on.
@@ -279,7 +446,65 @@ JSON example, or a fact; never open the old page's own prose for a claim's wordi
 ${(p.inputs || []).map((i) => `- ${i}`).join("\n")}
 
 Return the structured report only: the page's job (one paragraph), its page type, every fact id
-the drafter should draw on, the full claim inventory, and any new fact id you filed.`;
+the drafter should draw on, each id you added with why, the full claim inventory, and any new fact
+id you filed.`;
+}
+
+/**
+ * The outline's starting inventory for the page-inputs step: its fact ids, what the page covers,
+ * and what another page owns. Empty when the page carries none of the three.
+ * @param {{ factIds?: string[], covers?: string[], outOfScope?: string[] }} p
+ * @returns {string}
+ */
+function startingInventory(p) {
+  const ids = p.factIds || [];
+  const covers = p.covers || [];
+  const out = p.outOfScope || [];
+  if (!ids.length && !covers.length && !out.length) return "";
+  return `
+The outline's starting inventory for this page. Start from it; it is not the whole of your work.
+Fact ids the outline traced to this page's sources: ${ids.join(", ") || "(none)"}
+What the page covers:
+${covers.map((c) => `- ${c}`).join("\n") || "(none listed)"}
+Out of scope, owned by another page:
+${out.map((c) => `- ${c}`).join("\n") || "(none listed)"}
+
+Return every outline fact id in factIds. An outline id whose fact this page should not state still
+goes in factIds and gets a claim-inventory entry with disposition "cut" and its reason. You may add
+an id you trace for a covered topic the outline's ids miss; list each added id in addedFactIds with
+why you added it. A topic listed as out of scope stays off the page.
+`;
+}
+
+/**
+ * The outline's scope for the drafter: what the page covers and what another page owns, each a
+ * bullet list under its own lead line. Empty when the page carries neither.
+ * @param {{ covers?: string[], outOfScope?: string[] }} p
+ * @returns {string}
+ */
+function scopeLines(p) {
+  const bullets = (xs) => xs.map((x) => `- ${x}`).join("\n");
+  const parts = [];
+  if ((p.covers || []).length) parts.push(`What the page covers, from the outline:\n${bullets(p.covers)}`);
+  if ((p.outOfScope || []).length) parts.push(`Out of scope, owned by another page; keep it off this page:\n${bullets(p.outOfScope)}`);
+  return parts.length ? `\n${parts.join("\n\n")}\n` : "";
+}
+
+/**
+ * The drafter's index-link step: the helper command it runs after writing the page and before
+ * its gate. Empty without an outline naming an index.
+ * @param {{ path: string }} p
+ * @returns {string}
+ */
+function indexLinkLine(p) {
+  if (!INDEX) return "";
+  return `After you write the page and its brief, and before you run the gate, link the page into the
+arm index ${INDEX} by running exactly:
+  cairn-docs-outline link --worktree '${WT}' --outline '${OUTLINE}' --page '${p.path}'
+It adds one link under the page's group heading in outline order, or reports that the index already
+links the page. Never edit the index yourself and never add a second link. Report its one output
+line as indexLink; if it exits non-zero, report its error as indexLink and in couldNotDo.
+`;
 }
 
 function draftPrompt(p, pageInputs, round, findings) {
@@ -297,7 +522,7 @@ The brief is the source of the page's structure and voice.
 
 The page's job: ${pageInputs.job}
 Page type: ${pageInputs.pageType}
-
+${scopeLines(p)}
 Exemplar sources: read each in full, and imitate its anatomy and rhythm, never its wording, terms,
 or product names:
 ${(p.exemplarSources || []).map((e) => `- ${e}`).join("\n") || "(none named; follow the register's anatomy)"}
@@ -315,6 +540,7 @@ source can supply at all, a genuine design gap rather than a missing fact, goes 
 docs/internal/docs-friction-log.md (name it in frictionFiled). Commit nothing; leave the tree with
 your edits in place.
 
+${indexLinkLine(p)}
 ${gateLine(p)}
 
 Return the structured report only.`;
