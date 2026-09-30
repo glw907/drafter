@@ -41,6 +41,7 @@ function canonicalEntry(e) {
   const list = (v) => (Array.isArray(v) ? v.map(String) : []);
   return {
     path: String(e.path || ""),
+    title: String(e.title || ""),
     job: String(e.job || ""),
     pageType: String(e.pageType || ""),
     exemplarSources: list(e.exemplarSources),

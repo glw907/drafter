@@ -1,6 +1,6 @@
 // Tests docs-page-chain.js's outline support and its cairn-docs-outline helper: the helper's pure
 // functions (outline lookup, exemplar mapping, index link insertion), the runner's extracted
-// merge block, and dry runs of the whole runner body with agent, parallel, log, and phase stubbed.
+// merge block, and dry runs of the whole runner body with agent, parallel, log, phase, and budget stubbed.
 // The stubbed probe and drafter run the exact helper commands the runner renders into their
 // prompts, against a temp worktree, so a dry run proves the prompts carry a runnable command.
 // Run with: node tests/docs-page-chain-outline.test.mjs
@@ -51,7 +51,7 @@ const OUTLINE = {
   ],
   pages: [
     {
-      slug: "architecture", path: "docs/extend/architecture.md", group: "start", order: 1,
+      slug: "architecture", title: "Architecture", path: "docs/extend/architecture.md", group: "start", order: 1,
       job: "Learn where cairn ends and your site begins.", pageType: "concept",
       exemplars: [{ source: "core/rust-analyzer-architecture/", take: "Take the code map." }, { source: "evaluators/litestream/" }],
       figure: true, figureNote: "One diagram of the write path.", absorbs: ["docs/extend/data-tiers.md"],
@@ -59,7 +59,7 @@ const OUTLINE = {
       outOfScope: ["Security properties (security-model)."], pinned: []
     },
     {
-      slug: "add-cairn", path: "docs/extend/add-cairn.md", group: "start", order: 2,
+      slug: "add-cairn", title: "Add cairn", path: "docs/extend/add-cairn.md", group: "start", order: 2,
       job: "Add cairn to an app.", pageType: "tutorial", exemplars: [], figure: false,
       factIds: [], covers: [], outOfScope: [], pinned: ["#milestone-1"]
     },
@@ -112,7 +112,7 @@ const AsyncFunction = (async () => {}).constructor;
 const runnerBody = RUNNER_SRC.replace(/^export const meta/m, "const meta");
 // eslint-disable-next-line no-new-func -- running the runner body with injected globals is the
 // documented pattern for a workflow script node cannot import as a module.
-const runRunner = new AsyncFunction("args", "agent", "parallel", "log", "phase", runnerBody);
+const runRunner = new AsyncFunction("args", "agent", "parallel", "log", "phase", "budget", runnerBody);
 
 /** Runs one helper command line the runner rendered, with the helper file standing in for PATH. */
 function runHelperLine(line, home) {
@@ -218,6 +218,12 @@ check("resolve carries each exemplar's take line, the figure note, and the absor
   assert.deepEqual(e.exemplarTakes, ["Take the code map.", ""]);
   assert.equal(e.figureNote, "One diagram of the write path.");
   assert.deepEqual(e.absorbs, ["docs/extend/data-tiers.md"]);
+});
+
+check("resolve carries the entry's title, and an entry with none carries an empty one", () => {
+  const r = helper.resolveEntries(OUTLINE, ["docs/extend/architecture.md", "docs/extend/debug-your-site.md"], { exemplarRoot: "/ex", exists: () => true });
+  assert.equal(r.entries[0].title, "Architecture");
+  assert.equal(r.entries[1].title, "");
 });
 
 check("resolve names a path the outline does not carry and is not ok", () => {
@@ -374,7 +380,7 @@ check("a page the probe reports no entry for fails, named, even when the probe s
     /not in the outline o\.json: docs\/extend\/gone\.md/);
 });
 
-for (const [field, value] of [["exemplarTakes", ["x", ""]], ["figureNote", "other"], ["absorbs", []]]) {
+for (const [field, value] of [["exemplarTakes", ["x", ""]], ["figureNote", "other"], ["absorbs", []], ["title", "Other title"]]) {
   check(`the entry checksum covers ${field}`, () => {
     const probe = probeFor(["docs/extend/architecture.md"]);
     probe.entries[0][field] = value;
@@ -507,6 +513,139 @@ check("dry run: a page with no job, inline or from an outline, fails before any 
   const calls = [];
   await assert.rejects(runRunner(baseArgs("/wt", [{ id: "x", path: "docs/extend/x.md", track: "extend" }]), makeAgent("/wt", "/h", calls), parallel, noop, noop), /has no job/);
   assert.equal(calls.length, 0);
+});
+
+// -------------------------------------------------------------------------------------------
+// Dry runs of the map rows, the friction route, the title, the voice line, figures, and spent.
+// -------------------------------------------------------------------------------------------
+
+const MAP_PATH = "docs/internal/option-map.json";
+const FIX = { verdict: "fix", findings: [{ location: "l1", finding: "f", blocking: true }], summary: "fix" };
+
+/** A stubbed budget whose spent() climbs by `step` per call, starting at `start`. */
+function makeBudget(start, step) {
+  let n = start - step;
+  return { spent: () => (n += step) };
+}
+
+/** The pilot-page dry run: every agent that may report friction reports a stub value. */
+async function frictionDryRun(extraArgs = {}, budget) {
+  const home = makeHome();
+  const wt = makeWorktree();
+  const args = baseArgs(wt, [{ id: "architecture", path: "docs/extend/architecture.md", track: "extend" }], { outline: "docs/internal/outlines/extend.json", ...extraArgs });
+  const calls = [];
+  const inner = makeAgent(wt, home, []);
+  const agent = makeAgent(wt, home, calls, {
+    inputs: async () => ({
+      job: "the job", pageType: "concept", factIds: ["f:a7qx4m"], claimInventory: [],
+      rowsReceived: [{ key: "CairnAdapter.editor.nav", value: "pending architecture" }],
+      rowsDisposed: [{ key: "CairnAdapter.editor.nav", disposition: "filed", value: "f:new001" }],
+      frictionFiled: ["inputs-friction"]
+    }),
+    draft: async (prompt, opts) => ({ ...(await inner(prompt, opts)), frictionFiled: ["drafter-friction"] }),
+    facts: async () => ({ ...ACCEPT, frictionFiled: ["fact-read-friction"] }),
+    editor: async () => ({ ...ACCEPT, frictionFiled: ["editor-friction"] })
+  });
+  const out = await runRunner(args, agent, parallel, noop, noop, budget);
+  const prompt = (kind) => calls.find((c) => c.label.startsWith(`${kind}:`)).prompt;
+  return { out, calls, prompt, flat: (kind) => prompt(kind).replace(/\s+/g, " ") };
+}
+
+check("dry run: page inputs gets the map path, the page's slug, and the row selection rule", async () => {
+  const { flat } = await frictionDryRun();
+  const inputs = flat("inputs");
+  assert.ok(inputs.includes(MAP_PATH), "the map path");
+  assert.match(inputs, /This page's slug is "architecture"/);
+  assert.match(inputs, /every row whose value is "pending architecture"/);
+  assert.match(inputs, /every row whose value is one of these fact ids: f:a7qx4m, f:0duu5p/);
+  assert.match(inputs, /read them live from the file/);
+  assert.match(inputs, /"re-pointed"/);
+});
+
+check("dry run: page inputs and the fact read carry the retag order, the fact read's as a blocking finding", async () => {
+  const { flat: prompt } = await frictionDryRun();
+  const order = /raise pendingCount by one, then rewrite the row to "pending architecture", and only then retag the fact/;
+  const inputs = prompt("inputs");
+  assert.match(inputs, order);
+  assert.match(inputs, /retag it \[candidate\]/);
+  const facts = prompt("facts");
+  assert.match(facts, order);
+  assert.match(facts, /\[docs-drift\]/);
+  assert.ok(facts.includes(MAP_PATH), "the fact read names the map");
+  assert.match(facts, /Each row you rewrote is a blocking finding, located at docs\/internal\/option-map\.json/);
+});
+
+check("dry run: the drafter, page inputs, and the fact read carry the friction smells; the editor does not", async () => {
+  const { flat: prompt } = await frictionDryRun();
+  const smells = /a hedge, a caveat, an exception, a workaround, a surprising default, or two seams naming or behaving the same thing differently/;
+  for (const kind of ["inputs", "draft", "facts"]) {
+    assert.match(prompt(kind), smells, kind);
+    assert.match(prompt(kind), /fact ids or file:line/, kind);
+    assert.match(prompt(kind), /docs\/internal\/docs-friction-log\.md/, kind);
+  }
+  assert.doesNotMatch(prompt("editor"), smells);
+  assert.doesNotMatch(prompt("draft"), /a genuine design gap/);
+});
+
+check("dry run: the record carries the rows and friction from page inputs, the drafter, and the fact read, none from the editor", async () => {
+  const { out } = await frictionDryRun();
+  const record = out.pages[0];
+  assert.deepEqual(record.pageInputs.rowsReceived, [{ key: "CairnAdapter.editor.nav", value: "pending architecture" }]);
+  assert.deepEqual(record.pageInputs.rowsDisposed, [{ key: "CairnAdapter.editor.nav", disposition: "filed", value: "f:new001" }]);
+  assert.deepEqual(record.pageInputs.frictionFiled, ["inputs-friction"]);
+  assert.deepEqual(record.rounds[0].draft.frictionFiled, ["drafter-friction"]);
+  const reads = record.rounds[0].reads;
+  assert.deepEqual(reads.find((r) => r.read === "fact read").frictionFiled, ["fact-read-friction"]);
+  assert.equal(reads.find((r) => r.read === "register editor").frictionFiled, undefined);
+  assert.ok(!JSON.stringify(out).includes("editor-friction"), "the editor's friction reaches no record");
+});
+
+check("dry run: the fact read's friction reaches the record in a redraft round too", async () => {
+  const home = makeHome();
+  const wt = makeWorktree();
+  const args = baseArgs(wt, [{ id: "debug", path: "docs/extend/debug-your-site.md", track: "extend" }], { outline: "docs/internal/outlines/extend.json" });
+  let round = 0;
+  const agent = makeAgent(wt, home, [], {
+    facts: async () => (++round === 1 ? { ...FIX, frictionFiled: ["r1"] } : { ...ACCEPT, frictionFiled: ["r2"] })
+  });
+  const out = await runRunner(args, agent, parallel, noop, noop);
+  const record = out.pages[0];
+  assert.equal(record.status, "accepted");
+  assert.deepEqual(record.rounds[0].reads.find((r) => r.read === "fact read").frictionFiled, ["r1"]);
+  assert.deepEqual(record.rounds[1].reads.find((r) => r.read === "fact read").frictionFiled, ["r2"]);
+});
+
+check("dry run: the drafter gets the entry's title as the H1, and the voice source line", async () => {
+  const { prompt, flat } = await frictionDryRun();
+  assert.match(prompt("draft"), /The page's H1, verbatim: # Architecture\n/);
+  const draft = flat("draft");
+  assert.match(draft, /Voice comes only from the register's drafting brief and its primary exemplar, docs\/extend\/choose-an-ai-posture\.md/);
+  assert.match(draft, /supply structure and detail per step, never voice or wording/);
+});
+
+check("dry run: a page with no outline title gets no H1 line", async () => {
+  const home = makeHome();
+  const wt = makeWorktree();
+  const calls = [];
+  await runRunner(baseArgs(wt, [{ id: "debug", path: "docs/extend/debug-your-site.md", track: "extend" }], { outline: "docs/internal/outlines/extend.json" }), makeAgent(wt, home, calls), parallel, noop, noop);
+  assert.doesNotMatch(calls.find((c) => c.label.startsWith("draft:")).prompt, /The page's H1/);
+});
+
+check("dry run: a figure page's drafter prompt names the cairn-figure skill; a page without one does not", async () => {
+  const { prompt } = await frictionDryRun();
+  assert.ok(prompt("draft").includes("~/.claude/skills/cairn-figure/SKILL.md"));
+  const home = makeHome();
+  const wt = makeWorktree();
+  const calls = [];
+  await runRunner(baseArgs(wt, [{ id: "debug", path: "docs/extend/debug-your-site.md", track: "extend" }], { outline: "docs/internal/outlines/extend.json" }), makeAgent(wt, home, calls), parallel, noop, noop);
+  assert.ok(!calls.find((c) => c.label.startsWith("draft:")).prompt.includes("cairn-figure"));
+});
+
+check("dry run: the return carries spent, the budget delta across the run, and null with no budget", async () => {
+  const { out } = await frictionDryRun({}, makeBudget(100, 42));
+  assert.equal(out.spent, 42);
+  const bare = await frictionDryRun();
+  assert.equal(bare.out.spent, null);
 });
 
 // -------------------------------------------------------------------------------------------

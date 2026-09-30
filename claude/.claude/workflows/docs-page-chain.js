@@ -36,6 +36,7 @@
 //       reviewModel: "claude-opus-5-5",    // optional; default, also the page-inputs step's model
 //       pageInputsModel: "claude-opus-5-5", // optional; defaults to reviewModel
 //       outline: "docs/internal/outlines/extend.json",   // optional; see "The outline" below
+//       optionMap: "docs/internal/option-map.json",       // optional; the option map, this is the default
 //       pages: [
 //         { id: "architecture", path: "docs/extend/architecture.md", track: "extend" },   // with an outline
 //         {
@@ -60,9 +61,9 @@
 //
 // The outline (`args.outline`): a stage outline JSON, repo-relative to `args.worktree`, carrying
 // top-level `index` (the arm index, repo-relative), `groups: [{ id, title, pages }]`, and
-// `pages: [{ slug, path, group, order, job, pageType, exemplars: [{ source, take }], figure,
+// `pages: [{ slug, title, path, group, order, job, pageType, exemplars: [{ source, take }], figure,
 // figureNote, factIds, covers, outOfScope, absorbs, pinned }]`. With it, each entry in
-// `args.pages` needs only `id`, `path`, and `track`: its `job`, `pageType`, `exemplarSources`,
+// `args.pages` needs only `id`, `path`, and `track`: its `title`, `job`, `pageType`, `exemplarSources`,
 // `exemplarTakes`, `factIds`, `covers`, `outOfScope`, `absorbs`, `pinned`, `figure`, and
 // `figureNote` come from the outline page whose `path` matches, and any of those fields given
 // inline in `args.pages` overrides the outline's (inline `exemplarSources` alone drops the
@@ -89,6 +90,38 @@
 // page before `check:arm-indexes` sees it; a runner step before the drafter would link a page not
 // yet on disk, and one after would follow the gate.
 //
+// The option map (`args.optionMap`, default `docs/internal/option-map.json`, repo-relative): one
+// row per public option path, each a fact id, `exclude <reason>`, or `pending <slug>`, under a
+// top-level `pendingCount` constant that `check:options` holds the pending rows to. A page's slug
+// is its file's base name (every outline slug is). Page inputs receives the map path, the slug,
+// the page's fact ids, and the selection rule (the `pending <slug>` rows, and the rows whose fact
+// id is among the page's), reads its rows live, and disposes each pending row in its claim
+// inventory as carried, filed, cut (the row becomes `exclude <reason>`), or re-pointed to another
+// outline page not yet drafted. A disposal files the fact, then rewrites the row with the Edit
+// tool, then lowers the constant; a stale-read failure means another page wrote the map, so the
+// agent re-reads and redoes the edit. A retag that takes a mapped fact off `[verified]` (page
+// inputs to `[candidate]`, the fact read to `[docs-drift]`) raises the constant, then rewrites
+// each of its rows to `pending <slug>`, then retags; the fact read reports each such row as a
+// blocking finding. Page inputs reports `rowsReceived` and `rowsDisposed`, carried in
+// `record.pageInputs`.
+//
+// Design friction: page inputs, the drafter, and the fact read, the agents that meet the code,
+// file a friction entry in `docs/internal/docs-friction-log.md` for a hedge, a caveat, an
+// exception, a workaround, a surprising default, or two seams naming or behaving the same thing
+// differently, naming the fact ids or `file:line` involved, and list it in `frictionFiled`. An
+// entry never blocks the page. The record carries page inputs' list in `record.pageInputs`, the
+// drafter's in `rounds[].draft`, and the fact read's, copied by the runner, on its entry in
+// `rounds[].reads`; the register editor and the figure verifier do not report friction.
+//
+// The drafter gets the outline entry's `title` as the page's H1 (the title is in the entry
+// checksum), the voice source (the register's drafting brief and its primary exemplar only; the
+// page's exemplars give structure and detail per step), and, on a figure page, the
+// `cairn-figure` skill file to read and follow.
+//
+// The return carries `spent`: the runtime `budget.spent()` delta across the run, in its unit of
+// output tokens spent across the main loop and all workflows, so a relative measure only and
+// never a count against a pass ceiling. It is null when the runtime supplies no `budget`.
+//
 // Every agent starts with zero context. The runner renders each stage's prompt from args and
 // the page record; nothing load-bearing may live only in the conductor's conversation.
 
@@ -110,11 +143,18 @@ const CLAIM = {
   type: "object",
   properties: {
     claim: { type: "string" },
-    disposition: { type: "string", enum: ["carried", "filed", "cut"] },
+    disposition: { type: "string", enum: ["carried", "filed", "cut", "re-pointed"] },
     factId: { type: "string" },
     reason: { type: "string" }
   },
   required: ["claim", "disposition"]
+};
+
+// One option-map row as read: its path key and its value, verbatim.
+const MAP_ROW = {
+  type: "object",
+  properties: { key: { type: "string" }, value: { type: "string" } },
+  required: ["key", "value"]
 };
 
 const PAGE_INPUTS_SCHEMA = {
@@ -133,9 +173,24 @@ const PAGE_INPUTS_SCHEMA = {
     },
     claimInventory: { type: "array", items: CLAIM },
     factsFiled: { type: "array", items: { type: "string" } },
+    rowsReceived: { type: "array", items: MAP_ROW },
+    rowsDisposed: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          key: { type: "string" },
+          disposition: { type: "string", enum: ["carried", "filed", "cut", "re-pointed", "reopened"] },
+          value: { type: "string" },
+          reason: { type: "string" }
+        },
+        required: ["key", "disposition", "value"]
+      }
+    },
+    frictionFiled: { type: "array", items: { type: "string" } },
     couldNotDo: { type: "array", items: { type: "string" } }
   },
-  required: ["job", "pageType", "factIds", "claimInventory"]
+  required: ["job", "pageType", "factIds", "claimInventory", "rowsReceived", "rowsDisposed"]
 };
 
 const DRAFT_SCHEMA = {
@@ -167,6 +222,7 @@ const OUTLINE_ENTRY = {
   type: "object",
   properties: {
     path: { type: "string" },
+    title: { type: "string" },
     job: { type: "string" },
     pageType: { type: "string" },
     exemplarSources: { type: "array", items: { type: "string" } },
@@ -180,7 +236,7 @@ const OUTLINE_ENTRY = {
     figureNote: { type: "string" },
     checksum: { type: "string" }
   },
-  required: ["path", "job", "pageType", "exemplarSources", "exemplarTakes", "factIds", "covers", "outOfScope", "absorbs", "pinned", "figure", "figureNote", "checksum"]
+  required: ["path", "title", "job", "pageType", "exemplarSources", "exemplarTakes", "factIds", "covers", "outOfScope", "absorbs", "pinned", "figure", "figureNote", "checksum"]
 };
 
 const OUTLINE_PROBE_SCHEMA = {
@@ -201,7 +257,8 @@ const READ_SCHEMA = {
   properties: {
     verdict: { type: "string", enum: ["accept", "fix"] },
     findings: { type: "array", items: FINDING },
-    summary: { type: "string" }
+    summary: { type: "string" },
+    frictionFiled: { type: "array", items: { type: "string" } }
   },
   required: ["verdict", "findings", "summary"]
 };
@@ -220,6 +277,10 @@ const PAGE_INPUTS_MODEL = a.pageInputsModel || REVIEWER;
 const BOTH_REVIEWERS = a.bothReviewers === true;
 const PAGES_ARG = a.pages || [];
 const OUTLINE = a.outline || "";
+const OPTION_MAP = a.optionMap || "docs/internal/option-map.json";
+// The runtime's budget is absent outside it (a dry run), so `spent` is guarded, not assumed.
+const HAS_BUDGET = typeof budget !== "undefined" && budget !== null && typeof budget.spent === "function";
+const SPENT_AT_START = HAS_BUDGET ? budget.spent() : 0;
 
 if (!WT || !GATE || !PAGES_ARG.length) {
   throw new Error("docs-page-chain needs args.worktree, args.gate, and args.pages");
@@ -278,6 +339,7 @@ function canonicalEntry(e) {
   const list = (v) => (Array.isArray(v) ? v.map(String) : []);
   return {
     path: String(e.path || ""),
+    title: String(e.title || ""),
     job: String(e.job || ""),
     pageType: String(e.pageType || ""),
     exemplarSources: list(e.exemplarSources),
@@ -354,7 +416,7 @@ function mergeOutline(pages, probe, outlinePath) {
     throw new Error(`docs-page-chain: the outline probe mistranscribed its report (checksum ${probeChecksum(probe)}, reported ${probe.checksum})`);
   }
   if (!probe.ok) throw new Error(`docs-page-chain: the outline probe failed: ${probe.error || "no error given"}`);
-  const fields = ["job", "pageType", "exemplarSources", "exemplarTakes", "factIds", "covers", "outOfScope", "absorbs", "pinned", "figure", "figureNote"];
+  const fields = ["title", "job", "pageType", "exemplarSources", "exemplarTakes", "factIds", "covers", "outOfScope", "absorbs", "pinned", "figure", "figureNote"];
   const merged = pages.map((p) => {
     const entry = entries.find((e) => e.path === p.path);
     if (checksumOf(entry) !== entry.checksum) {
@@ -439,6 +501,76 @@ function briefPathFor(p) {
 }
 
 /**
+ * The page's slug, the key its option-map rows name: its file's base name, which every outline
+ * slug equals.
+ * @param {{ path: string }} p
+ * @returns {string}
+ */
+function slugOf(p) {
+  return baseNoExt(p.path);
+}
+
+/**
+ * The friction instruction the three agents that meet the code share: the smells that signal a
+ * design flaw, where an entry goes, and that it never blocks the page.
+ * @returns {string}
+ */
+function frictionLine() {
+  return `Design friction: when stating the code as it is takes a hedge, a caveat, an exception, a
+workaround, a surprising default, or two seams naming or behaving the same thing differently, add
+one entry to docs/internal/docs-friction-log.md with the Edit tool, in the shape the log's header
+sets, naming the fact ids or file:line involved (on a stale-read failure, re-read the log and redo
+the edit). List each entry's heading in frictionFiled. An entry never blocks or pauses the page:
+the page documents the code as it is.`;
+}
+
+/**
+ * The map rule's retag order for an agent that may take a mapped fact off [verified].
+ * @param {{ path: string }} p
+ * @param {string} tag - the tag the agent retags to
+ * @returns {string}
+ */
+function retagOrder(p, tag) {
+  return `Before you retag a fact ${tag}, find every row in the option map ${OPTION_MAP} whose value is
+that fact id. For each such row, in this order and with the Edit tool: raise pendingCount by one,
+then rewrite the row to "pending ${slugOf(p)}", and only then retag the fact. This order keeps the
+option gate green for every page in flight; on a stale-read failure, re-read the map and redo the
+edit.`;
+}
+
+/**
+ * Page inputs' option-map step: the map, the page's slug, the row selection rule, and how each
+ * pending row is disposed under the map rule.
+ * @param {{ path: string, factIds?: string[] }} p
+ * @returns {string}
+ */
+function mapRowsLine(p) {
+  const slug = slugOf(p);
+  const ids = p.factIds || [];
+  return `
+Option map rows. The option map ${OPTION_MAP} holds one row per public option path (its key), whose
+value is a fact id, "exclude <reason>", or "pending <slug>", under a top-level pendingCount
+constant the option gate holds the pending rows to. This page's slug is "${slug}". Your rows are
+every row whose value is "pending ${slug}"${ids.length ? `, and every row whose value is one of these fact ids: ${ids.join(", ")}` : ""};
+read them live from the file, never from a copy. Return each one in rowsReceived, key and value
+verbatim. A row naming a fact id is context: that fact carries the option.
+
+Dispose each pending row as one claim-inventory entry naming its key, then return it in
+rowsDisposed with its disposition and the row's new value:
+- "carried" or "filed": a [verified] fact names the member in backticks and its Source: cites the
+  declaring type's file. The row becomes that fact id.
+- "cut": the option stays off every page, for the reason you give. The row becomes
+  "exclude <reason>".
+- "re-pointed": the option belongs to another outline page not yet drafted. The row becomes
+  "pending <that page's slug>", and the claim carries the reason.
+A disposal runs in this order: file the fact, then rewrite the row with the Edit tool, then lower
+pendingCount by one (a re-pointed row leaves it unchanged). Rewrite no row but your own and those
+the retag order above names, never raise pendingCount except by that order, and on a stale-read
+failure (another page in flight wrote the map) re-read the file and redo the edit.
+`;
+}
+
+/**
  * The gate string for one page: the conductor's template with `{page}` and `{brief}`
  * substituted, plus the tool gate for a page carrying pinned slugs.
  * @param {{ path: string, track: string, pinned?: string[] }} p
@@ -480,19 +612,24 @@ Give each claim exactly one disposition:
   Edit tool (never a shell append), tagged [verified] with a Source: line, or [external] with the
   vendor's URL for a Cloudflare or GitHub step. Cite the new fact id.
 - "cut": the claim does not survive the page; give the reason.
+- "re-pointed": an option-map row only (below); another page owns the option.
 
 A cited fact whose only source is an arm page is retraced to code, config, or a vendor doc first;
 when that fails, retag it [candidate] and do not cite it. Never file a fact tagged [candidate] or
 [docs-drift] yourself, and never retag any fact except that one narrow case; the independent fact
-read does the rest of the retagging, not you.
+read does the rest of the retagging, not you. ${retagOrder(p, "[candidate]")} Then dispose that row
+like any other pending row of yours, and return it in rowsDisposed as "reopened" before its final
+disposition.
+${mapRowsLine(p)}
+${frictionLine()}
 
 Inputs to trace claims against (read each in full; the only source of a command, a transcript, a
 JSON example, or a fact; never open the old page's own prose for a claim's wording):
 ${(p.inputs || []).map((i) => `- ${i}`).join("\n")}
 
 Return the structured report only: the page's job (one paragraph), its page type, every fact id
-the drafter should draw on, each id you added with why, the full claim inventory, and any new fact
-id you filed.`;
+the drafter should draw on, each id you added with why, the full claim inventory, any new fact
+id you filed, the map rows you received and disposed, and any friction entry you filed.`;
 }
 
 /**
@@ -587,28 +724,31 @@ function draftPrompt(p, pageInputs, round, findings) {
 
 ${common}
 ${registerLine(p, "drafter")}
-The brief is the source of the page's structure and voice.
-
+The brief is the source of the page's structure and voice. Voice comes only from the register's
+drafting brief and its primary exemplar, docs/extend/choose-an-ai-posture.md; the page's exemplars
+below supply structure and detail per step, never voice or wording.
+${p.title ? `\nThe page's H1, verbatim: # ${p.title}\n` : ""}
 The page's job: ${pageInputs.job}
 Page type: ${pageInputs.pageType}
 ${scopeLines(p)}
-Exemplar sources: read each in full, and imitate its anatomy and rhythm, never its wording, terms,
-or product names:
+Exemplar sources: read each in full, and imitate its anatomy and its detail per step, never its
+voice, wording, terms, or product names:
 ${exemplarList(p) || "(none named; follow the register's anatomy)"}
-${p.figure && p.figureNote ? `\nFigure note, from the outline: ${p.figureNote}\n` : ""}
+${p.figure ? `\nThis page carries a figure: read and follow the skill file ~/.claude/skills/cairn-figure/SKILL.md.\n` : ""}${p.figure && p.figureNote ? `\nFigure note, from the outline: ${p.figureNote}\n` : ""}
 
 Fact ids to draw on: ${(pageInputs.factIds || []).join(", ") || "(none)"}
-Claim inventory, one disposition per claim:
+Claim inventory, one disposition per claim (a "cut" or "re-pointed" claim stays off the page):
 ${inventory || "(the page is new; no prior claims to carry)"}
 ${p.pinned && p.pinned.length ? `Pinned heading slugs this page must keep, verbatim: ${p.pinned.join(", ")}` : ""}
 ${round > 1 ? `\nCombined findings from the reads:\n${findings}\n` : ""}
 Write the page's sentence-to-fact brief alongside the page at ${briefPathFor(p)}, citing only the
 fact ids above or "no-claim". File no fact yourself, new or retagged. A claim the page needs whose
 fact is not among the ids above is a couldNotDo naming the missing fact; do not draft that claim
-and do not file its fact yourself, since the conductor re-runs page inputs for it. Something no
-source can supply at all, a genuine design gap rather than a missing fact, goes to
-docs/internal/docs-friction-log.md (name it in frictionFiled). Commit nothing; leave the tree with
-your edits in place.
+and do not file its fact yourself, since the conductor re-runs page inputs for it.
+
+${frictionLine()}
+
+Commit nothing; leave the tree with your edits in place.
 
 ${indexLinkLine(p)}
 ${gateLine(p)}
@@ -639,9 +779,15 @@ Check every claim on the page against its cited fact id, retrace every cited fac
 source and fix or retag it [docs-drift] in the same chain when it no longer matches, and confirm
 every claim the inventory marks "carried" or "filed" still appears on the page. A claim on the
 page with no cited fact behind it, a cited fact that no longer matches its source, or an inventory
-claim the page dropped without a "cut" disposition is a blocking finding (location, claim, what is
-wrong). Verdict "fix" if any blocking finding exists; otherwise "accept" with the count of claims
-traced.`;
+claim the page dropped without a "cut" or "re-pointed" disposition is a blocking finding (location,
+claim, what is wrong).
+
+${retagOrder(p, "[docs-drift]")} Each row you rewrote is a blocking finding, located at
+${OPTION_MAP} and the row's key, so the page escalates unless the redraft round resolves it.
+
+${frictionLine()}
+
+Verdict "fix" if any blocking finding exists; otherwise "accept" with the count of claims traced.`;
 }
 
 /**
@@ -711,6 +857,23 @@ async function runReads(p, pageInputs, round, names) {
   return { list, missing, anyFix };
 }
 
+/**
+ * One round's read entries for the record. The fact read's `frictionFiled` is copied onto its
+ * entry; the register editor's and the figure verifier's are dropped, since neither reports
+ * friction.
+ * @param {Array<[string, { verdict: string, summary: string, findings: Array<{ blocking: boolean }>, frictionFiled?: string[] }]>} list
+ * @returns {object[]}
+ */
+function readEntries(list) {
+  return list.map(([n, r]) => ({
+    read: n,
+    verdict: r.verdict,
+    summary: r.summary,
+    blocking: r.findings.filter((f) => f.blocking).length,
+    ...(n === "fact read" && Array.isArray(r.frictionFiled) ? { frictionFiled: r.frictionFiled } : {})
+  }));
+}
+
 // === CROSS-REGRESSION DERIVATION (docs-page-chain-derivation.test.mjs extracts this block) ===
 /**
  * Derives the cross-regression flag from a page's round records: a reviewer that accepted in
@@ -746,7 +909,7 @@ async function chain(p) {
   if (!d1) return { ...record, status: "escalate", reason: "drafter returned nothing" };
   record.rounds.push({ round: 1, draft: d1 });
   const r1 = await runReads(p, pageInputs, 1, allNames);
-  record.rounds[0].reads = r1.list.map(([n, r]) => ({ read: n, verdict: r.verdict, summary: r.summary, blocking: r.findings.filter((f) => f.blocking).length }));
+  record.rounds[0].reads = readEntries(r1.list);
   // A read that returned nothing is never a silent accept.
   if (r1.missing) return { ...record, status: "escalate", reason: `${r1.missing} read(s) returned nothing in round 1` };
   if (!r1.anyFix && d1.gate === "pass") return { ...record, status: "accepted" };
@@ -757,7 +920,7 @@ async function chain(p) {
   if (!d2) return { ...record, status: "escalate", reason: "redrafter returned nothing" };
   record.rounds.push({ round: 2, draft: d2 });
   const r2 = await runReads(p, pageInputs, 2, rereviewNames);
-  record.rounds[1].reads = r2.list.map(([n, r]) => ({ read: n, verdict: r.verdict, summary: r.summary, blocking: r.findings.filter((f) => f.blocking).length }));
+  record.rounds[1].reads = readEntries(r2.list);
   const cr = deriveCrossRegression(record, BOTH_REVIEWERS);
   if (cr !== undefined) record.crossRegression = cr;
   if (r2.missing) return { ...record, status: "escalate", reason: `${r2.missing} read(s) returned nothing in round 2` };
@@ -785,4 +948,5 @@ await parallel(Array.from({ length: Math.min(IN_FLIGHT, PAGES.length) }, (_, i) 
 phase("Report");
 const accepted = results.filter((r) => r.status === "accepted").length;
 log(`${accepted}/${PAGES.length} pages accepted; ${PAGES.length - accepted} escalated`);
-return { pages: results, accepted, escalated: results.filter((r) => r.status !== "accepted").map((r) => r.id) };
+const spent = HAS_BUDGET ? budget.spent() - SPENT_AT_START : null;
+return { pages: results, accepted, escalated: results.filter((r) => r.status !== "accepted").map((r) => r.id), spent };
