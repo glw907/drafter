@@ -902,6 +902,56 @@ check("dry run: a rework page's inventory carries the outline ids its brief cite
   assert.match(f, /or appear in the claim inventory above as "cut" with a reason/, "the coverage rule C satisfies as cut");
 });
 
+/** Runs the real rework-state command the probe prompt names, then lets `edit` alter its report. */
+function tamperedState(home, edit) {
+  return async (prompt) => {
+    const r = JSON.parse(runHelperLine(helperLine(prompt, "rework-state"), home));
+    edit(r);
+    return r;
+  };
+}
+
+check("dry run: a rework-state report with a tampered checksum fails the run as mistranscribed", async () => {
+  const home = makeHome();
+  const wt = reworkWorktree();
+  const page = { id: "architecture", path: "docs/extend/architecture.md", track: "extend", rework: REWORK };
+  const agent = makeAgent(wt, home, [], { "rework-state": tamperedState(home, (r) => { r.head = "0000000"; }) });
+  await assert.rejects(runRunner(baseArgs(wt, [page], { outline: "docs/internal/outlines/extend.json" }), agent, parallel, noop, noop), /mistranscribed its report/);
+});
+
+check("dry run: a rework-state report with ok false and a valid checksum fails the run", async () => {
+  const home = makeHome();
+  const wt = reworkWorktree();
+  const page = { id: "architecture", path: "docs/extend/architecture.md", track: "extend", rework: REWORK };
+  const agent = makeAgent(wt, home, [], {
+    "rework-state": tamperedState(home, (r) => {
+      r.ok = false;
+      r.error = "no HEAD";
+      r.checksum = helper.reworkChecksum(r);
+    })
+  });
+  await assert.rejects(runRunner(baseArgs(wt, [page], { outline: "docs/internal/outlines/extend.json" }), agent, parallel, noop, noop), /rework-state probe failed: no HEAD/);
+});
+
+check("dry run: a clean rework page whose state carries an error escalates with that reason and makes no rework call", async () => {
+  const home = makeHome();
+  const wt = reworkWorktree();
+  const page = { id: "architecture", path: "docs/extend/architecture.md", track: "extend", rework: REWORK };
+  const calls = [];
+  const agent = makeAgent(wt, home, calls, {
+    "rework-state": tamperedState(home, (r) => {
+      r.pages[0].error = "brief not readable: BRIEF-ERROR";
+      r.checksum = helper.reworkChecksum(r);
+    })
+  });
+  const out = await runRunner(baseArgs(wt, [page], { outline: "docs/internal/outlines/extend.json" }), agent, parallel, noop, noop);
+  assert.equal(out.pages[0].status, "escalate");
+  assert.equal(out.pages[0].reason, "brief not readable: BRIEF-ERROR");
+  assert.equal(out.pages[0].rework, true);
+  assert.ok(!calls.some((c) => c.label.startsWith("rework:")), "no rework call");
+  assert.equal(out.pages[0].rounds.length, 0);
+});
+
 check("dry run: a rework page that is untracked or has uncommitted changes is not run; its record escalates with the reason", async () => {
   for (const state of ["untracked", "modified"]) {
     const { labels, record } = await reworkDryRun({}, {}, { state });

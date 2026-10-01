@@ -331,8 +331,6 @@ const READ_SCHEMA = {
   required: ["verdict", "findings", "summary"]
 };
 
-// The final reader read's report: a read's verdict and findings, plus its answer to Part V's
-// "What do you think the writer was trying to do with this document?"
 // The helper's rework-state report, as the probe returns it.
 const REWORK_STATE_SCHEMA = {
   type: "object",
@@ -359,6 +357,8 @@ const REWORK_STATE_SCHEMA = {
   required: ["ok", "head", "pages", "checksum"]
 };
 
+// The final reader read's report: a read's verdict and findings, plus its answer to Part V's
+// "What do you think the writer was trying to do with this document?"
 const READER_SCHEMA = {
   type: "object",
   properties: {
