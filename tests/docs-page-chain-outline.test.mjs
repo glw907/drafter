@@ -701,6 +701,8 @@ check("dry run: the structural edit seat runs in round 1 with the outline entry 
     assert.ok(s.includes(item), `checklist item: ${item}`);
   }
   assert.ok(!s.includes("Tags and entities are used correctly."), "the inapplicable AsciiDoc item is left out");
+  assert.ok(!s.includes("- a table of contents menu"), "the table of contents item is not a checklist line");
+  assert.match(s, /"a table of contents menu that shows users where they are in the document" is left out: the site renderer \(cairn\.pub\) supplies the table of contents, not the page\./, "marked inapplicable, with the reason");
   assert.match(s, /## The page anatomies/, "the register's page anatomies, by heading");
   assert.ok(s.includes(RECORD), "the prior-art record");
   assert.match(s, /never edits/);
@@ -755,11 +757,14 @@ check("dry run: the final reader read never runs before acceptance, and never on
   assert.ok(second.labels.indexOf("reader:debug-your-site") > second.labels.indexOf("editor:debug-your-site:r2"), "after the round-2 reads");
 });
 
-check("dry run: the final reader read's fix drives exactly one scoped redraft with scoped register and fact reads", async () => {
-  const { labels, record, flat } = await seatDryRun("docs/extend/architecture.md", { reader: async () => READER_FIX });
+check("dry run: the final reader read's fix drives one scoped redraft, scoped register and fact reads, and a re-test that accepts", async () => {
+  let n = 0;
+  const { labels, record, flat } = await seatDryRun("docs/extend/architecture.md", { reader: async () => (++n === 1 ? READER_FIX : { ...ACCEPT, paraphrase: "RETEST-PARAPHRASE" }) });
   const tail = labels.slice(labels.indexOf("reader:architecture"));
-  assert.deepEqual(tail, ["reader:architecture", "reader-redraft:architecture", "editor:architecture:final", "facts:architecture:final"]);
+  assert.deepEqual(tail, ["reader:architecture", "reader-redraft:architecture", "editor:architecture:final", "facts:architecture:final", "reader:architecture:retest"]);
   assert.equal(record.status, "accepted");
+  assert.equal(record.finalRead.retest.verdict, "accept");
+  assert.equal(record.finalRead.retest.paraphrase, "RETEST-PARAPHRASE");
   assert.equal(record.finalRead.verdict, "fix");
   assert.deepEqual(record.finalRead.findings, READER_FIX.findings);
   assert.equal(record.finalRead.paraphrase, "READER-PARAPHRASE");
@@ -775,7 +780,17 @@ check("dry run: the final reader read's fix drives exactly one scoped redraft wi
   }
 });
 
-check("dry run: a scoped read's fix after the final read's redraft escalates, with no second final read", async () => {
+check("dry run: a re-test that returns fix escalates the page, with exactly two reader calls and one redraft", async () => {
+  const { labels, record } = await seatDryRun("docs/extend/architecture.md", { reader: async () => READER_FIX });
+  assert.equal(record.status, "escalate");
+  assert.deepEqual(labels.filter((l) => l.startsWith("reader:")), ["reader:architecture", "reader:architecture:retest"]);
+  assert.equal(labels.filter((l) => l.startsWith("reader-redraft:")).length, 1);
+  assert.equal(labels[labels.length - 1], "reader:architecture:retest");
+  assert.equal(record.finalRead.retest.verdict, "fix");
+  assert.deepEqual(record.finalRead.retest.findings, READER_FIX.findings);
+});
+
+check("dry run: a scoped read's fix after the final read's redraft escalates, with no re-test", async () => {
   const { labels, record } = await seatDryRun("docs/extend/architecture.md", {
     reader: async () => READER_FIX,
     editor: async (p, o) => (o.label.endsWith(":final") ? FIX : ACCEPT)

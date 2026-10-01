@@ -125,7 +125,10 @@
 // `docs/superpowers/research/2026-09-30-page-level-review-prior-art.md` adopts in "## b.
 // Structural edit seat": the Red Hat peer review guide's Structure Checklist, less its two
 // AsciiDoc and reuse items, and Google Technical Writing Two's introduction, review, navigation,
-// and heading lead-in items, all quoted verbatim, with the introduction checked on every page. It
+// and heading lead-in items, all quoted verbatim, with the introduction checked on every page.
+// Google's navigation item "a table of contents menu" is left out as inapplicable, the way Red
+// Hat's modular-docs items are: the site renderer (cairn.pub) supplies the table of contents,
+// not the page. It
 // reads the whole page against its outline entry (`job`, `covers`, `outOfScope`, and the
 // outline's `crossLinks` from the page's slug, read live) and the register's page anatomies, and
 // never edits. Its findings join the round's like the other reads', and `bothReviewers`
@@ -144,8 +147,16 @@
 // mismatch and each point where it had to infer. Its "fix" sends the page back for one redraft
 // of the cited spots, which takes the register editor's and the fact read's reads scoped to the
 // changed sentences (the parent spec's "Edits after the chain"); a "fix" or a red gate there
-// escalates, and the reader does not read again. Its verdict, summary, paraphrase, and findings,
-// and any redraft and scoped reads, land in `record.finalRead`, never in `rounds`.
+// escalates. When those reads accept on a green gate, the reader reads once more, a re-test, per
+// Part V's iteration rule: "Test, make corrections based on feedback, and test again. Plan to
+// test at least twice." The re-test's "accept" accepts the page; its "fix" escalates, with no
+// further redraft or read. Its verdict, summary, paraphrase, and findings, and any redraft,
+// scoped reads, and re-test (`retest`), land in `record.finalRead`, never in `rounds`.
+//
+// The reader's prompt confines any step it runs to a scratch directory outside the worktree and
+// leaves a step needing an account, a secret, or a deploy unrun. That is an operational safety
+// constraint resting on the runner's "modify no file" pattern (the outline probe's), not a docs
+// rule.
 //
 // The drafter writes the introduction, the section hand-off lead-ins, and the ending the
 // register's page anatomies require, records each `no-claim` in the brief when it carries no
@@ -168,7 +179,7 @@ export const meta = {
     { title: "Draft", detail: "the drafter writes the page and runs the docs gate itself" },
     { title: "Read", detail: "structural edit, register editor, and fact read in parallel, all Opus, plus a figure read when the page carries one" },
     { title: "Redraft", detail: "one round on the combined findings; only the reviewer(s) that returned fix re-read by default" },
-    { title: "Final read", detail: "one reader read on an accepted page; its fix takes one scoped redraft and scoped reads" },
+    { title: "Final read", detail: "one reader read on an accepted page; its fix takes one scoped redraft, scoped reads, and one re-test" },
     { title: "Report", detail: "per-page records for the conductor" }
   ]
 };
@@ -970,6 +981,8 @@ User stories
 
 Block 2, Google Technical Writing Two, "Organizing large documents"
 (https://developers.google.com/tech-writing/two/large-docs). Check the introduction on every page.
+Its navigation item "a table of contents menu that shows users where they are in the document" is
+left out: the site renderer (cairn.pub) supplies the table of contents, not the page.
 "If readers of your documentation can't find relevance in the subject, they are likely to ignore it.
 To set the ground rules for your users, we recommend providing an introduction that includes the
 following information:
@@ -984,7 +997,6 @@ in your overview. Does your introduction provide an accurate overview of the top
 - introduction and summary sections
 - a clear, logical development of the subject
 - headings and subheadings that help users understand the subject
-- a table of contents menu that shows users where they are in the document
 - links to related resources or more in-depth information
 - links to what to learn next"
 "Most readers appreciate at least a brief introduction under each heading to provide some context."
@@ -1140,10 +1152,10 @@ function deriveCrossRegression(record, bothReviewers) {
 // === END CROSS-REGRESSION DERIVATION ===
 
 /**
- * The final reader read, run once on a page every read has accepted. Its "fix" sends the page
- * back for one redraft of the cited spots, which then takes the register editor's and the fact
- * read's reads scoped to the changed sentences; a "fix" or a red gate there escalates, and the
- * reader does not read again.
+ * The final reader read, run on a page every read has accepted. Its "fix" sends the page back for
+ * one redraft of the cited spots, which then takes the register editor's and the fact read's
+ * reads scoped to the changed sentences; a "fix" or a red gate there escalates. Otherwise the
+ * reader re-tests once (Part V: "test again"): "accept" accepts the page, "fix" escalates.
  * @param {Record<string, any>} p
  * @param {Record<string, any>} pageInputs
  * @param {Record<string, any>} record
@@ -1162,8 +1174,15 @@ async function finalRead(p, pageInputs, record) {
   const r = await runReads(p, pageInputs, "final", ["register editor", "fact read"], cited);
   record.finalRead.reads = readEntries(r.list);
   if (r.missing) return { ...record, status: "escalate", reason: `${r.missing} scoped read(s) returned nothing after the final reader read` };
-  if (!r.anyFix && d.gate === "pass") return { ...record, status: "accepted" };
-  return { ...record, status: "escalate", reason: "a scoped read returned fix or the gate was red after the final reader read's redraft", findings: combined(r.list) };
+  if (r.anyFix || d.gate !== "pass") {
+    return { ...record, status: "escalate", reason: "a scoped read returned fix or the gate was red after the final reader read's redraft", findings: combined(r.list) };
+  }
+
+  const rt = await agent(readerPrompt(p, pageInputs.pageType || p.pageType), { label: `reader:${p.id}:retest`, phase: "Final read", schema: READER_SCHEMA, model: REVIEWER, agentType: "general-purpose" });
+  if (!rt) return { ...record, status: "escalate", reason: "the final reader read's re-test returned nothing" };
+  record.finalRead.retest = { verdict: rt.verdict, summary: rt.summary, paraphrase: rt.paraphrase, findings: rt.findings || [] };
+  if (rt.verdict !== "fix") return { ...record, status: "accepted" };
+  return { ...record, status: "escalate", reason: "the final reader read's re-test returned fix", findings: combined([["final reader read re-test", record.finalRead.retest]]) };
 }
 
 async function chain(p) {
