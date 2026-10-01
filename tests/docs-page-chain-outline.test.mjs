@@ -134,7 +134,7 @@ const ACCEPT = { verdict: "accept", findings: [], summary: "ok" };
 /**
  * A stubbed agent: the outline probe runs its rendered command and returns the JSON verbatim;
  * page inputs echo the page's outline job; the drafter writes the page and runs its rendered
- * link command; every read accepts.
+ * link command (a redraft after the final reader read included); every read accepts.
  */
 function makeAgent(wt, home, calls, overrides = {}) {
   return async (prompt, opts) => {
@@ -143,7 +143,7 @@ function makeAgent(wt, home, calls, overrides = {}) {
     if (overrides[kind]) return overrides[kind](prompt, opts);
     if (kind === "outline") return JSON.parse(runHelperLine(helperLine(prompt, "resolve"), home));
     if (kind === "inputs") return { job: "the job", pageType: "concept", factIds: ["f:a7qx4m"], claimInventory: [] };
-    if (kind === "draft" || kind === "redraft") {
+    if (kind === "draft" || kind === "redraft" || kind === "reader-redraft") {
       const path = prompt.match(/(?:Draft the page|Redraft) (\S+)/)[1];
       write(wt, path, "# Architecture of cairn\n\nBody.\n");
       const link = helperLine(prompt, "link");
@@ -431,7 +431,7 @@ check("dry run: one outline page resolves its entry, feeds the prompts, and link
   const calls = [];
   const out = await runRunner(args, makeAgent(wt, home, calls), parallel, noop, noop);
   assert.equal(out.accepted, 1);
-  assert.deepEqual(calls.map((c) => c.label), ["outline", "inputs:architecture", "draft:architecture", "editor:architecture:r1", "facts:architecture:r1", "figure:architecture:r1"]);
+  assert.deepEqual(calls.map((c) => c.label), ["outline", "inputs:architecture", "draft:architecture", "structure:architecture:r1", "editor:architecture:r1", "facts:architecture:r1", "figure:architecture:r1", "reader:architecture"]);
 
   const inputs = calls.find((c) => c.label.startsWith("inputs:")).prompt;
   assert.match(inputs, /Learn where cairn ends and your site begins\./);
@@ -661,6 +661,137 @@ check("dry run: the return carries spent, the budget delta across the run, and n
   assert.equal(out.spent, 42);
   const bare = await frictionDryRun();
   assert.equal(bare.out.spent, null);
+});
+
+// -------------------------------------------------------------------------------------------
+// Dry runs of the structural edit seat, the final reader read, and the drafter's anatomy line.
+// -------------------------------------------------------------------------------------------
+
+const RECORD = "docs/superpowers/research/2026-09-30-page-level-review-prior-art.md";
+const STRUCT_FIX = { verdict: "fix", findings: [{ location: "docs/extend/architecture.md:3", finding: "STRUCT-FINDING intro omits scope", blocking: true }], summary: "structure fix" };
+const READER_FIX = { verdict: "fix", findings: [{ location: "docs/extend/architecture.md:9", finding: "READER-FINDING had to infer the seam", blocking: true }], summary: "reader fix", paraphrase: "READER-PARAPHRASE" };
+
+/** One outline page through the runner with stubbed agents; returns its calls and its record. */
+async function seatDryRun(pagePath, overrides = {}, extraArgs = {}) {
+  const home = makeHome();
+  const wt = makeWorktree();
+  const id = pagePath.replace(/^.*\/|\.md$/g, "");
+  const calls = [];
+  const out = await runRunner(baseArgs(wt, [{ id, path: pagePath, track: "extend" }], { outline: "docs/internal/outlines/extend.json", ...extraArgs }), makeAgent(wt, home, calls, overrides), parallel, noop, noop);
+  const labels = calls.map((c) => c.label);
+  const prompt = (label) => calls.find((c) => c.label === label).prompt;
+  return { out, record: out.pages[0], labels, prompt, flat: (label) => prompt(label).replace(/\s+/g, " ") };
+}
+
+check("dry run: the structural edit seat runs in round 1 with the outline entry and the published checklist", async () => {
+  const { labels, flat } = await seatDryRun("docs/extend/architecture.md");
+  assert.ok(labels.includes("structure:architecture:r1"));
+  const s = flat("structure:architecture:r1");
+  assert.match(s, /Learn where cairn ends and your site begins\./, "the outline job");
+  assert.match(s, /- The export map\./, "the outline covers");
+  assert.match(s, /- Security properties \(security-model\)\./, "the outline's out of scope");
+  assert.match(s, /crossLinks.*"from" is "architecture"/, "the outline's cross-links for this slug");
+  assert.ok(s.includes("docs/internal/outlines/extend.json"), "the outline path");
+  for (const item of ["Module types are not mixed.", "Module types are used correctly.", "Information is provided at the right pace.",
+    "Information is presented in the most logical order and location.", "Cross-references are used appropriately and only when useful.",
+    "The user goal is clear.", "Tasks reflect the intended goal of the user.", "Troubleshooting and error recognition steps are included where appropriate.",
+    "What the document covers.", "What prior knowledge you expect readers to have.", "What the document doesn't cover.",
+    "Does your introduction provide an accurate overview of the topics you cover?",
+    "Most readers appreciate at least a brief introduction under each heading to provide some context."]) {
+    assert.ok(s.includes(item), `checklist item: ${item}`);
+  }
+  assert.ok(!s.includes("Tags and entities are used correctly."), "the inapplicable AsciiDoc item is left out");
+  assert.match(s, /## The page anatomies/, "the register's page anatomies, by heading");
+  assert.ok(s.includes(RECORD), "the prior-art record");
+  assert.match(s, /never edits/);
+});
+
+check("dry run: the structural seat's fix reaches the redraft prompt and it re-reads in lean mode; the editor does not", async () => {
+  let n = 0;
+  const { labels, flat, record } = await seatDryRun("docs/extend/architecture.md", { structure: async () => (++n === 1 ? STRUCT_FIX : ACCEPT) });
+  assert.match(flat("redraft:architecture"), /## structural edit: fix/);
+  assert.match(flat("redraft:architecture"), /STRUCT-FINDING intro omits scope/);
+  assert.ok(labels.includes("structure:architecture:r2"));
+  assert.ok(!labels.includes("editor:architecture:r2"));
+  assert.equal(record.rounds[0].reads.find((r) => r.read === "structural edit").verdict, "fix");
+  assert.equal(record.status, "accepted");
+});
+
+check("dry run: with bothReviewers, the structural seat runs again in round 2 beside every reviewer", async () => {
+  const { labels, record } = await seatDryRun("docs/extend/debug-your-site.md", { editor: async (p, o) => (o.label.endsWith(":r1") ? FIX : ACCEPT) }, { bothReviewers: true });
+  for (const l of ["structure:debug-your-site:r2", "editor:debug-your-site:r2", "facts:debug-your-site:r2"]) assert.ok(labels.includes(l), l);
+  assert.equal(record.crossRegression, false);
+});
+
+check("dry run: the final reader read runs last, after every read accepts, and its verdict lands in the record", async () => {
+  const { labels, record, prompt, flat } = await seatDryRun("docs/extend/architecture.md", { reader: async () => ({ ...ACCEPT, paraphrase: "READER-PARAPHRASE" }) });
+  assert.equal(labels[labels.length - 1], "reader:architecture");
+  assert.equal(labels.filter((l) => l.startsWith("reader")).length, 1);
+  assert.equal(record.status, "accepted");
+  assert.equal(record.finalRead.verdict, "accept");
+  assert.equal(record.finalRead.paraphrase, "READER-PARAPHRASE");
+  assert.deepEqual(record.finalRead.findings, []);
+  assert.ok(!prompt("reader:architecture").includes("Learn where cairn ends"), "the job is not in the reader's prompt");
+  const r = flat("reader:architecture");
+  assert.ok(!r.includes("The export map."), "the covers are not in the reader's prompt");
+  assert.ok(r.includes("What do you think the writer was trying to do with this document?"));
+  assert.match(r, /tell you in his or her own words what that section means/, "a concept page's paraphrase test");
+  assert.ok(r.indexOf("What do you think the writer") < r.indexOf("docs/internal/outlines/extend.json"), "the outline is named only after the paraphrase step");
+});
+
+check("dry run: a task page's reader follows it as a reader would and logs each inference", async () => {
+  const { flat } = await seatDryRun("docs/extend/debug-your-site.md", { inputs: async () => ({ job: "j", pageType: "task guide", factIds: [], claimInventory: [], rowsReceived: [], rowsDisposed: [] }) });
+  const r = flat("reader:debug-your-site");
+  assert.ok(r.includes("following it as a reader would"));
+  assert.ok(r.includes("logging every point where it had to infer"));
+  assert.doesNotMatch(r, /his or her own words/);
+});
+
+check("dry run: the final reader read never runs before acceptance, and never on an escalated page", async () => {
+  const { labels, record } = await seatDryRun("docs/extend/debug-your-site.md", { editor: async () => FIX });
+  assert.equal(record.status, "escalate");
+  assert.ok(!labels.some((l) => l.startsWith("reader")));
+  const second = await seatDryRun("docs/extend/debug-your-site.md", { editor: async (p, o) => (o.label.endsWith(":r1") ? FIX : ACCEPT) });
+  assert.ok(second.labels.indexOf("reader:debug-your-site") > second.labels.indexOf("editor:debug-your-site:r2"), "after the round-2 reads");
+});
+
+check("dry run: the final reader read's fix drives exactly one scoped redraft with scoped register and fact reads", async () => {
+  const { labels, record, flat } = await seatDryRun("docs/extend/architecture.md", { reader: async () => READER_FIX });
+  const tail = labels.slice(labels.indexOf("reader:architecture"));
+  assert.deepEqual(tail, ["reader:architecture", "reader-redraft:architecture", "editor:architecture:final", "facts:architecture:final"]);
+  assert.equal(record.status, "accepted");
+  assert.equal(record.finalRead.verdict, "fix");
+  assert.deepEqual(record.finalRead.findings, READER_FIX.findings);
+  assert.equal(record.finalRead.paraphrase, "READER-PARAPHRASE");
+  assert.equal(record.finalRead.redraft.gate, "pass");
+  assert.deepEqual(record.finalRead.reads.map((r) => r.read), ["register editor", "fact read"]);
+  assert.equal(record.rounds.length, 1, "the scoped redraft is not a chain round");
+  const redraft = flat("reader-redraft:architecture");
+  assert.match(redraft, /READER-FINDING had to infer the seam/);
+  assert.match(redraft, /only the spots/);
+  for (const l of ["editor:architecture:final", "facts:architecture:final"]) {
+    assert.match(flat(l), /Changed sentences get both reviews, scoped to those sentences/, l);
+    assert.match(flat(l), /READER-FINDING had to infer the seam/, l);
+  }
+});
+
+check("dry run: a scoped read's fix after the final read's redraft escalates, with no second final read", async () => {
+  const { labels, record } = await seatDryRun("docs/extend/architecture.md", {
+    reader: async () => READER_FIX,
+    editor: async (p, o) => (o.label.endsWith(":final") ? FIX : ACCEPT)
+  });
+  assert.equal(record.status, "escalate");
+  assert.equal(labels.filter((l) => l.startsWith("reader:")).length, 1);
+  assert.equal(labels.filter((l) => l.startsWith("reader-redraft:")).length, 1);
+});
+
+check("dry run: the drafter prompt carries the anatomy pointer and the no-claim instruction", async () => {
+  const { flat } = await seatDryRun("docs/extend/architecture.md");
+  const d = flat("draft:architecture");
+  assert.match(d, /the introduction, the section hand-off lead-ins, and the ending the register's page anatomies require/);
+  assert.match(d, /"no-claim" when it carries no extractable fact/);
+  assert.ok(d.includes("scripts/checks/check-provenance.mjs"));
+  assert.ok(d.includes("a no-claim sentence cites nothing, so any extractable fact in it fails"));
 });
 
 // -------------------------------------------------------------------------------------------

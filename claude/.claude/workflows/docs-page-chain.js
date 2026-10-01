@@ -8,13 +8,14 @@
 // `[candidate]`. The drafter (`cairn-docs-drafter` by default) writes the page and its
 // sentence-to-fact brief from that record and files no fact of its own; it runs the docs gate
 // itself as its last act and reports the result; it reads the page's exemplar sources whole. The
-// register editor and a fact read run in
-// parallel, both Opus 5.5, plus a figure-verifier read for a page carrying a figure. One redraft
+// structural edit seat, the register editor, and a fact read run in
+// parallel, all Opus 5.5, plus a figure-verifier read for a page carrying a figure. One redraft
 // round on the combined findings, gated and re-read; by default only the reviewer(s) that
 // returned "fix" re-read (`args.bothReviewers` re-reads every reviewer instead and the record
 // carries a cross-regression flag: a reviewer that accepted in round 1 and returned "fix" in
 // round 2). A second "fix" from a re-reader escalates to the conductor; there is no third round.
-// The conductor reads only the per-page records returned.
+// A page every read accepts then takes the final reader read, last. The conductor reads only the
+// per-page records returned.
 //
 // Invoke by name from the conductor session:
 //
@@ -119,6 +120,37 @@
 // page's exemplars give structure and detail per step), and, on a figure page, the
 // `cairn-figure` skill file to read and follow.
 //
+// The structural edit seat (`structural edit` in the record, `general-purpose`, read-only by its
+// prompt) runs the structural-edit checklist that
+// `docs/superpowers/research/2026-09-30-page-level-review-prior-art.md` adopts in "## b.
+// Structural edit seat": the Red Hat peer review guide's Structure Checklist, less its two
+// AsciiDoc and reuse items, and Google Technical Writing Two's introduction, review, navigation,
+// and heading lead-in items, all quoted verbatim, with the introduction checked on every page. It
+// reads the whole page against its outline entry (`job`, `covers`, `outOfScope`, and the
+// outline's `crossLinks` from the page's slug, read live) and the register's page anatomies, and
+// never edits. Its findings join the round's like the other reads', and `bothReviewers`
+// re-reads it. The register editor's own definition carries line-level grading, which the
+// record's ordering (line editing after structure) keeps out of this seat, so it reuses
+// `general-purpose` as the fact read does rather than a new agent file.
+//
+// The final reader read (`record.finalRead`, `general-purpose`) runs once per page, after every
+// read has accepted, in round 1 or round 2; an escalated page never takes it. It follows the same
+// record's "## f. The final reader read": the Federal Plain Language Guidelines' Part V, with the
+// agent as the participant. It reads only the page: a concept page takes Part V's paraphrase
+// test, a task or tutorial page is followed as a reader would (DigitalOcean), and every page
+// answers Part V's open-ended questions, "What do you think the writer was trying to do with
+// this document?" returned as `paraphrase`. Only then does it read the page's `job` from the
+// outline file (with no outline, the job rides in its prompt's last step) and report each
+// mismatch and each point where it had to infer. Its "fix" sends the page back for one redraft
+// of the cited spots, which takes the register editor's and the fact read's reads scoped to the
+// changed sentences (the parent spec's "Edits after the chain"); a "fix" or a red gate there
+// escalates, and the reader does not read again. Its verdict, summary, paraphrase, and findings,
+// and any redraft and scoped reads, land in `record.finalRead`, never in `rounds`.
+//
+// The drafter writes the introduction, the section hand-off lead-ins, and the ending the
+// register's page anatomies require, records each `no-claim` in the brief when it carries no
+// extractable fact, and cites the fact id when it does.
+//
 // The return carries `spent`: the runtime `budget.spent()` delta across the run, in its unit of
 // output tokens spent across the main loop and all workflows, so a relative measure only and
 // never a count against a pass ceiling. It is null when the runtime supplies no `budget`.
@@ -134,8 +166,9 @@ export const meta = {
     { title: "Outline", detail: "with args.outline, one probe resolves every page's outline entry" },
     { title: "Page inputs", detail: "one agent per page: job, type, fact ids, claim inventory" },
     { title: "Draft", detail: "the drafter writes the page and runs the docs gate itself" },
-    { title: "Read", detail: "register editor and fact read in parallel, both Opus, plus a figure read when the page carries one" },
+    { title: "Read", detail: "structural edit, register editor, and fact read in parallel, all Opus, plus a figure read when the page carries one" },
     { title: "Redraft", detail: "one round on the combined findings; only the reviewer(s) that returned fix re-read by default" },
+    { title: "Final read", detail: "one reader read on an accepted page; its fix takes one scoped redraft and scoped reads" },
     { title: "Report", detail: "per-page records for the conductor" }
   ]
 };
@@ -262,6 +295,19 @@ const READ_SCHEMA = {
     frictionFiled: { type: "array", items: { type: "string" } }
   },
   required: ["verdict", "findings", "summary"]
+};
+
+// The final reader read's report: a read's verdict and findings, plus its answer to Part V's
+// "What do you think the writer was trying to do with this document?"
+const READER_SCHEMA = {
+  type: "object",
+  properties: {
+    verdict: READ_SCHEMA.properties.verdict,
+    findings: READ_SCHEMA.properties.findings,
+    summary: { type: "string" },
+    paraphrase: { type: "string" }
+  },
+  required: ["verdict", "findings", "summary", "paraphrase"]
 };
 
 const a = args || {};
@@ -714,10 +760,22 @@ line as indexLink; if it exits non-zero, report its error as indexLink and in co
 `;
 }
 
-function draftPrompt(p, pageInputs, round, findings) {
+/**
+ * The drafter's prompt for a first draft, the round-2 redraft, or the one redraft after the final
+ * reader read, which changes only the spots that read cites.
+ * @param {Record<string, any>} p
+ * @param {Record<string, any>} pageInputs
+ * @param {number} round
+ * @param {string} [findings] - the combined findings a redraft works from
+ * @param {boolean} [afterFinalRead] - the redraft is the final reader read's
+ * @returns {string}
+ */
+function draftPrompt(p, pageInputs, round, findings, afterFinalRead = false) {
   const head = round === 1
     ? `Draft the page ${p.path} at its final path, from the page inputs below and nothing else.`
-    : `Redraft ${p.path} once, on the combined findings below. Fix every blocking finding; take a non-blocking one when it is right. Do not widen the page.`;
+    : afterFinalRead
+      ? `Redraft ${p.path} once, on the final reader read's findings below. Change only the spots they cite and leave the rest of the page as it stands.`
+      : `Redraft ${p.path} once, on the combined findings below. Fix every blocking finding; take a non-blocking one when it is right. Do not widen the page.`;
   const inventory = (pageInputs.claimInventory || [])
     .map((c) => `- [${c.disposition}] ${c.claim}${c.factId ? ` (${c.factId})` : ""}${c.reason ? ` -- ${c.reason}` : ""}`)
     .join("\n");
@@ -742,6 +800,12 @@ Claim inventory, one disposition per claim (a "cut" or "re-pointed" claim stays 
 ${inventory || "(the page is new; no prior claims to carry)"}
 ${p.pinned && p.pinned.length ? `Pinned heading slugs this page must keep, verbatim: ${p.pinned.join(", ")}` : ""}
 ${round > 1 ? `\nCombined findings from the reads:\n${findings}\n` : ""}
+Write the introduction, the section hand-off lead-ins, and the ending the register's page anatomies
+require for this page's type; the removal rule does not cut them. In the brief, record each of
+those sentences "no-claim" when it carries no extractable fact, and cite its fact id when it does:
+scripts/checks/check-provenance.mjs fails a no-claim sentence that holds one ("a no-claim sentence
+cites nothing, so any extractable fact in it fails").
+
 Write the page's sentence-to-fact brief alongside the page at ${briefPathFor(p)}, citing only the
 fact ids above or "no-claim". File no fact yourself, new or retagged. A claim the page needs whose
 fact is not among the ids above is a couldNotDo naming the missing fact; do not draft that claim
@@ -757,25 +821,43 @@ ${gateLine(p)}
 Return the structured report only.`;
 }
 
-function editorPrompt(p) {
+/**
+ * The scope line for a register or fact read after the final reader read's redraft: the parent
+ * spec's rule for an edit after the chain, and the spots that changed. Empty for a chain round.
+ * @param {string} [scope] - the final reader read's findings, as the redraft received them
+ * @returns {string}
+ */
+function scopeNote(scope) {
+  if (!scope) return "";
+  return `
+This read is scoped. The page changed only at the spots the final reader read cites below, and
+"Changed sentences get both reviews, scoped to those sentences"
+(docs/superpowers/specs/2026-09-26-draft-docs-approach-design.md, "Edits after the chain"). Grade
+the changed sentences.
+
+${scope}
+`;
+}
+
+function editorPrompt(p, scope) {
   return `Adversarial register edit of ${p.path} in ${WT}.
 
 ${common}
 ${registerLine(p, "editor")}
-
+${scopeNote(scope)}
 Run plain \`vale ${p.path}\` from the worktree, never the docs gate, and read every alert it
 prints. Read the page, then grade the brief's structure checklist, the brief's tells, and Vale's
 alerts together, with the Names section, logic, and facts-adjacent phrasing. Return ranked
 findings with a proposed rewrite each, and a verdict: "fix" if any finding is blocking.`;
 }
 
-function factPrompt(p, pageInputs) {
+function factPrompt(p, pageInputs, scope) {
   const inventory = (pageInputs.claimInventory || [])
     .map((c) => `- [${c.disposition}] ${c.claim}${c.factId ? ` (${c.factId})` : ""}${c.reason ? ` -- ${c.reason}` : ""}`)
     .join("\n");
   return `Fact read of ${p.path} in ${WT}. The page's claim inventory from its page-inputs step:
 ${inventory || "(none recorded)"}
-${outlineCoverage(p)}
+${outlineCoverage(p)}${scopeNote(scope)}
 Check every claim on the page against its cited fact id, retrace every cited fact against its
 source and fix or retag it [docs-drift] in the same chain when it no longer matches, and confirm
 every claim the inventory marks "carried" or "filed" still appears on the page. A claim on the
@@ -827,6 +909,146 @@ function figurePrompt(p) {
 figure fails; otherwise "accept".${p.figureNote ? `\n\nFigure note, from the outline: ${p.figureNote}` : ""}`;
 }
 
+// The prior-art record the structural edit seat and the final reader read quote: the only source
+// of their checklist and test wording.
+const PRIOR_ART = "docs/superpowers/research/2026-09-30-page-level-review-prior-art.md";
+
+/**
+ * The structural edit seat's prompt: the two published blocks the prior-art record adopts in
+ * "## b. Structural edit seat", quoted verbatim, run over the whole page against its outline
+ * entry, with the type's introduction duties from the register's page anatomies.
+ * @param {Record<string, any>} p
+ * @returns {string}
+ */
+function structurePrompt(p) {
+  const bullets = (xs) => (xs || []).map((x) => `- ${x}`).join("\n") || "(none listed)";
+  const crossLinks = OUTLINE
+    ? `Cross-links: read the top-level crossLinks array in ${OUTLINE} live, and take every entry
+whose "from" is "${slugOf(p)}"; each names a page this one links ("to") and why.`
+    : "";
+  return `Structural edit of ${p.path} in ${WT}.
+
+${common}
+The level, as the Editorial Freelancers Association defines it: "Developmental editors (also called
+'substantive,' 'structural,' or 'content' editors) deal with content, organization, and genre
+considerations." Your stance, from ${PRIOR_ART}, "## b. Structural edit seat": "an editor. It reads
+the whole page against the outline and this checklist, returns findings with \`file:line\`, and never
+edits." Grade the page at this level only.
+
+The page's outline entry${OUTLINE ? `, from ${OUTLINE}` : ""}:
+Job: ${p.job}
+Page type: ${p.pageType || "(none given)"}
+What the page covers:
+${bullets(p.covers)}
+Out of scope, owned by another page:
+${bullets(p.outOfScope)}
+${crossLinks}
+
+How the entry is read, from the same record: "the outline's \`job\` is the page's purpose, \`covers\`
+is the list the page must deliver in the order the seat judges (Block 1 "most logical order"), and
+\`outOfScope\` is the page's "doesn't cover" list; the seat compares the introduction to those three."
+Cross-links are the page's "See-also, next steps, related resources" ("## e. Outline fields").
+
+Read the section "## The page anatomies" of ${REGISTER}, by its exact heading. The introduction it
+requires for this page's type is "the second half of the same check" as Google's introduction items
+below, and its ending is the page's closing section.
+
+Block 1, the Red Hat peer review guide's "Structure Checklist"
+(https://redhat-documentation.github.io/peer-review/), the items that apply. Run the two module-type
+items against cairn's page types, the anatomies in the register.
+Structure meets modular guidelines
+- Module types are not mixed.
+- Module types are used correctly.
+A logical flow of information
+- Information is provided at the right pace.
+- Information is presented in the most logical order and location.
+- Cross-references are used appropriately and only when useful.
+User stories
+- The user goal is clear.
+- Tasks reflect the intended goal of the user.
+- Troubleshooting and error recognition steps are included where appropriate.
+
+Block 2, Google Technical Writing Two, "Organizing large documents"
+(https://developers.google.com/tech-writing/two/large-docs). Check the introduction on every page.
+"If readers of your documentation can't find relevance in the subject, they are likely to ignore it.
+To set the ground rules for your users, we recommend providing an introduction that includes the
+following information:
+- What the document covers.
+- What prior knowledge you expect readers to have.
+- What the document doesn't cover.
+Remember that you want to keep your documentation easy to maintain, so don't try to cover everything
+in the introduction."
+"After you've completed the first draft, check your entire document against the expectations you set
+in your overview. Does your introduction provide an accurate overview of the topics you cover?"
+"Clear navigation includes:
+- introduction and summary sections
+- a clear, logical development of the subject
+- headings and subheadings that help users understand the subject
+- a table of contents menu that shows users where they are in the document
+- links to related resources or more in-depth information
+- links to what to learn next"
+"Most readers appreciate at least a brief introduction under each heading to provide some context."
+"Structure your outline so that your document introduces information when it's most relevant to your
+reader."
+
+A checklist item the page fails is a blocking finding: its file:line as location, the item it fails
+and how, and in rewrite a suggestion for how to address it. Verdict "fix" if any blocking finding
+exists; otherwise "accept".`;
+}
+
+/**
+ * The final reader read's prompt: the Federal Plain Language Guidelines' Part V test as the
+ * prior-art record adopts it in "## f. The final reader read", with the agent as the participant.
+ * The prompt names the page alone; the job is read from the outline only after the reader has
+ * answered, since "the outline is what it is tested against afterward" (the record's table).
+ * @param {Record<string, any>} p
+ * @param {string} pageType - the page-inputs step's page type, or the outline's
+ * @returns {string}
+ */
+function readerPrompt(p, pageType) {
+  const type = String(pageType || "");
+  let first;
+  if (/concept/i.test(type)) {
+    first = `Part V's paraphrase test: "Ask the participant to read to a specific stopping point, known as
+a cue. Each time the participant reaches a cue, ask the participant to tell you in his or her own
+words what that section means." Each section's end is a cue: write in your own words what that
+section means, and keep each paraphrase in summary.`;
+  } else if (/task|tutorial|how-to/i.test(type)) {
+    first = `DigitalOcean's test for a tutorial: "We ask that you thoroughly test it by reading through it and
+following it as a reader would." Follow the page as the cold reader of
+docs/superpowers/specs/2026-09-21-draft-docs-design.md does: "an agent with the page and a terminal
+only", "logging every point where it had to infer". Run a step only in a scratch directory outside
+the worktree; read a step that needs an account, a secret, or a deploy without running it, and log
+what you had to infer to understand it.`;
+  } else {
+    first = `Read the page once, whole.`;
+  }
+  const job = OUTLINE
+    ? `open ${OUTLINE} and read the "job" of the entry in "pages" whose "path" is "${p.path}"`
+    : `read the page's job: ${p.job}`;
+  return `Final reader read of ${p.path} in ${WT}. You are the reader: you have this page and nothing
+else. Read no other file until step 3, and modify no file in the worktree.
+
+The method is the Federal Plain Language Guidelines, Part V, "Test", and you are its participant.
+
+Step 1. ${first}
+
+Step 2. Answer Part V's open-ended questions:
+  What would you do if you got this document?
+  What do you think the writer was trying to do with this document?
+  Thinking of other people you know who might get this document:
+    What about the document might work well for them?
+    What about the document might cause them problems?
+Return your answer to the second question as paraphrase, and the other answers in summary.
+
+Step 3. Only now, ${job}. Each mismatch between your paraphrase and that job is a blocking finding:
+"wherever participants misunderstood the message, the document has a problem that you should fix"
+(Part V). Each point where you had to infer is a finding, blocking when it is an unstated step or an
+unclassified error (the cold-reader row of docs/superpowers/specs/2026-09-21-draft-docs-design.md).
+Give each its file:line as location. The method's source is ${PRIOR_ART}, "## f. The final reader
+read". Verdict "fix" if any blocking finding exists; otherwise "accept".`;
+}
+
 function combined(readList) {
   return readList
     .map(([name, r]) => `## ${name}: ${r.verdict}\n${r.summary}\n` +
@@ -835,25 +1057,40 @@ function combined(readList) {
 }
 
 /**
- * Every reviewer this page carries: the two standing reads, plus a figure-verifier read for a
+ * Every reviewer this page carries: the three standing reads, plus a figure-verifier read for a
  * page with `p.figure` set.
  * @param {{ figure?: boolean }} p
  * @returns {string[]}
  */
 function reviewNames(p) {
-  return ["register editor", "fact read", ...(p.figure ? ["figure verifier"] : [])];
+  return ["structural edit", "register editor", "fact read", ...(p.figure ? ["figure verifier"] : [])];
 }
 
-async function runReads(p, pageInputs, round, names) {
+/**
+ * Runs the named reads in parallel. `round` is a chain round's number, or "final" for the scoped
+ * reads after the final reader read's redraft, which pass that read's findings as `scope`.
+ * @param {Record<string, any>} p
+ * @param {Record<string, any>} pageInputs
+ * @param {number | "final"} round
+ * @param {string[]} names
+ * @param {string} [scope]
+ * @returns {Promise<{ list: Array<[string, any]>, missing: number, anyFix: boolean }>}
+ */
+async function runReads(p, pageInputs, round, names, scope) {
+  const tag = round === "final" ? "final" : `r${round}`;
+  const phaseName = round === "final" ? "Final read" : "Read";
   const tasks = [];
+  if (names.includes("structural edit")) {
+    tasks.push(["structural edit", () => agent(structurePrompt(p), { label: `structure:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "general-purpose" })]);
+  }
   if (names.includes("register editor")) {
-    tasks.push(["register editor", () => agent(editorPrompt(p), { label: `editor:${p.id}:r${round}`, phase: "Read", schema: READ_SCHEMA, model: REVIEWER, agentType: "cairn-register-editor" })]);
+    tasks.push(["register editor", () => agent(editorPrompt(p, scope), { label: `editor:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "cairn-register-editor" })]);
   }
   if (names.includes("fact read")) {
-    tasks.push(["fact read", () => agent(factPrompt(p, pageInputs), { label: `facts:${p.id}:r${round}`, phase: "Read", schema: READ_SCHEMA, model: REVIEWER, agentType: "general-purpose" })]);
+    tasks.push(["fact read", () => agent(factPrompt(p, pageInputs, scope), { label: `facts:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "general-purpose" })]);
   }
   if (names.includes("figure verifier")) {
-    tasks.push(["figure verifier", () => agent(figurePrompt(p), { label: `figure:${p.id}:r${round}`, phase: "Read", schema: READ_SCHEMA, model: REVIEWER, agentType: "figure-verifier" })]);
+    tasks.push(["figure verifier", () => agent(figurePrompt(p), { label: `figure:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "figure-verifier" })]);
   }
   const results = await parallel(tasks.map(([, fn]) => fn));
   const list = tasks.map(([name], i) => [name, results[i]]).filter(([, r]) => r);
@@ -864,8 +1101,7 @@ async function runReads(p, pageInputs, round, names) {
 
 /**
  * One round's read entries for the record. The fact read's `frictionFiled` is copied onto its
- * entry; the register editor's and the figure verifier's are dropped, since neither reports
- * friction.
+ * entry; any other read's is dropped, since only the fact read reports friction.
  * @param {Array<[string, { verdict: string, summary: string, findings: Array<{ blocking: boolean }>, frictionFiled?: string[] }]>} list
  * @returns {object[]}
  */
@@ -903,6 +1139,33 @@ function deriveCrossRegression(record, bothReviewers) {
 }
 // === END CROSS-REGRESSION DERIVATION ===
 
+/**
+ * The final reader read, run once on a page every read has accepted. Its "fix" sends the page
+ * back for one redraft of the cited spots, which then takes the register editor's and the fact
+ * read's reads scoped to the changed sentences; a "fix" or a red gate there escalates, and the
+ * reader does not read again.
+ * @param {Record<string, any>} p
+ * @param {Record<string, any>} pageInputs
+ * @param {Record<string, any>} record
+ * @returns {Promise<Record<string, any>>} the page's final record
+ */
+async function finalRead(p, pageInputs, record) {
+  const fr = await agent(readerPrompt(p, pageInputs.pageType || p.pageType), { label: `reader:${p.id}`, phase: "Final read", schema: READER_SCHEMA, model: REVIEWER, agentType: "general-purpose" });
+  if (!fr) return { ...record, status: "escalate", reason: "the final reader read returned nothing" };
+  record.finalRead = { verdict: fr.verdict, summary: fr.summary, paraphrase: fr.paraphrase, findings: fr.findings || [] };
+  if (fr.verdict !== "fix") return { ...record, status: "accepted" };
+
+  const cited = combined([["final reader read", { ...fr, findings: fr.findings || [] }]]);
+  const d = await agent(draftPrompt(p, pageInputs, 2, cited, true), { label: `reader-redraft:${p.id}`, phase: "Final read", schema: DRAFT_SCHEMA, model: DRAFTER, agentType: DRAFTER_TYPE });
+  if (!d) return { ...record, status: "escalate", reason: "the redraft after the final reader read returned nothing" };
+  record.finalRead.redraft = d;
+  const r = await runReads(p, pageInputs, "final", ["register editor", "fact read"], cited);
+  record.finalRead.reads = readEntries(r.list);
+  if (r.missing) return { ...record, status: "escalate", reason: `${r.missing} scoped read(s) returned nothing after the final reader read` };
+  if (!r.anyFix && d.gate === "pass") return { ...record, status: "accepted" };
+  return { ...record, status: "escalate", reason: "a scoped read returned fix or the gate was red after the final reader read's redraft", findings: combined(r.list) };
+}
+
 async function chain(p) {
   const record = { id: p.id, path: p.path, brief: briefPathFor(p), rounds: [] };
   const pageInputs = await agent(pageInputsPrompt(p), { label: `inputs:${p.id}`, phase: "Page inputs", schema: PAGE_INPUTS_SCHEMA, model: PAGE_INPUTS_MODEL, agentType: PAGE_INPUTS_TYPE });
@@ -917,7 +1180,7 @@ async function chain(p) {
   record.rounds[0].reads = readEntries(r1.list);
   // A read that returned nothing is never a silent accept.
   if (r1.missing) return { ...record, status: "escalate", reason: `${r1.missing} read(s) returned nothing in round 1` };
-  if (!r1.anyFix && d1.gate === "pass") return { ...record, status: "accepted" };
+  if (!r1.anyFix && d1.gate === "pass") return finalRead(p, pageInputs, record);
 
   const rereviewNames = BOTH_REVIEWERS ? allNames : r1.list.filter(([, r]) => r.verdict === "fix").map(([n]) => n);
   const findings = combined(r1.list) + (d1.gate !== "pass" ? `\n\n## gate: ${d1.gate}\n${d1.gateTail || ""}` : "");
@@ -929,7 +1192,7 @@ async function chain(p) {
   const cr = deriveCrossRegression(record, BOTH_REVIEWERS);
   if (cr !== undefined) record.crossRegression = cr;
   if (r2.missing) return { ...record, status: "escalate", reason: `${r2.missing} read(s) returned nothing in round 2` };
-  if (!r2.anyFix && d2.gate === "pass") return { ...record, status: "accepted" };
+  if (!r2.anyFix && d2.gate === "pass") return finalRead(p, pageInputs, record);
   return { ...record, status: "escalate", reason: "second fix verdict or red gate", findings: combined(r2.list) };
 }
 

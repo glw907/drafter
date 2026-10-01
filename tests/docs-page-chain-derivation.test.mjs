@@ -233,6 +233,13 @@ check("the drafter definition names no grader or v2 chain, and runs its own gate
   assert.doesNotMatch(DRAFTER_SRC, /\[candidate\]/);
 });
 
+check("the drafter definition keeps the anatomy's sentences from the removal rule and records them no-claim only without a fact", () => {
+  const flat = DRAFTER_SRC.replace(/\s+/g, " ");
+  assert.match(flat, /The introduction, the section hand-off lead-ins, and the ending the register's page anatomies require are not cut under this rule\./);
+  assert.match(flat, /`no-claim` only when it carries no extractable fact/);
+  assert.ok(flat.includes("a no-claim sentence cites nothing, so any extractable fact in it fails"));
+});
+
 check("the per-page record carries its brief path from the start, on every return path", () => {
   assert.match(RUNNER_SRC, /const record = \{ id: p\.id, path: p\.path, brief: briefPathFor\(p\), rounds: \[\] \};/);
 });
