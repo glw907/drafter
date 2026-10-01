@@ -790,6 +790,19 @@ check("dry run: a re-test that returns fix escalates the page, with exactly two 
   assert.deepEqual(record.finalRead.retest.findings, READER_FIX.findings);
 });
 
+check("dry run: a red gate on the final read's redraft escalates at once, with no scoped reads and no re-test", async () => {
+  const { labels, record } = await seatDryRun("docs/extend/architecture.md", {
+    reader: async () => READER_FIX,
+    "reader-redraft": async (prompt) => ({ path: prompt.match(/Redraft (\S+)/)[1], gate: "fail", gateCommand: "stub", gateTail: "GATE-TAIL vale error" })
+  });
+  assert.equal(record.status, "escalate");
+  assert.deepEqual(labels.filter((l) => l.startsWith("reader:")), ["reader:architecture"]);
+  assert.ok(!labels.includes("reader:architecture:retest"));
+  assert.ok(!labels.includes("editor:architecture:final"));
+  assert.ok(!labels.includes("facts:architecture:final"));
+  assert.match(record.findings, /## gate: fail\nGATE-TAIL vale error/);
+});
+
 check("dry run: a scoped read's fix after the final read's redraft escalates, with no re-test", async () => {
   const { labels, record } = await seatDryRun("docs/extend/architecture.md", {
     reader: async () => READER_FIX,

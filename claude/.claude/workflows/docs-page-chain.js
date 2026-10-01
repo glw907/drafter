@@ -1171,11 +1171,14 @@ async function finalRead(p, pageInputs, record) {
   const d = await agent(draftPrompt(p, pageInputs, 2, cited, true), { label: `reader-redraft:${p.id}`, phase: "Final read", schema: DRAFT_SCHEMA, model: DRAFTER, agentType: DRAFTER_TYPE });
   if (!d) return { ...record, status: "escalate", reason: "the redraft after the final reader read returned nothing" };
   record.finalRead.redraft = d;
+  if (d.gate !== "pass") {
+    return { ...record, status: "escalate", reason: "the gate was red after the final reader read's redraft", findings: `## gate: ${d.gate}\n${d.gateTail || ""}` };
+  }
   const r = await runReads(p, pageInputs, "final", ["register editor", "fact read"], cited);
   record.finalRead.reads = readEntries(r.list);
   if (r.missing) return { ...record, status: "escalate", reason: `${r.missing} scoped read(s) returned nothing after the final reader read` };
-  if (r.anyFix || d.gate !== "pass") {
-    return { ...record, status: "escalate", reason: "a scoped read returned fix or the gate was red after the final reader read's redraft", findings: combined(r.list) };
+  if (r.anyFix) {
+    return { ...record, status: "escalate", reason: "a scoped read returned fix after the final reader read's redraft", findings: combined(r.list) };
   }
 
   const rt = await agent(readerPrompt(p, pageInputs.pageType || p.pageType), { label: `reader:${p.id}:retest`, phase: "Final read", schema: READER_SCHEMA, model: REVIEWER, agentType: "general-purpose" });
