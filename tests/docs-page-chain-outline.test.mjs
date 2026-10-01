@@ -142,6 +142,7 @@ function makeAgent(wt, home, calls, overrides = {}) {
     const kind = opts.label.split(":")[0];
     if (overrides[kind]) return overrides[kind](prompt, opts);
     if (kind === "outline") return JSON.parse(runHelperLine(helperLine(prompt, "resolve"), home));
+    if (kind === "rework-state") return JSON.parse(runHelperLine(helperLine(prompt, "rework-state"), home));
     if (kind === "inputs") return { job: "the job", pageType: "concept", factIds: ["f:a7qx4m"], claimInventory: [] };
     if (kind === "draft" || kind === "redraft" || kind === "reader-redraft" || kind === "rework") {
       const path = prompt.match(/(?:Draft the page|Redraft) (\S+)/)[1];
@@ -171,7 +172,7 @@ const endAt = RUNNER_SRC.indexOf(END);
 let runnerMerge = null;
 if (startAt !== -1 && endAt > startAt) {
   // eslint-disable-next-line no-new-func -- same extraction pattern as the derivation test.
-  runnerMerge = new Function(`${RUNNER_SRC.slice(startAt, endAt)}\nreturn { canonicalEntry, fnv, checksumOf, probeChecksum, mergeOutline };`)();
+  runnerMerge = new Function(`${RUNNER_SRC.slice(startAt, endAt)}\nreturn { canonicalEntry, fnv, checksumOf, probeChecksum, mergeOutline, reworkChecksum: typeof reworkChecksum === "function" ? reworkChecksum : undefined };`)();
 }
 
 check("the merge markers are present, in order", () => {
@@ -829,28 +830,85 @@ check("dry run: the drafter prompt carries the anatomy pointer and the no-claim 
 const REWORK = "REWORK-TEXT the page opens on a meta sentence; add an introduction.";
 const REWORK_SCOPE = "page-level only (introduction, section order, hand-offs, depth, ending, covers), sentences kept where they stand; follow the register's page anatomies.";
 
+const BRIEF_PATH = "docs/internal/briefs/extend/architecture.json";
+
+/** Runs git in a fixture worktree with a fixed identity. */
+function git(wt, args) {
+  return execSync(`git -c user.name=t -c user.email=t@example.com ${args}`, { cwd: wt, encoding: "utf8" }).trim();
+}
+
+/**
+ * A worktree that is a git repo holding the architecture page and its brief, the brief citing
+ * `cited`. `state` leaves the page committed and unchanged ("clean"), never added ("untracked"),
+ * or committed then edited ("modified").
+ */
+function reworkWorktree({ outline = OUTLINE, cited = ["f:a7qx4m", "f:0duu5p"], state = "clean" } = {}) {
+  const wt = makeWorktree(outline);
+  write(wt, BRIEF_PATH, JSON.stringify({ page: "docs/extend/architecture.md", sentences: cited.map((id) => ({ text: `s ${id}`, id })).concat([{ text: "intro", id: "no-claim" }]) }));
+  git(wt, "init -q");
+  if (state !== "untracked") write(wt, "docs/extend/architecture.md", "# Architecture\n\nCommitted body.\n");
+  git(wt, "add -A");
+  git(wt, "commit -q -m fixture");
+  if (state === "untracked") write(wt, "docs/extend/architecture.md", "# Architecture\n\nNew.\n");
+  if (state === "modified") write(wt, "docs/extend/architecture.md", "# Architecture\n\nEdited.\n");
+  return wt;
+}
+
 /** One outline page carrying `rework` through the runner with stubbed agents. */
-async function reworkDryRun(overrides = {}, extraArgs = {}) {
+async function reworkDryRun(overrides = {}, extraArgs = {}, fixture = {}) {
   const home = makeHome();
-  const wt = makeWorktree();
-  write(wt, "docs/extend/architecture.md", "# Architecture\n\nCommitted body.\n");
+  const wt = reworkWorktree(fixture);
   const calls = [];
   const page = { id: "architecture", path: "docs/extend/architecture.md", track: "extend", rework: REWORK };
   const out = await runRunner(baseArgs(wt, [page], { outline: "docs/internal/outlines/extend.json", ...extraArgs }), makeAgent(wt, home, calls, overrides), parallel, noop, noop);
   const labels = calls.map((c) => c.label);
   const flat = (label) => calls.find((c) => c.label === label).prompt.replace(/\s+/g, " ");
-  return { record: out.pages[0], labels, flat };
+  return { record: out.pages[0], labels, flat, wt };
 }
 
 check("dry run: a rework page skips page inputs and the round-1 draft; its first draft call carries the rework text and the scope line", async () => {
   const { labels, flat } = await reworkDryRun();
   assert.ok(!labels.some((l) => l.startsWith("inputs:")), "no page-inputs call");
   assert.ok(!labels.some((l) => l.startsWith("draft:")), "no round-1 draft call");
-  assert.equal(labels[1], "rework:architecture", "the rework redraft is the first page call");
+  assert.equal(labels[1], "rework-state", "one probe reads the page's git state and brief");
+  assert.equal(labels[2], "rework:architecture", "the rework redraft is the first page call");
   const d = flat("rework:architecture");
   assert.match(d, /^Redraft docs\/extend\/architecture\.md once, on the combined findings below\./);
   assert.ok(d.includes(REWORK), "the rework text");
   assert.ok(d.includes(REWORK_SCOPE), "the scope line");
+});
+
+check("helper: rework-state reports HEAD, the page's git state, and the ids its brief cites, under a checksum", () => {
+  const wt = reworkWorktree({ cited: ["f:a7qx4m"] });
+  const r = helper.reworkState(wt, ["docs/extend/architecture.md"], [BRIEF_PATH]);
+  assert.equal(r.ok, true);
+  assert.equal(r.head, git(wt, "rev-parse --short HEAD"));
+  assert.deepEqual(r.pages, [{ path: "docs/extend/architecture.md", brief: BRIEF_PATH, state: "clean", cited: ["f:a7qx4m"] }]);
+  assert.equal(r.checksum, helper.reworkChecksum(r));
+  assert.equal(runnerMerge.reworkChecksum.toString(), helper.reworkChecksum.toString());
+  assert.equal(helper.reworkState(reworkWorktree({ state: "untracked" }), ["docs/extend/architecture.md"], [BRIEF_PATH]).pages[0].state, "untracked");
+  assert.equal(helper.reworkState(reworkWorktree({ state: "modified" }), ["docs/extend/architecture.md"], [BRIEF_PATH]).pages[0].state, "modified");
+});
+
+check("dry run: a rework page's inventory carries the outline ids its brief cites and cuts the rest, so the fact read has no coverage gap", async () => {
+  const outline = { ...OUTLINE, pages: OUTLINE.pages.map((p) => (p.slug === "architecture" ? { ...p, factIds: ["f:aaaaaa", "f:bbbbbb", "f:cccccc"] } : p)) };
+  const { flat, wt } = await reworkDryRun({}, {}, { outline, cited: ["f:aaaaaa", "f:bbbbbb"] });
+  const head = git(wt, "rev-parse --short HEAD");
+  const f = flat("facts:architecture:r1");
+  assert.match(f, /- \[carried\] [^-]*\(f:aaaaaa\)/);
+  assert.match(f, /- \[carried\] [^-]*\(f:bbbbbb\)/);
+  assert.ok(f.includes(`- [cut] an outline fact for this page (f:cccccc) -- cut at the pilot draft (brief at ${head})`), "C is cut with its reason");
+  assert.doesNotMatch(f, /\[carried\] [^-]*\(f:cccccc\)/);
+  assert.match(f, /or appear in the claim inventory above as "cut" with a reason/, "the coverage rule C satisfies as cut");
+});
+
+check("dry run: a rework page that is untracked or has uncommitted changes is not run; its record escalates with the reason", async () => {
+  for (const state of ["untracked", "modified"]) {
+    const { labels, record } = await reworkDryRun({}, {}, { state });
+    assert.equal(record.status, "escalate", state);
+    assert.match(record.reason, new RegExp(`docs/extend/architecture\\.md is ${state}`), state);
+    assert.deepEqual(labels, ["outline", "rework-state"], `${state}: no page agent runs`);
+  }
 });
 
 check("dry run: a rework page's fact read carries the outline factIds as the carried inventory", async () => {
@@ -866,6 +924,7 @@ check("dry run: a rework page's register and fact reads carry the scope note; th
   for (const l of ["editor:architecture:r1", "facts:architecture:r1"]) {
     assert.match(flat(l), /Changed sentences get both reviews, scoped to those sentences/, l);
     assert.ok(flat(l).includes("git diff -- docs/extend/architecture.md"), `${l} names the changed sentences by the diff`);
+    assert.match(flat(l), /If it prints nothing, the rework changed nothing: return "fix" with that finding\./, `${l} fails an empty rework`);
   }
   assert.doesNotMatch(flat("structure:architecture:r1"), /Changed sentences get both reviews/);
   assert.doesNotMatch(flat("structure:architecture:r1"), /git diff/);

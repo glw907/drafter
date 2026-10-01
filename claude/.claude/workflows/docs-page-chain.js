@@ -167,12 +167,18 @@
 // brief are the draft. Its first drafter call is the round-2 redraft prompt (label `rework:`),
 // with the `rework` text as its findings and the scope line "page-level only (introduction,
 // section order, hand-offs, depth, ending, covers), sentences kept where they stand; follow the
-// register's page anatomies." Page inputs is replaced by the outline's job, type, and fact ids,
-// each fact id carried, so the fact read's inventory check has a baseline. That draft takes the
+// register's page anatomies." Before any page agent, one probe runs the helper's `rework-state`
+// command (checksum-verified, like the outline probe) for HEAD, each rework page's git state, and
+// the fact ids its committed brief cites. A rework page that is untracked or has uncommitted
+// changes is not run: its record escalates with that reason. Page inputs is replaced by the
+// outline's job and type and an inventory built from the brief: an id the brief cites is
+// carried, and an outline id it does not cite is cut "cut at the pilot draft (brief at <HEAD>)",
+// so the fact read's coverage rule has a baseline and raises nothing for it. That draft takes the
 // round-1 reads, then the existing round flow, `bothReviewers`, and the final reader read with its
 // re-test. Its register and fact reads, in both rounds, carry the scope note naming the changed
-// sentences by `git diff -- <page>`, as the final-read path's scoped reads do; the structural edit
-// seat reads the whole page unscoped. A round-2 redraft keeps the scope line. The record carries
+// sentences by `git diff -- <page>`, as the final-read path's scoped reads do, and return "fix"
+// when that diff is empty, since the rework then changed nothing; the structural edit seat reads
+// the whole page unscoped. A round-2 redraft keeps the scope line. The record carries
 // `rework: true` and no `pageInputs`. A page without `rework` runs exactly as before.
 //
 // The drafter writes the introduction, the section hand-off lead-ins, and the ending the
@@ -327,6 +333,32 @@ const READ_SCHEMA = {
 
 // The final reader read's report: a read's verdict and findings, plus its answer to Part V's
 // "What do you think the writer was trying to do with this document?"
+// The helper's rework-state report, as the probe returns it.
+const REWORK_STATE_SCHEMA = {
+  type: "object",
+  properties: {
+    ok: { type: "boolean" },
+    head: { type: "string" },
+    pages: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          brief: { type: "string" },
+          state: { type: "string" },
+          cited: { type: "array", items: { type: "string" } },
+          error: { type: "string" }
+        },
+        required: ["path", "brief", "state", "cited"]
+      }
+    },
+    error: { type: "string" },
+    checksum: { type: "string" }
+  },
+  required: ["ok", "head", "pages", "checksum"]
+};
+
 const READER_SCHEMA = {
   type: "object",
   properties: {
@@ -504,6 +536,21 @@ function mergeOutline(pages, probe, outlinePath) {
   });
   return { pages: merged, index: String(probe.index || "") };
 }
+/**
+ * The checksum of a rework-state report: its status, HEAD, error, and every page field, in a
+ * fixed order.
+ * @param {{ ok?: boolean, head?: string, error?: string, pages?: Array<{ path?: string, brief?: string, state?: string, cited?: string[], error?: string }> }} r
+ * @returns {string}
+ */
+function reworkChecksum(r) {
+  return fnv(JSON.stringify({
+    ok: r.ok === true,
+    head: String(r.head || ""),
+    error: String(r.error || ""),
+    pages: (r.pages || []).map((x) => [String(x.path || ""), String(x.brief || ""), String(x.state || ""), Array.isArray(x.cited) ? x.cited.map(String) : [], String(x.error || "")])
+  }));
+}
+
 // === END OUTLINE MERGE ===
 
 /**
@@ -531,6 +578,39 @@ stderr. Run no other command and modify no file.`,
 }
 
 const { pages: PAGES, index: INDEX } = await resolvePages();
+
+/**
+ * With any page carrying `rework`, one probe agent runs the helper's `rework-state` command and
+ * the runner verifies its report: HEAD, each rework page's git state, and the fact ids its brief
+ * cites. Null when no page carries `rework`.
+ * @returns {Promise<{ head: string, pages: Array<{ path: string, state: string, cited: string[], error?: string }> } | null>}
+ * @throws {Error} on a mistranscribed report or an unresolved HEAD
+ */
+async function reworkProbe() {
+  const pages = PAGES.filter((p) => typeof p.rework === "string" && p.rework !== "");
+  if (!pages.length) return null;
+  const quote = (xs) => xs.map((x) => `'${x}'`).join(" ");
+  const report = await agent(
+    `Run exactly this command, once, from any directory:
+
+  cairn-docs-outline rework-state --worktree '${WT}' --paths ${quote(pages.map((p) => p.path))} --briefs ${quote(pages.map(briefPathFor))}
+
+It prints one JSON object on stdout, whatever its exit status. Return that object as your
+structured output with every field and every array element copied verbatim, character for
+character, in the same order: a changed, dropped, or reordered string fails the run. If it prints
+nothing on stdout, return ok: false, head: "", pages: [], and error: the text it printed on
+stderr. Run no other command and modify no file.`,
+    { label: "rework-state", phase: "Outline", schema: REWORK_STATE_SCHEMA, model: "sonnet", effort: "low" }
+  );
+  if (!report) throw new Error("docs-page-chain: the rework-state probe returned nothing");
+  if (reworkChecksum(report) !== report.checksum) {
+    throw new Error(`docs-page-chain: the rework-state probe mistranscribed its report (checksum ${reworkChecksum(report)}, reported ${report.checksum})`);
+  }
+  if (!report.ok) throw new Error(`docs-page-chain: the rework-state probe failed: ${report.error || "no error given"}`);
+  return report;
+}
+
+const REWORK_STATE = await reworkProbe();
 for (const p of PAGES) {
   if (!p.job) throw new Error(`docs-page-chain: ${p.path} has no job, inline or from an outline`);
 }
@@ -860,8 +940,7 @@ Return the structured report only.`;
 function scopeNote(scope, where = "The page changed only at the spots the final reader read cites below") {
   if (!scope) return "";
   return `
-This read is scoped. ${where}, and
-"Changed sentences get both reviews, scoped to those sentences"
+This read is scoped. ${where}. "Changed sentences get both reviews, scoped to those sentences"
 (docs/superpowers/specs/2026-09-26-draft-docs-approach-design.md, "Edits after the chain"). Grade
 the changed sentences.
 
@@ -1212,18 +1291,25 @@ async function finalRead(p, pageInputs, record) {
 const REWORK_SCOPE = "page-level only (introduction, section order, hand-offs, depth, ending, covers), sentences kept where they stand; follow the register's page anatomies.";
 
 /**
- * The page inputs a rework page stands in for the page-inputs step with: the outline's job, type,
- * and fact ids, each fact id carried, so the fact read's inventory check has a baseline.
+ * The page inputs a rework page stands in for the page-inputs step with, built from its committed
+ * brief so the fact read's inventory check has a baseline: an id the brief cites is carried; an
+ * outline id it does not cite is cut, since the page's own draft cut it.
  * @param {Record<string, any>} p
+ * @param {{ cited: string[] }} state - the page's rework-state entry
+ * @param {string} head - the worktree's short HEAD sha
  * @returns {Record<string, any>}
  */
-function reworkInputs(p) {
-  const ids = p.factIds || [];
+function reworkInputs(p, state, head) {
+  const outlineIds = p.factIds || [];
+  const cited = state.cited || [];
+  const ids = [...outlineIds, ...cited.filter((id) => !outlineIds.includes(id))];
   return {
     job: p.job,
     pageType: p.pageType || "",
     factIds: ids,
-    claimInventory: ids.map((id) => ({ claim: "an outline fact for this page", disposition: "carried", factId: id }))
+    claimInventory: ids.map((id) => (cited.includes(id)
+      ? { claim: "an outline fact for this page", disposition: "carried", factId: id }
+      : { claim: "an outline fact for this page", disposition: "cut", factId: id, reason: `cut at the pilot draft (brief at ${head})` }))
   };
 }
 
@@ -1232,8 +1318,12 @@ async function chain(p) {
   const rework = typeof p.rework === "string" && p.rework !== "";
   let pageInputs;
   if (rework) {
-    pageInputs = reworkInputs(p);
     record.rework = true;
+    const state = REWORK_STATE.pages.find((x) => x.path === p.path);
+    if (!state) return { ...record, status: "escalate", reason: `the rework-state probe reported nothing for ${p.path}` };
+    if (state.state !== "clean") return { ...record, status: "escalate", reason: `rework needs a committed, unchanged page: ${p.path} is ${state.state}` };
+    if (state.error) return { ...record, status: "escalate", reason: state.error };
+    pageInputs = reworkInputs(p, state, REWORK_STATE.head);
   } else {
     pageInputs = await agent(pageInputsPrompt(p), { label: `inputs:${p.id}`, phase: "Page inputs", schema: PAGE_INPUTS_SCHEMA, model: PAGE_INPUTS_MODEL, agentType: PAGE_INPUTS_TYPE });
     if (!pageInputs) return { ...record, status: "escalate", reason: "page-inputs step returned nothing" };
@@ -1242,7 +1332,7 @@ async function chain(p) {
   // A rework page's reads are scoped to what changed; the structural edit seat reads it whole.
   const reworkFindings = rework ? `## rework\n${p.rework}\n\nScope: ${REWORK_SCOPE}` : undefined;
   const reworkWhere = rework
-    ? `The page changed at the page level on the rework findings below; run \`git diff -- ${p.path}\` from the worktree to name the changed sentences`
+    ? `The page changed at the page level on the rework findings below; run \`git diff -- ${p.path}\` from the worktree to name the changed sentences. If it prints nothing, the rework changed nothing: return "fix" with that finding`
     : undefined;
 
   const allNames = reviewNames(p);

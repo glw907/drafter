@@ -19,12 +19,22 @@
 //     second link. The read-insert-write runs under a lock keyed by the index path, so pages
 //     drafted in parallel cannot clobber each other's link.
 //
+//   cairn-docs-outline rework-state --worktree <dir> --paths <page>... --briefs <brief>...
+//     Prints one JSON object: { ok, head, pages, error?, checksum }, for a rework run, which starts
+//     from committed pages. `head` is the worktree's short HEAD sha. Each page (paired with the
+//     brief at the same position) reports its git `state` ("clean", "untracked", or "modified",
+//     the last for any staged or unstaged change) and `cited`, the fact ids its brief's sentences
+//     cite, in first-cited order; a brief it cannot read or parse gives the page an `error`. The
+//     checksum covers every field, so a probe that mistranscribes the report fails the run.
+//     Exits 0 when ok (HEAD resolved), else 1.
+//
 // `--exemplars <dir>` overrides the capture root (default ~/.local/share/cairn/exemplars).
 // Tested by ~/.dotfiles/tests/docs-page-chain-outline.test.mjs, which also requires this file
 // as a module; keep canonicalEntry, fnv, checksumOf, and probeChecksum identical to the runner's
-// copies.
+// copies, and reworkChecksum identical to the runner's.
 "use strict";
 
+const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -93,6 +103,62 @@ function probeChecksum(r) {
     error: String(r.error || ""),
     entries: (r.entries || []).map((e) => String(e.checksum || ""))
   }));
+}
+
+/**
+ * The checksum of a rework-state report: its status, HEAD, error, and every page field, in a
+ * fixed order.
+ * @param {{ ok?: boolean, head?: string, error?: string, pages?: Array<{ path?: string, brief?: string, state?: string, cited?: string[], error?: string }> }} r
+ * @returns {string}
+ */
+function reworkChecksum(r) {
+  return fnv(JSON.stringify({
+    ok: r.ok === true,
+    head: String(r.head || ""),
+    error: String(r.error || ""),
+    pages: (r.pages || []).map((x) => [String(x.path || ""), String(x.brief || ""), String(x.state || ""), Array.isArray(x.cited) ? x.cited.map(String) : [], String(x.error || "")])
+  }));
+}
+
+/**
+ * Reads the state a rework run starts from: the worktree's HEAD, each page's git state, and the
+ * fact ids its brief cites.
+ * @param {string} worktree
+ * @param {string[]} paths - repo-relative page paths
+ * @param {string[]} briefs - repo-relative brief paths, one per page, in the same order
+ * @returns {{ ok: boolean, head: string, pages: object[], error?: string, checksum: string }}
+ */
+function reworkState(worktree, paths, briefs) {
+  const git = (...args) => execFileSync("git", ["-C", worktree, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  let head = "";
+  let error;
+  try {
+    head = git("rev-parse", "--short", "HEAD");
+  } catch (e) {
+    error = `no HEAD in ${worktree}: ${String(e.stderr || e.message).trim()}`;
+  }
+  const pages = paths.map((p, i) => {
+    const brief = briefs[i] || "";
+    let state = "untracked";
+    try {
+      git("ls-files", "--error-unmatch", "--", p);
+      state = git("status", "--porcelain", "--", p) ? "modified" : "clean";
+    } catch {
+      // ls-files --error-unmatch exits non-zero for a path git does not track.
+    }
+    const out = { path: p, brief, state, cited: [] };
+    try {
+      const sentences = JSON.parse(fs.readFileSync(path.resolve(worktree, brief), "utf8")).sentences || [];
+      for (const x of sentences) if (typeof x.id === "string" && x.id.startsWith("f:") && !out.cited.includes(x.id)) out.cited.push(x.id);
+    } catch (e) {
+      out.error = `brief not readable: ${brief}: ${e.message}`;
+    }
+    return out;
+  });
+  const r = { ok: Boolean(head), head, pages };
+  if (error) r.error = error;
+  r.checksum = reworkChecksum(r);
+  return r;
 }
 
 /**
@@ -339,7 +405,7 @@ function linkPage(opts) {
 }
 
 /**
- * Parses `--flag value` pairs; `--paths` takes every value up to the next flag.
+ * Parses `--flag value` pairs; `--paths` and `--briefs` take every value up to the next flag.
  * @param {string[]} argv
  * @returns {Record<string, string | string[]>}
  */
@@ -347,9 +413,9 @@ function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i].replace(/^--/, "");
-    if (key === "paths") {
-      out.paths = [];
-      while (i + 1 < argv.length && !argv[i + 1].startsWith("--")) out.paths.push(argv[++i]);
+    if (key === "paths" || key === "briefs") {
+      out[key] = [];
+      while (i + 1 < argv.length && !argv[i + 1].startsWith("--")) out[key].push(argv[++i]);
     } else {
       out[key] = argv[++i];
     }
@@ -360,6 +426,12 @@ function parseArgs(argv) {
 function main(argv) {
   const [cmd, ...rest] = argv;
   const o = parseArgs(rest);
+  if (cmd === "rework-state") {
+    if (!o.worktree) throw new Error("rework-state needs --worktree <dir>");
+    const result = reworkState(o.worktree, o.paths || [], o.briefs || []);
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    return result.ok ? 0 : 1;
+  }
   if (!o.worktree || !o.outline) throw new Error("usage: cairn-docs-outline resolve|link --worktree <dir> --outline <path> ...");
   if (cmd === "resolve") {
     const outline = JSON.parse(fs.readFileSync(path.resolve(o.worktree, o.outline), "utf8"));
@@ -372,10 +444,10 @@ function main(argv) {
     process.stdout.write(`${linkPage({ worktree: o.worktree, outline: o.outline, page: o.page })}\n`);
     return 0;
   }
-  throw new Error(`unknown command "${cmd}"; expected resolve or link`);
+  throw new Error(`unknown command "${cmd}"; expected resolve, link, or rework-state`);
 }
 
-module.exports = { canonicalEntry, fnv, checksumOf, probeChecksum, exemplarFile, resolveEntries, insertIndexLink, pageTitle, breakStaleLock, linkPage };
+module.exports = { canonicalEntry, fnv, checksumOf, probeChecksum, reworkChecksum, reworkState, exemplarFile, resolveEntries, insertIndexLink, pageTitle, breakStaleLock, linkPage };
 
 if (require.main === module) {
   try {
