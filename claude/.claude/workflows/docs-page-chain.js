@@ -54,7 +54,8 @@
 //           figure: false,                 // optional; true adds a figure-verifier read
 //           factIds: ["f:abc123"],          // optional; page inputs' starting fact ids
 //           covers: ["<a topic the page covers>"],        // optional
-//           outOfScope: ["<a topic another page owns>"]   // optional
+//           outOfScope: ["<a topic another page owns>"],   // optional
+//           rework: "<job-read findings and owner rulings>"   // optional; see "Rework" below
 //         }
 //       ]
 //     }
@@ -157,6 +158,22 @@
 // leaves a step needing an account, a secret, or a deploy unrun. That is an operational safety
 // constraint resting on the runner's "modify no file" pattern (the outline probe's), not a docs
 // rule.
+//
+// Rework (`rework` on a page): the plan's task 7b
+// (`docs/superpowers/plans/2026-09-30-draft-docs-stage-2a.md`, "Task 7b: rework the pilot at the
+// page level") reworks committed pages at the page level, sentences kept where they stand, and
+// takes them through the new seats. A page carrying `rework`, a string of that page's job-read
+// findings and owner rulings, skips page inputs and the round-1 draft: its committed page and
+// brief are the draft. Its first drafter call is the round-2 redraft prompt (label `rework:`),
+// with the `rework` text as its findings and the scope line "page-level only (introduction,
+// section order, hand-offs, depth, ending, covers), sentences kept where they stand; follow the
+// register's page anatomies." Page inputs is replaced by the outline's job, type, and fact ids,
+// each fact id carried, so the fact read's inventory check has a baseline. That draft takes the
+// round-1 reads, then the existing round flow, `bothReviewers`, and the final reader read with its
+// re-test. Its register and fact reads, in both rounds, carry the scope note naming the changed
+// sentences by `git diff -- <page>`, as the final-read path's scoped reads do; the structural edit
+// seat reads the whole page unscoped. A round-2 redraft keeps the scope line. The record carries
+// `rework: true` and no `pageInputs`. A page without `rework` runs exactly as before.
 //
 // The drafter writes the introduction, the section hand-off lead-ins, and the ending the
 // register's page anatomies require, records each `no-claim` in the brief when it carries no
@@ -833,15 +850,17 @@ Return the structured report only.`;
 }
 
 /**
- * The scope line for a register or fact read after the final reader read's redraft: the parent
- * spec's rule for an edit after the chain, and the spots that changed. Empty for a chain round.
- * @param {string} [scope] - the final reader read's findings, as the redraft received them
+ * The scope line for a register or fact read on an edit after the chain: the parent spec's rule,
+ * where the changed sentences are, and the findings the redraft worked from. Empty for a chain
+ * round on a drafted page.
+ * @param {string} [scope] - the findings the redraft received
+ * @param {string} [where] - where the changed sentences are; defaults to the final reader read's spots
  * @returns {string}
  */
-function scopeNote(scope) {
+function scopeNote(scope, where = "The page changed only at the spots the final reader read cites below") {
   if (!scope) return "";
   return `
-This read is scoped. The page changed only at the spots the final reader read cites below, and
+This read is scoped. ${where}, and
 "Changed sentences get both reviews, scoped to those sentences"
 (docs/superpowers/specs/2026-09-26-draft-docs-approach-design.md, "Edits after the chain"). Grade
 the changed sentences.
@@ -850,25 +869,25 @@ ${scope}
 `;
 }
 
-function editorPrompt(p, scope) {
+function editorPrompt(p, scope, where) {
   return `Adversarial register edit of ${p.path} in ${WT}.
 
 ${common}
 ${registerLine(p, "editor")}
-${scopeNote(scope)}
+${scopeNote(scope, where)}
 Run plain \`vale ${p.path}\` from the worktree, never the docs gate, and read every alert it
 prints. Read the page, then grade the brief's structure checklist, the brief's tells, and Vale's
 alerts together, with the Names section, logic, and facts-adjacent phrasing. Return ranked
 findings with a proposed rewrite each, and a verdict: "fix" if any finding is blocking.`;
 }
 
-function factPrompt(p, pageInputs, scope) {
+function factPrompt(p, pageInputs, scope, where) {
   const inventory = (pageInputs.claimInventory || [])
     .map((c) => `- [${c.disposition}] ${c.claim}${c.factId ? ` (${c.factId})` : ""}${c.reason ? ` -- ${c.reason}` : ""}`)
     .join("\n");
   return `Fact read of ${p.path} in ${WT}. The page's claim inventory from its page-inputs step:
 ${inventory || "(none recorded)"}
-${outlineCoverage(p)}${scopeNote(scope)}
+${outlineCoverage(p)}${scopeNote(scope, where)}
 Check every claim on the page against its cited fact id, retrace every cited fact against its
 source and fix or retag it [docs-drift] in the same chain when it no longer matches, and confirm
 every claim the inventory marks "carried" or "filed" still appears on the page. A claim on the
@@ -1086,9 +1105,10 @@ function reviewNames(p) {
  * @param {number | "final"} round
  * @param {string[]} names
  * @param {string} [scope]
+ * @param {string} [where] - where the changed sentences are, for a rework page's scoped reads
  * @returns {Promise<{ list: Array<[string, any]>, missing: number, anyFix: boolean }>}
  */
-async function runReads(p, pageInputs, round, names, scope) {
+async function runReads(p, pageInputs, round, names, scope, where) {
   const tag = round === "final" ? "final" : `r${round}`;
   const phaseName = round === "final" ? "Final read" : "Read";
   const tasks = [];
@@ -1096,10 +1116,10 @@ async function runReads(p, pageInputs, round, names, scope) {
     tasks.push(["structural edit", () => agent(structurePrompt(p), { label: `structure:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "general-purpose" })]);
   }
   if (names.includes("register editor")) {
-    tasks.push(["register editor", () => agent(editorPrompt(p, scope), { label: `editor:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "cairn-register-editor" })]);
+    tasks.push(["register editor", () => agent(editorPrompt(p, scope, where), { label: `editor:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "cairn-register-editor" })]);
   }
   if (names.includes("fact read")) {
-    tasks.push(["fact read", () => agent(factPrompt(p, pageInputs, scope), { label: `facts:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "general-purpose" })]);
+    tasks.push(["fact read", () => agent(factPrompt(p, pageInputs, scope, where), { label: `facts:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "general-purpose" })]);
   }
   if (names.includes("figure verifier")) {
     tasks.push(["figure verifier", () => agent(figurePrompt(p), { label: `figure:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "figure-verifier" })]);
@@ -1188,28 +1208,62 @@ async function finalRead(p, pageInputs, record) {
   return { ...record, status: "escalate", reason: "the final reader read's re-test returned fix", findings: combined([["final reader read re-test", record.finalRead.retest]]) };
 }
 
+// The scope a rework page's redraft holds to, stated in its findings.
+const REWORK_SCOPE = "page-level only (introduction, section order, hand-offs, depth, ending, covers), sentences kept where they stand; follow the register's page anatomies.";
+
+/**
+ * The page inputs a rework page stands in for the page-inputs step with: the outline's job, type,
+ * and fact ids, each fact id carried, so the fact read's inventory check has a baseline.
+ * @param {Record<string, any>} p
+ * @returns {Record<string, any>}
+ */
+function reworkInputs(p) {
+  const ids = p.factIds || [];
+  return {
+    job: p.job,
+    pageType: p.pageType || "",
+    factIds: ids,
+    claimInventory: ids.map((id) => ({ claim: "an outline fact for this page", disposition: "carried", factId: id }))
+  };
+}
+
 async function chain(p) {
   const record = { id: p.id, path: p.path, brief: briefPathFor(p), rounds: [] };
-  const pageInputs = await agent(pageInputsPrompt(p), { label: `inputs:${p.id}`, phase: "Page inputs", schema: PAGE_INPUTS_SCHEMA, model: PAGE_INPUTS_MODEL, agentType: PAGE_INPUTS_TYPE });
-  if (!pageInputs) return { ...record, status: "escalate", reason: "page-inputs step returned nothing" };
-  record.pageInputs = pageInputs;
+  const rework = typeof p.rework === "string" && p.rework !== "";
+  let pageInputs;
+  if (rework) {
+    pageInputs = reworkInputs(p);
+    record.rework = true;
+  } else {
+    pageInputs = await agent(pageInputsPrompt(p), { label: `inputs:${p.id}`, phase: "Page inputs", schema: PAGE_INPUTS_SCHEMA, model: PAGE_INPUTS_MODEL, agentType: PAGE_INPUTS_TYPE });
+    if (!pageInputs) return { ...record, status: "escalate", reason: "page-inputs step returned nothing" };
+    record.pageInputs = pageInputs;
+  }
+  // A rework page's reads are scoped to what changed; the structural edit seat reads it whole.
+  const reworkFindings = rework ? `## rework\n${p.rework}\n\nScope: ${REWORK_SCOPE}` : undefined;
+  const reworkWhere = rework
+    ? `The page changed at the page level on the rework findings below; run \`git diff -- ${p.path}\` from the worktree to name the changed sentences`
+    : undefined;
 
   const allNames = reviewNames(p);
-  const d1 = await agent(draftPrompt(p, pageInputs, 1), { label: `draft:${p.id}`, phase: "Draft", schema: DRAFT_SCHEMA, model: DRAFTER, agentType: DRAFTER_TYPE });
+  const d1 = rework
+    ? await agent(draftPrompt(p, pageInputs, 2, reworkFindings), { label: `rework:${p.id}`, phase: "Draft", schema: DRAFT_SCHEMA, model: DRAFTER, agentType: DRAFTER_TYPE })
+    : await agent(draftPrompt(p, pageInputs, 1), { label: `draft:${p.id}`, phase: "Draft", schema: DRAFT_SCHEMA, model: DRAFTER, agentType: DRAFTER_TYPE });
   if (!d1) return { ...record, status: "escalate", reason: "drafter returned nothing" };
   record.rounds.push({ round: 1, draft: d1 });
-  const r1 = await runReads(p, pageInputs, 1, allNames);
+  const r1 = await runReads(p, pageInputs, 1, allNames, reworkFindings, reworkWhere);
   record.rounds[0].reads = readEntries(r1.list);
   // A read that returned nothing is never a silent accept.
   if (r1.missing) return { ...record, status: "escalate", reason: `${r1.missing} read(s) returned nothing in round 1` };
   if (!r1.anyFix && d1.gate === "pass") return finalRead(p, pageInputs, record);
 
   const rereviewNames = BOTH_REVIEWERS ? allNames : r1.list.filter(([, r]) => r.verdict === "fix").map(([n]) => n);
-  const findings = combined(r1.list) + (d1.gate !== "pass" ? `\n\n## gate: ${d1.gate}\n${d1.gateTail || ""}` : "");
+  const findings = combined(r1.list) + (d1.gate !== "pass" ? `\n\n## gate: ${d1.gate}\n${d1.gateTail || ""}` : "") +
+    (rework ? `\n\nScope: ${REWORK_SCOPE}` : "");
   const d2 = await agent(draftPrompt(p, pageInputs, 2, findings), { label: `redraft:${p.id}`, phase: "Redraft", schema: DRAFT_SCHEMA, model: DRAFTER, agentType: DRAFTER_TYPE });
   if (!d2) return { ...record, status: "escalate", reason: "redrafter returned nothing" };
   record.rounds.push({ round: 2, draft: d2 });
-  const r2 = await runReads(p, pageInputs, 2, rereviewNames);
+  const r2 = await runReads(p, pageInputs, 2, rereviewNames, reworkFindings, reworkWhere);
   record.rounds[1].reads = readEntries(r2.list);
   const cr = deriveCrossRegression(record, BOTH_REVIEWERS);
   if (cr !== undefined) record.crossRegression = cr;

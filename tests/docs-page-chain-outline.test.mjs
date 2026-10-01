@@ -143,7 +143,7 @@ function makeAgent(wt, home, calls, overrides = {}) {
     if (overrides[kind]) return overrides[kind](prompt, opts);
     if (kind === "outline") return JSON.parse(runHelperLine(helperLine(prompt, "resolve"), home));
     if (kind === "inputs") return { job: "the job", pageType: "concept", factIds: ["f:a7qx4m"], claimInventory: [] };
-    if (kind === "draft" || kind === "redraft" || kind === "reader-redraft") {
+    if (kind === "draft" || kind === "redraft" || kind === "reader-redraft" || kind === "rework") {
       const path = prompt.match(/(?:Draft the page|Redraft) (\S+)/)[1];
       write(wt, path, "# Architecture of cairn\n\nBody.\n");
       const link = helperLine(prompt, "link");
@@ -820,6 +820,78 @@ check("dry run: the drafter prompt carries the anatomy pointer and the no-claim 
   assert.match(d, /"no-claim" when it carries no extractable fact/);
   assert.ok(d.includes("scripts/checks/check-provenance.mjs"));
   assert.ok(d.includes("a no-claim sentence cites nothing, so any extractable fact in it fails"));
+});
+
+// -------------------------------------------------------------------------------------------
+// Dry runs of the rework entry point: a committed page reworked at the page level.
+// -------------------------------------------------------------------------------------------
+
+const REWORK = "REWORK-TEXT the page opens on a meta sentence; add an introduction.";
+const REWORK_SCOPE = "page-level only (introduction, section order, hand-offs, depth, ending, covers), sentences kept where they stand; follow the register's page anatomies.";
+
+/** One outline page carrying `rework` through the runner with stubbed agents. */
+async function reworkDryRun(overrides = {}, extraArgs = {}) {
+  const home = makeHome();
+  const wt = makeWorktree();
+  write(wt, "docs/extend/architecture.md", "# Architecture\n\nCommitted body.\n");
+  const calls = [];
+  const page = { id: "architecture", path: "docs/extend/architecture.md", track: "extend", rework: REWORK };
+  const out = await runRunner(baseArgs(wt, [page], { outline: "docs/internal/outlines/extend.json", ...extraArgs }), makeAgent(wt, home, calls, overrides), parallel, noop, noop);
+  const labels = calls.map((c) => c.label);
+  const flat = (label) => calls.find((c) => c.label === label).prompt.replace(/\s+/g, " ");
+  return { record: out.pages[0], labels, flat };
+}
+
+check("dry run: a rework page skips page inputs and the round-1 draft; its first draft call carries the rework text and the scope line", async () => {
+  const { labels, flat } = await reworkDryRun();
+  assert.ok(!labels.some((l) => l.startsWith("inputs:")), "no page-inputs call");
+  assert.ok(!labels.some((l) => l.startsWith("draft:")), "no round-1 draft call");
+  assert.equal(labels[1], "rework:architecture", "the rework redraft is the first page call");
+  const d = flat("rework:architecture");
+  assert.match(d, /^Redraft docs\/extend\/architecture\.md once, on the combined findings below\./);
+  assert.ok(d.includes(REWORK), "the rework text");
+  assert.ok(d.includes(REWORK_SCOPE), "the scope line");
+});
+
+check("dry run: a rework page's fact read carries the outline factIds as the carried inventory", async () => {
+  const { flat } = await reworkDryRun();
+  const f = flat("facts:architecture:r1");
+  assert.match(f, /- \[carried\] [^-]*\(f:a7qx4m\)/);
+  assert.match(f, /- \[carried\] [^-]*\(f:0duu5p\)/);
+  assert.doesNotMatch(f, /\(none recorded\)/);
+});
+
+check("dry run: a rework page's register and fact reads carry the scope note; the structural seat does not", async () => {
+  const { flat } = await reworkDryRun();
+  for (const l of ["editor:architecture:r1", "facts:architecture:r1"]) {
+    assert.match(flat(l), /Changed sentences get both reviews, scoped to those sentences/, l);
+    assert.ok(flat(l).includes("git diff -- docs/extend/architecture.md"), `${l} names the changed sentences by the diff`);
+  }
+  assert.doesNotMatch(flat("structure:architecture:r1"), /Changed sentences get both reviews/);
+  assert.doesNotMatch(flat("structure:architecture:r1"), /git diff/);
+});
+
+check("dry run: a rework page's fix takes the round-2 redraft, still page-level, with scoped reads", async () => {
+  const { labels, flat, record } = await reworkDryRun({ editor: async (p, o) => (o.label.endsWith(":r1") ? FIX : ACCEPT) });
+  assert.ok(labels.includes("redraft:architecture"));
+  assert.ok(flat("redraft:architecture").includes(REWORK_SCOPE));
+  assert.match(flat("editor:architecture:r2"), /Changed sentences get both reviews/);
+  assert.equal(record.status, "accepted");
+});
+
+check("dry run: a rework page reaches the final read on acceptance", async () => {
+  const { labels, record } = await reworkDryRun();
+  assert.equal(labels[labels.length - 1], "reader:architecture");
+  assert.equal(record.status, "accepted");
+  assert.equal(record.rework, true);
+  assert.equal(record.finalRead.verdict, "accept");
+});
+
+check("dry run: a page without rework produces the same call labels as before, with no scope note", async () => {
+  const { labels, flat } = await seatDryRun("docs/extend/architecture.md");
+  assert.deepEqual(labels, ["outline", "inputs:architecture", "draft:architecture", "structure:architecture:r1", "editor:architecture:r1", "facts:architecture:r1", "figure:architecture:r1", "reader:architecture"]);
+  assert.doesNotMatch(flat("editor:architecture:r1"), /This read is scoped/);
+  assert.doesNotMatch(flat("facts:architecture:r1"), /This read is scoped/);
 });
 
 // -------------------------------------------------------------------------------------------
