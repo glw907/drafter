@@ -843,7 +843,7 @@ check("dry run: the drafter prompt carries the anatomy pointer and the no-claim 
 // -------------------------------------------------------------------------------------------
 
 const REWORK = "REWORK-TEXT the page opens on a meta sentence; add an introduction.";
-const REWORK_SCOPE = "page-level only (introduction, section order, hand-offs, depth, ending, covers), sentences kept where they stand; follow the register's page anatomies.";
+const REWORK_SCOPE = "page-level only (introduction, section order, hand-offs, depth, ending, covers); the page plan governs order, placement, and cuts, and a sentence is kept where the plan keeps it; follow the register's page anatomies.";
 
 const BRIEF_PATH = "docs/internal/briefs/extend/architecture.json";
 
@@ -1129,6 +1129,19 @@ check("dry run: the drafter drafts from the plan, with its dispositions in the i
   assert.ok(d.includes(`- [cut] the hook (f:0duu5p) -- ${SUBORDINATED}`), "a subordinated fact");
   assert.match(d, /an array of the fact ids it synthesizes/);
   assert.match(d, /top-level "cuts" array/);
+});
+
+check("dry run: a fact id the plan places beyond the inventory reaches the drafter's fact ids", async () => {
+  const { flat, prompt } = await seatDryRun("docs/extend/architecture.md", {
+    plan: async (prompt) => {
+      const r = stubPlan(makeWorktree(), prompt);
+      r.claimInventory.push({ claim: "an added fact", disposition: "carried", factId: "f:extra1", section: "Seams" });
+      return r;
+    }
+  });
+  const ids = prompt("draft:architecture").match(/Fact ids to draw on: ([^\n]*)/)[1].split(", ");
+  assert.ok(ids.includes("f:extra1"), `the drafter's fact ids: ${ids.join(", ")}`);
+  assert.ok(flat("draft:architecture").includes('- [carried] an added fact (f:extra1) in section "Seams"'));
 });
 
 check("dry run: the fact read's inventory carries the plan's dispositions, and its coverage rule reads them", async () => {

@@ -127,7 +127,8 @@
 // `couldNotDo` naming the reference page and a reference-arm friction entry, never kept on the
 // page. The runner writes those dispositions back into the claim inventory the drafter and fact
 // read receive, as "carried" with a `section` or "cut" with the reason (a subordinated fact's
-// reason names its link), and escalates a plan that leaves an id undisposed. The structural edit
+// reason names its link), adds every id the plan places to the drafter's fact ids, and escalates
+// a plan that leaves an id undisposed. The structural edit
 // seat reads the plan before any prose (`structure:<id>:plan`), grading order, pace, user goal,
 // and the introduction's three parts at the plan level against the outline entry; its "fix" takes
 // one plan revision (`replan:<id>`) and one re-read, and a second "fix" escalates. The record
@@ -188,26 +189,27 @@
 //
 // Rework (`rework` on a page): the plan's task 7b
 // (`docs/superpowers/plans/2026-09-30-draft-docs-stage-2a.md`, "Task 7b: rework the pilot at the
-// page level") reworks committed pages at the page level, sentences kept where they stand, and
-// takes them through the new seats. A page carrying `rework`, a string of that page's job-read
-// findings and owner rulings, skips page inputs and the round-1 draft: its committed page and
-// brief are the draft. It takes the plan step and plan read like any page, its `rework` text in
-// the plan's prompt, before its first drafter call. Its first drafter call is the round-2 redraft prompt (label `rework:`),
-// with the `rework` text as its findings and the scope line "page-level only (introduction,
-// section order, hand-offs, depth, ending, covers), sentences kept where they stand; follow the
-// register's page anatomies." Before any page agent, one probe runs the helper's `rework-state`
-// command (checksum-verified, like the outline probe) for HEAD, each rework page's git state, and
-// the fact ids its committed brief cites. A rework page that is untracked or has uncommitted
-// changes is not run: its record escalates with that reason. Page inputs is replaced by the
-// outline's job and type and an inventory built from the brief: an id the brief cites is
-// carried, and an outline id it does not cite is cut "cut at the pilot draft (brief at <HEAD>)",
-// so the fact read's coverage rule has a baseline and raises nothing for it. That draft takes the
-// round-1 reads, then the existing round flow, `bothReviewers`, and the final reader read with its
-// re-test. Its register and fact reads, in both rounds, carry the scope note naming the changed
-// sentences by `git diff -- <page>`, as the final-read path's scoped reads do, and return "fix"
-// when that diff is empty, since the rework then changed nothing; the structural edit seat reads
-// the whole page unscoped. A round-2 redraft keeps the scope line. The record carries
-// `rework: true` and no `pageInputs`. A page without `rework` runs exactly as before.
+// page level") reworks committed pages at the page level, a sentence kept where the page plan keeps
+// it, and takes them through the new seats. A page carrying `rework`, a string of that page's
+// job-read findings and owner rulings, skips page inputs and the round-1 draft: its committed page
+// and brief are the draft. It takes the plan step and plan read like any page, its `rework` text in
+// the plan's prompt, before its first drafter call. Its first drafter call is the round-2 redraft
+// prompt (label `rework:`), with the `rework` text as its findings and the scope line "page-level
+// only (introduction, section order, hand-offs, depth, ending, covers); the page plan governs
+// order, placement, and cuts, and a sentence is kept where the plan keeps it; follow the register's
+// page anatomies." Before any page agent, one probe runs the helper's `rework-state` command
+// (checksum-verified, like the outline probe) for HEAD, each rework page's git state, and the fact
+// ids its committed brief cites. A rework page that is untracked or has uncommitted changes is not
+// run: its record escalates with that reason. Page inputs is replaced by the outline's job and type
+// and an inventory built from the brief: an id the brief cites is carried, and an outline id it
+// does not cite is cut "cut at the pilot draft (brief at <HEAD>)", so the fact read's coverage rule
+// has a baseline and raises nothing for it. That draft takes the round-1 reads, then the existing
+// round flow, `bothReviewers`, and the final reader read with its re-test. Its register and fact
+// reads, in both rounds, carry the scope note naming the changed sentences by `git diff -- <page>`,
+// as the final-read path's scoped reads do, and return "fix" when that diff is empty, since the
+// rework then changed nothing; the structural edit seat reads the whole page unscoped. A round-2
+// redraft keeps the scope line. The record carries `rework: true` and no `pageInputs`. A page
+// without `rework` runs exactly as before.
 //
 // The drafter writes the introduction, the section hand-off lead-ins, and the ending the
 // register's page anatomies require, records each `no-claim` in the brief when it carries no
@@ -1509,7 +1511,7 @@ async function finalRead(p, pageInputs, record) {
 }
 
 // The scope a rework page's redraft holds to, stated in its findings.
-const REWORK_SCOPE = "page-level only (introduction, section order, hand-offs, depth, ending, covers), sentences kept where they stand; follow the register's page anatomies.";
+const REWORK_SCOPE = "page-level only (introduction, section order, hand-offs, depth, ending, covers); the page plan governs order, placement, and cuts, and a sentence is kept where the plan keeps it; follow the register's page anatomies.";
 
 /**
  * The page inputs a rework page stands in for the page-inputs step with, built from its committed
@@ -1561,7 +1563,12 @@ async function planStep(p, pageInputs, record) {
     const read = await agent(structurePrompt(p, "plan"), { label: `structure:${p.id}:${tag}`, phase: "Plan", schema: READ_SCHEMA, model: REVIEWER, agentType: "general-purpose" });
     if (!read) return { escalate: { ...record, status: "escalate", reason: "the plan read returned nothing" } };
     step.reads.push(...readEntries([["structural edit", read]]));
-    if (read.verdict !== "fix") return { pageInputs: { ...pageInputs, claimInventory: applied.inventory } };
+    if (read.verdict !== "fix") {
+      // An id the plan places beyond page inputs' list joins the drafter's fact ids.
+      const placed = applied.inventory.filter((c) => c.disposition === "carried" && c.factId).map((c) => c.factId);
+      const factIds = [...new Set([...(pageInputs.factIds || []), ...placed])];
+      return { pageInputs: { ...pageInputs, factIds, claimInventory: applied.inventory } };
+    }
     if (tag === "plan2") {
       return { escalate: { ...record, status: "escalate", reason: "second fix verdict on the plan read", findings: combined([["structural edit", read]]) } };
     }
