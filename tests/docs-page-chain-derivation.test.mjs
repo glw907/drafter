@@ -240,8 +240,20 @@ check("the drafter definition keeps the anatomy's sentences from the removal rul
   assert.ok(flat.includes("a no-claim sentence cites nothing, so any extractable fact in it fails"));
 });
 
-check("the per-page record carries its brief path from the start, on every return path", () => {
-  assert.match(RUNNER_SRC, /const record = \{ id: p\.id, path: p\.path, brief: briefPathFor\(p\), rounds: \[\] \};/);
+check("the per-page record carries its brief and plan paths from the start, on every return path", () => {
+  assert.match(RUNNER_SRC, /const record = \{ id: p\.id, path: p\.path, brief: briefPathFor\(p\), plan: planPathFor\(p\), rounds: \[\] \};/);
+});
+
+check("the drafter definition keeps a sentence carrying a section's claim from the plan, and drafts from the plan", () => {
+  const flat = DRAFTER_SRC.replace(/\s+/g, " ");
+  assert.match(flat, /A sentence that carries a section's claim from the plan is not cut under this rule either\./);
+  assert.match(flat, /the source of the page's order, each section's claim, and each fact's placement/);
+});
+
+check("the drafter definition's brief shape takes a multi-id sentence and a cuts list", () => {
+  assert.match(DRAFTER_SRC, /"id": \["<fact id>", "<fact id>"\]/);
+  assert.match(DRAFTER_SRC, /"cuts": \[/);
+  assert.match(DRAFTER_SRC, /\{ "id": "<fact id>", "reason": "<the plan's reason, verbatim>" \}/);
 });
 
 check("a missing fact is a couldNotDo, not a friction-log entry", () => {

@@ -5,17 +5,19 @@
 // draw on, and a claim inventory with a disposition per claim
 // (carried by a cited fact, newly filed, or cut with a reason), filing any new fact itself with
 // the Edit tool as `[verified]` (a `Source:` line) or `[external]` (the vendor URL), never
-// `[candidate]`. The drafter (`cairn-docs-drafter` by default) writes the page and its
-// sentence-to-fact brief from that record and files no fact of its own; it runs the docs gate
-// itself as its last act and reports the result; it reads the page's exemplar sources whole. The
-// structural edit seat, the register editor, and a fact read run in
-// parallel, all Opus 5.5, plus a figure-verifier read for a page carrying a figure. One redraft
+// `[candidate]`. The plan step then writes the page plan, and the structural edit seat reads it
+// before any prose (see "The page plan" below). The drafter (`cairn-docs-drafter` by default)
+// writes the page and its sentence-to-fact brief from the plan and that record and files no fact
+// of its own; it runs the docs gate itself as its last act and reports the result; it reads the
+// page's exemplar sources whole. The structural edit seat, the register editor, and a fact read
+// run in parallel, all Opus 5.5, plus a figure-verifier read for a page carrying a figure. One redraft
 // round on the combined findings, gated and re-read; by default only the reviewer(s) that
 // returned "fix" re-read (`args.bothReviewers` re-reads every reviewer instead and the record
 // carries a cross-regression flag: a reviewer that accepted in round 1 and returned "fix" in
 // round 2). A second "fix" from a re-reader escalates to the conductor; there is no third round.
 // A page every read accepts then takes the final reader read, last. The conductor reads only the
-// per-page records returned.
+// per-page records returned. Each record carries the files the run leaves for commit: the page
+// (`path`), its brief (`brief`), and its plan (`plan`).
 //
 // Invoke by name from the conductor session:
 //
@@ -36,6 +38,8 @@
 //       drafterModel: "claude-opus-5-5",   // optional; default
 //       reviewModel: "claude-opus-5-5",    // optional; default, also the page-inputs step's model
 //       pageInputsModel: "claude-opus-5-5", // optional; defaults to reviewModel
+//       planModel: "claude-opus-5-5",      // optional; the plan step's model, this is the default
+//       planEffort: "xhigh",               // optional; the plan step's effort, this is the default
 //       outline: "docs/internal/outlines/extend.json",   // optional; see "The outline" below
 //       optionMap: "docs/internal/option-map.json",       // optional; the option map, this is the default
 //       pages: [
@@ -108,17 +112,39 @@
 // `pending <this page's slug>`, its own retags' rows included, so an accepted page leaves none. Page inputs reports `rowsReceived` and `rowsDisposed`, carried in
 // `record.pageInputs`.
 //
-// Design friction: page inputs, the drafter, and the fact read, the agents that meet the code,
-// file a friction entry in `docs/internal/docs-friction-log.md` for a hedge, a caveat, an
-// exception, a workaround, a surprising default, or two seams naming or behaving the same thing
-// differently, naming the fact ids or `file:line` involved, and list it in `frictionFiled`. An
-// entry never blocks the page. The record carries page inputs' list in `record.pageInputs`, the
-// drafter's in `rounds[].draft`, and the fact read's, copied by the runner, on its entry in
+// The page plan (`docs/superpowers/research/2026-10-01-draft-docs-2a-page-plan-diagnosis.md`):
+// the chain carried no artifact that holds a page's argument, so one plan step runs after page
+// inputs (or a rework page's inventory) and before the draft, on `args.planModel` at
+// `args.planEffort` (default Opus 5.5 at `xhigh`, the chain's one judgment seat). It writes
+// `docs/internal/briefs/<track>/<slug>.plan.md`, Google's outline written down (Google Technical
+// Writing Two, "Organizing large documents": "think of an outline as the narrative for your
+// document"), from the job, page type, register anatomy, exemplar takes, fact ids, and claim
+// inventory: the introduction's three parts, the sections in the order it argues for (each with
+// its heading, the one sentence a reader takes from it, the fact ids it draws on, and its
+// hand-off), and the ending section the anatomy requires. Every fact id the inventory carries is
+// placed in a section, subordinated (a link to the reference page or entry that states it, named),
+// or cut with a reason; a subordinated fact whose reference target does not state it is a
+// `couldNotDo` naming the reference page and a reference-arm friction entry, never kept on the
+// page. The runner writes those dispositions back into the claim inventory the drafter and fact
+// read receive, as "carried" with a `section` or "cut" with the reason (a subordinated fact's
+// reason names its link), and escalates a plan that leaves an id undisposed. The structural edit
+// seat reads the plan before any prose (`structure:<id>:plan`), grading order, pace, user goal,
+// and the introduction's three parts at the plan level against the outline entry; its "fix" takes
+// one plan revision (`replan:<id>`) and one re-read, and a second "fix" escalates. The record
+// carries the plan's reads, `couldNotDo`, and friction in `record.planStep`.
+//
+// Design friction: page inputs, the plan step, the drafter, and the fact read, the agents that
+// meet the code, file a friction entry in `docs/internal/docs-friction-log.md` for a hedge, a
+// caveat, an exception, a workaround, a surprising default, or two seams naming or behaving the
+// same thing differently, naming the fact ids or `file:line` involved, and list it in
+// `frictionFiled`. An entry never blocks the page. The record carries page inputs' list in
+// `record.pageInputs`, the plan step's in `record.planStep`, the drafter's in `rounds[].draft`, and the fact read's, copied by the runner, on its entry in
 // `rounds[].reads`; the register editor and the figure verifier do not report friction.
 //
 // The drafter gets the outline entry's `title` as the page's H1 (the title is in the entry
-// checksum), the voice source (the register's drafting brief and its primary exemplar only; the
-// page's exemplars give structure and detail per step), and, on a figure page, the
+// checksum), the page plan's path as the source of the page's order, each section's claim, and
+// each fact's placement, the voice source (the register's drafting brief and its primary exemplar
+// only; the page's exemplars give structure and detail per step), and, on a figure page, the
 // `cairn-figure` skill file to read and follow.
 //
 // The structural edit seat (`structural edit` in the record, `general-purpose`, read-only by its
@@ -129,10 +155,11 @@
 // and heading lead-in items, all quoted verbatim, with the introduction checked on every page.
 // Google's navigation item "a table of contents menu" is left out as inapplicable, the way Red
 // Hat's modular-docs items are: the site renderer (cairn.pub) supplies the table of contents,
-// not the page. It
-// reads the whole page against its outline entry (`job`, `covers`, `outOfScope`, and the
-// outline's `crossLinks` from the page's slug, read live) and the register's page anatomies, and
-// never edits. Its findings join the round's like the other reads', and `bothReviewers`
+// not the page. Its plan read comes first (see "The page plan" above). Its page read in each
+// round reads the whole page against its plan and the checklist, no longer against the outline's
+// `covers` order, since the plan carries the order and its reason; it still reads the outline
+// entry (`job`, `covers`, `outOfScope`, and the outline's `crossLinks` from the page's slug, read
+// live) and the register's page anatomies for the introduction, and never edits. Its findings join the round's like the other reads', and `bothReviewers`
 // re-reads it. The register editor's own definition carries line-level grading, which the
 // record's ordering (line editing after structure) keeps out of this seat, so it reuses
 // `general-purpose` as the fact read does rather than a new agent file.
@@ -164,7 +191,8 @@
 // page level") reworks committed pages at the page level, sentences kept where they stand, and
 // takes them through the new seats. A page carrying `rework`, a string of that page's job-read
 // findings and owner rulings, skips page inputs and the round-1 draft: its committed page and
-// brief are the draft. Its first drafter call is the round-2 redraft prompt (label `rework:`),
+// brief are the draft. It takes the plan step and plan read like any page, its `rework` text in
+// the plan's prompt, before its first drafter call. Its first drafter call is the round-2 redraft prompt (label `rework:`),
 // with the `rework` text as its findings and the scope line "page-level only (introduction,
 // section order, hand-offs, depth, ending, covers), sentences kept where they stand; follow the
 // register's page anatomies." Before any page agent, one probe runs the helper's `rework-state`
@@ -183,7 +211,10 @@
 //
 // The drafter writes the introduction, the section hand-off lead-ins, and the ending the
 // register's page anatomies require, records each `no-claim` in the brief when it carries no
-// extractable fact, and cites the fact id when it does.
+// extractable fact, and cites the fact id when it does. The removal rule keeps a sentence that
+// carries a section's claim from the plan, as it keeps the anatomy's. A brief sentence's `id` is
+// one fact id, an array of the ids a synthesizing sentence cites, or `no-claim`, and the brief
+// carries a top-level `cuts` array of `{ id, reason }` mirroring the plan's cut dispositions.
 //
 // The return carries `spent`: the runtime `budget.spent()` delta across the run, in its unit of
 // output tokens spent across the main loop and all workflows, so a relative measure only and
@@ -199,6 +230,7 @@ export const meta = {
   phases: [
     { title: "Outline", detail: "with args.outline, one probe resolves every page's outline entry" },
     { title: "Page inputs", detail: "one agent per page: job, type, fact ids, claim inventory" },
+    { title: "Plan", detail: "one agent writes the page plan; the structural edit seat reads it before any prose, one revision on fix" },
     { title: "Draft", detail: "the drafter writes the page and runs the docs gate itself" },
     { title: "Read", detail: "structural edit, register editor, and fact read in parallel, all Opus, plus a figure read when the page carries one" },
     { title: "Redraft", detail: "one round on the combined findings; only the reviewer(s) that returned fix re-read by default" },
@@ -207,15 +239,32 @@ export const meta = {
   ]
 };
 
+// `section` is set only on a "carried" claim the page plan places: the heading it sits under.
 const CLAIM = {
   type: "object",
   properties: {
     claim: { type: "string" },
     disposition: { type: "string", enum: ["carried", "filed", "cut", "re-pointed"] },
     factId: { type: "string" },
-    reason: { type: "string" }
+    reason: { type: "string" },
+    section: { type: "string" }
   },
   required: ["claim", "disposition"]
+};
+
+// The plan step's report: the plan's path and its dispositions, in the existing dispositions only.
+const PLAN_SCHEMA = {
+  type: "object",
+  properties: {
+    plan: { type: "string" },
+    claimInventory: {
+      type: "array",
+      items: { ...CLAIM, properties: { ...CLAIM.properties, disposition: { type: "string", enum: ["carried", "cut"] } }, required: ["claim", "disposition", "factId"] }
+    },
+    couldNotDo: { type: "array", items: { type: "string" } },
+    frictionFiled: { type: "array", items: { type: "string" } }
+  },
+  required: ["plan", "claimInventory"]
 };
 
 // One option-map row as read: its path key and its value, verbatim.
@@ -381,6 +430,9 @@ const TOOL_GATE = a.toolGate || `make -C ${WT}/tool check`;   // appended for a 
 const REVIEWER = a.reviewModel || "claude-opus-5-5";
 const PAGE_INPUTS_TYPE = a.pageInputsType || "general-purpose";
 const PAGE_INPUTS_MODEL = a.pageInputsModel || REVIEWER;
+// The plan step is the chain's one judgment seat, so it defaults to the strongest seat.
+const PLAN_MODEL = a.planModel || "claude-opus-5-5";
+const PLAN_EFFORT = a.planEffort || "xhigh";
 const BOTH_REVIEWERS = a.bothReviewers === true;
 const PAGES_ARG = a.pages || [];
 const OUTLINE = a.outline || "";
@@ -656,6 +708,15 @@ function briefPathFor(p) {
 }
 
 /**
+ * The page plan's path, beside the page's brief.
+ * @param {{ path: string, track: string }} p
+ * @returns {string}
+ */
+function planPathFor(p) {
+  return `docs/internal/briefs/${p.track}/${baseNoExt(p.path)}.plan.md`;
+}
+
+/**
  * The page's slug, the key its option-map rows name: its file's base name, which every outline
  * slug equals.
  * @param {{ path: string }} p
@@ -869,6 +930,129 @@ line as indexLink; if it exits non-zero, report its error as indexLink and in co
 }
 
 /**
+ * The claim inventory as prompt lines: one per claim, with the section a plan places it in and
+ * the reason a claim is cut.
+ * @param {{ claimInventory?: Array<{ claim: string, disposition: string, factId?: string, section?: string, reason?: string }> }} pageInputs
+ * @returns {string}
+ */
+function inventoryLines(pageInputs) {
+  return (pageInputs.claimInventory || [])
+    .map((c) => `- [${c.disposition}] ${c.claim}${c.factId ? ` (${c.factId})` : ""}${c.section ? ` in section "${c.section}"` : ""}${c.reason ? ` -- ${c.reason}` : ""}`)
+    .join("\n");
+}
+
+/**
+ * Writes the plan's dispositions back into the claim inventory. The ids the plan must dispose are
+ * the outline's and page inputs' fact ids, less any id every inventory entry already cuts or
+ * re-points; the plan may still dispose such an id again. A plan entry disposes its id only as
+ * "carried" with a section or "cut" with a reason. An inventory claim keeps its own wording and
+ * takes the plan's disposition for its id; a plan entry for an id the inventory lacks is appended.
+ * @param {{ factIds?: string[] }} p
+ * @param {{ factIds?: string[], claimInventory?: Array<Record<string, any>> }} pageInputs
+ * @param {Array<Record<string, any>>} [planInventory] - the plan step's claimInventory
+ * @returns {{ required: string[], undisposed: string[], inventory: Array<Record<string, any>> }}
+ */
+function applyPlan(p, pageInputs, planInventory) {
+  const inv = pageInputs.claimInventory || [];
+  const settled = (id) => {
+    const es = inv.filter((c) => c.factId === id);
+    return es.length > 0 && es.every((c) => c.disposition === "cut" || c.disposition === "re-pointed");
+  };
+  const ids = [...new Set([...(p.factIds || []), ...(pageInputs.factIds || []), ...inv.map((c) => c.factId).filter(Boolean)])];
+  const required = ids.filter((id) => !settled(id));
+  const byId = new Map();
+  for (const e of planInventory || []) {
+    if (!e || !e.factId) continue;
+    if (e.disposition === "carried" && e.section) byId.set(e.factId, { disposition: "carried", section: e.section });
+    else if (e.disposition === "cut" && e.reason) byId.set(e.factId, { disposition: "cut", reason: e.reason });
+  }
+  const inventory = inv.map((c) => (c.factId && byId.has(c.factId) ? { claim: c.claim, factId: c.factId, ...byId.get(c.factId) } : c));
+  for (const e of planInventory || []) {
+    if (e && byId.has(e.factId) && !inventory.some((c) => c.factId === e.factId)) inventory.push({ claim: e.claim, factId: e.factId, ...byId.get(e.factId) });
+  }
+  return { required, undisposed: required.filter((id) => !byId.has(id)), inventory };
+}
+
+// Google Technical Writing Two, "Organizing large documents": the source of the page plan, and
+// of the structural edit seat's introduction, review, and navigation items.
+const GOOGLE_LARGE_DOCS = "https://developers.google.com/tech-writing/two/large-docs";
+
+/**
+ * The plan step's prompt, for the first plan or its one revision on the plan read's findings. The
+ * plan is Google's outline written down, per the 2026-10-01 page-plan diagnosis
+ * (docs/superpowers/research/2026-10-01-draft-docs-2a-page-plan-diagnosis.md): the chain carried
+ * no artifact that holds a page's argument.
+ * @param {Record<string, any>} p
+ * @param {Record<string, any>} pageInputs
+ * @param {string} [findings] - the plan read's findings a revision works from
+ * @returns {string}
+ */
+function planPrompt(p, pageInputs, findings) {
+  const head = findings
+    ? `Revise the page plan ${planPathFor(p)} for ${p.path} once, on the structural edit's findings below. Fix every blocking finding, keep the plan's dispositions in step with the revision, and return the whole report again.`
+    : `Write the page plan for ${p.path} at ${planPathFor(p)}. You are the plan step of the docs page chain: you write no page prose and you do not run a gate.`;
+  const rework = typeof p.rework === "string" && p.rework !== ""
+    ? `\nThis page is committed and is being reworked. Its job-read findings and owner rulings, verbatim:\n\n${p.rework}\n`
+    : "";
+  return `${head}
+
+${common}
+The plan is Google's outline, written down (Google Technical Writing Two, "Organizing large documents",
+${GOOGLE_LARGE_DOCS}): "You might find it useful to think of an outline as the narrative for your
+document," and "Structure your outline so that your document introduces information when it's most
+relevant to your reader." The drafter drafts from it: the plan is the source of the page's order,
+each section's claim, and each fact's placement. The structural edit seat reads it before any prose
+exists. The outline's covers order is an inventory, and Google's lesson is "a published reason to
+re-sequence sections that follow the outline's \`covers\` order as an inventory" (${PRIOR_ART},
+"## b. Structural edit seat"): the plan argues the order.
+
+Read the section "## The page anatomies" of ${REGISTER}, by its exact heading, for this page type's
+introduction and ending.
+
+The page's job, from the stage outline: ${pageInputs.job}
+Page type: ${pageInputs.pageType}
+${scopeLines(p)}
+The exemplars the drafter will imitate, with what the outline takes from each (context for the
+page's shape):
+${exemplarList(p) || "(none named; follow the register's anatomy)"}
+${rework}
+Fact ids the plan disposes, every one: ${applyPlan(p, pageInputs).required.join(", ") || "(none)"}
+Claim inventory from page inputs, one disposition per claim (you may dispose a "cut" fact id again):
+${inventoryLines(pageInputs) || "(none recorded)"}
+
+Read each fact's bullet in docs/internal/facts/ (search for its id) before you place it.
+
+The plan holds:
+1. The introduction, in Google's three parts: "What the document covers.", "What prior knowledge
+   you expect readers to have.", and "What the document doesn't cover.", with the introduction the
+   anatomy requires for this page's type.
+2. The sections, in the order the plan argues for, with the reason for that order. Each section
+   carries its heading, the one sentence a reader takes from it, the fact ids it draws on, and its
+   hand-off. That sentence is the section's first sentence on the page ("The first sentence of each
+   section states its answer", the drafter's rule), decided here before drafting.
+3. The ending section the anatomy requires for this page's type.
+4. A disposition for every fact id above: placed in a section; subordinated, a link to the reference
+   page or entry that states it, named; or cut with a reason. A fact the page does not need for its
+   job is subordinated or cut, and that is a disposition, not a dropped fact.
+
+Before you subordinate a fact, open the reference page or entry you name and confirm it states the
+fact. When it does not, report a couldNotDo naming the reference page, and file it as reference-arm
+friction (below); the fact is still subordinated, never kept on the page for that reason.
+
+Name every file in the plan by its repo path in a code span, never as a Markdown link: the docs link
+gate walks docs/ and resolves a link relative to the plan file.
+
+Return claimInventory with one entry per fact id you dispose, in the existing dispositions only:
+"carried" with its factId and the section heading it is placed under, or "cut" with its factId and
+the reason (a subordinated fact's reason names the reference page or entry that states it).
+${findings ? `\nThe structural edit's findings on the plan:\n${findings}\n` : ""}
+${frictionLine()}
+
+Commit nothing; leave the plan file in place. Return the structured report only: the plan's path,
+claimInventory, couldNotDo, and frictionFiled.`;
+}
+
+/**
  * The drafter's prompt for a first draft, the round-2 redraft, or the one redraft after the final
  * reader read, which changes only the spots that read cites.
  * @param {Record<string, any>} p
@@ -880,20 +1064,20 @@ line as indexLink; if it exits non-zero, report its error as indexLink and in co
  */
 function draftPrompt(p, pageInputs, round, findings, afterFinalRead = false) {
   const head = round === 1
-    ? `Draft the page ${p.path} at its final path, from the page inputs below and nothing else.`
+    ? `Draft the page ${p.path} at its final path, from its page plan and the page inputs below and nothing else.`
     : afterFinalRead
       ? `Redraft ${p.path} once, on the final reader read's findings below. Change only the spots they cite and leave the rest of the page as it stands.`
       : `Redraft ${p.path} once, on the combined findings below. Fix every blocking finding; take a non-blocking one when it is right. Do not widen the page.`;
-  const inventory = (pageInputs.claimInventory || [])
-    .map((c) => `- [${c.disposition}] ${c.claim}${c.factId ? ` (${c.factId})` : ""}${c.reason ? ` -- ${c.reason}` : ""}`)
-    .join("\n");
+  const inventory = inventoryLines(pageInputs);
   return `${head}
 
 ${common}
 ${registerLine(p, "drafter")}
-The brief is the source of the page's structure and voice. Voice comes only from the register's
-drafting brief and its primary exemplar, docs/extend/choose-an-ai-posture.md; the page's exemplars
-below supply structure and detail per step, never voice or wording.
+The page plan at ${planPathFor(p)} is the source of the page's order, each section's claim, and each
+fact's placement: read it whole before you draft, and draft its sections in its order, each opening
+on the sentence the plan gives it. The register's drafting brief is the source of voice. Voice comes
+only from the register's drafting brief and its primary exemplar, docs/extend/choose-an-ai-posture.md;
+the page's exemplars below supply structure and detail per step, never voice or wording.
 ${p.title ? `\nThe page's H1, verbatim: # ${p.title}\n` : ""}
 The page's job: ${pageInputs.job}
 Page type: ${pageInputs.pageType}
@@ -904,18 +1088,24 @@ ${exemplarList(p) || "(none named; follow the register's anatomy)"}
 ${p.figure ? `\nThis page carries a figure: read and follow the skill file ~/.claude/skills/cairn-figure/SKILL.md.\n` : ""}${p.figure && p.figureNote ? `\nFigure note, from the outline: ${p.figureNote}\n` : ""}
 
 Fact ids to draw on: ${(pageInputs.factIds || []).join(", ") || "(none)"}
-Claim inventory, one disposition per claim (a "cut" or "re-pointed" claim stays off the page):
+Claim inventory, one disposition per claim, with the page plan's dispositions (a "carried" claim
+sits in the section the plan names; a "cut" or "re-pointed" claim stays off the page, and a
+subordinated one takes the link to the reference page its reason names):
 ${inventory || "(the page is new; no prior claims to carry)"}
 ${p.pinned && p.pinned.length ? `Pinned heading slugs this page must keep, verbatim: ${p.pinned.join(", ")}` : ""}
 ${round > 1 ? `\nCombined findings from the reads:\n${findings}\n` : ""}
 Write the introduction, the section hand-off lead-ins, and the ending the register's page anatomies
-require for this page's type; the removal rule does not cut them. In the brief, record each of
+require for this page's type; the removal rule does not cut them, nor a sentence that carries a
+section's claim from the plan. In the brief, record each of
 those sentences "no-claim" when it carries no extractable fact, and cite its fact id when it does:
 scripts/checks/check-provenance.mjs fails a no-claim sentence that holds one ("a no-claim sentence
 cites nothing, so any extractable fact in it fails").
 
 Write the page's sentence-to-fact brief alongside the page at ${briefPathFor(p)}, citing only the
-fact ids above or "no-claim". File no fact yourself, new or retagged. A claim the page needs whose
+fact ids above or "no-claim". A sentence's id is one fact id, an array of the fact ids it
+synthesizes when it states two or more together, or "no-claim". The brief also carries a top-level
+"cuts" array mirroring the plan's cut dispositions: one { "id", "reason" } entry per fact id the
+claim inventory above marks "cut", its reason verbatim. File no fact yourself, new or retagged. A claim the page needs whose
 fact is not among the ids above is a couldNotDo naming the missing fact; do not draft that claim
 and do not file its fact yourself, since the conductor re-runs page inputs for it.
 
@@ -961,10 +1151,11 @@ findings with a proposed rewrite each, and a verdict: "fix" if any finding is bl
 }
 
 function factPrompt(p, pageInputs, scope, where) {
-  const inventory = (pageInputs.claimInventory || [])
-    .map((c) => `- [${c.disposition}] ${c.claim}${c.factId ? ` (${c.factId})` : ""}${c.reason ? ` -- ${c.reason}` : ""}`)
-    .join("\n");
-  return `Fact read of ${p.path} in ${WT}. The page's claim inventory from its page-inputs step:
+  const inventory = inventoryLines(pageInputs);
+  return `Fact read of ${p.path} in ${WT}. The page's claim inventory from its page-inputs step, with
+the dispositions of its page plan, ${planPathFor(p)}: a "carried" claim names the section the plan
+places it in, and a subordinated fact is "cut" with a reason naming the reference page or entry
+that states it.
 ${inventory || "(none recorded)"}
 ${outlineCoverage(p)}${scopeNote(scope, where)}
 Check every claim on the page against its cited fact id, retrace every cited fact against its
@@ -988,8 +1179,9 @@ Verdict "fix" if any blocking finding exists; otherwise "accept" with the count 
 
 /**
  * The fact read's outline coverage check: every outline fact id is carried on the page or cut with
- * a reason, and an absorbed page's facts are not silently dropped. Empty without outline ids or
- * absorbed pages.
+ * a reason, and an absorbed page's facts are not silently dropped. The inventory carries the page
+ * plan's dispositions, so an id the plan subordinates or cuts is disposed, and an id it places is
+ * held to the page. Empty without outline ids or absorbed pages.
  * @param {{ track: string, factIds?: string[], absorbs?: string[] }} p
  * @returns {string}
  */
@@ -1000,7 +1192,9 @@ function outlineCoverage(p) {
   const idPart = ids.length
     ? `The outline's fact ids for this page: ${ids.join(", ")}
 Each one must be cited on the page (see its brief, ${briefPathFor(p)}) or appear in the claim
-inventory above as "cut" with a reason. An outline id that is neither is a blocking finding.`
+inventory above as "cut" with a reason. An outline id that is neither is a blocking finding.
+An outline id the plan subordinates or cuts with a reason is disposed, not dropped; an id the plan
+places in a section that the page omits is a blocking finding.`
     : "";
   const absorbPart = absorbs.length
     ? `This page absorbs these retired pages, whose facts sit in docs/internal/facts/${p.track}.md under
@@ -1024,26 +1218,55 @@ const PRIOR_ART = "docs/superpowers/research/2026-09-30-page-level-review-prior-
 
 /**
  * The structural edit seat's prompt: the two published blocks the prior-art record adopts in
- * "## b. Structural edit seat", quoted verbatim, run over the whole page against its outline
- * entry, with the type's introduction duties from the register's page anatomies.
+ * "## b. Structural edit seat", quoted verbatim, with the type's introduction duties from the
+ * register's page anatomies. The plan read runs them over the page plan before any prose,
+ * grading order, pace, user goal, and the introduction's three parts at the plan level against
+ * the outline entry. The page read runs them over the whole page against its plan, since the plan
+ * carries the order and its reason, Google's outline "as the narrative for your document".
  * @param {Record<string, any>} p
+ * @param {"plan" | "page"} [mode]
  * @returns {string}
  */
-function structurePrompt(p) {
+function structurePrompt(p, mode = "page") {
   const bullets = (xs) => (xs || []).map((x) => `- ${x}`).join("\n") || "(none listed)";
+  const plan = mode === "plan";
   const crossLinks = OUTLINE
     ? `Cross-links: read the top-level crossLinks array in ${OUTLINE} live, and take every entry
 whose "from" is "${slugOf(p)}"; each names a page this one links ("to") and why.`
     : "";
-  return `Structural edit of ${p.path} in ${WT}.
+  const head = plan
+    ? `Structural edit of the page plan ${planPathFor(p)} for ${p.path} in ${WT}. No prose exists yet:
+read the plan, never the page.`
+    : `Structural edit of ${p.path} in ${WT}.`;
+  const level = plan
+    ? `
+This is the plan read. The plan is Google's outline, written down (Google Technical Writing Two,
+"Organizing large documents", ${GOOGLE_LARGE_DOCS}): "You might find it useful to think of an
+outline as the narrative for your document," and "Structure your outline so that your document
+introduces information when it's most relevant to your reader." At the plan level, grade order,
+pace, user goal, and the introduction's three parts: Block 1's "Information is presented in the
+most logical order and location.", "Information is provided at the right pace.", and "The user
+goal is clear.", and Block 2's three introduction items, read against the plan's introduction.
+`
+    : "";
+  const entryRead = plan
+    ? `How the entry is read, from the same record: "the outline's \`job\` is the page's purpose, \`covers\`
+is the list the page must deliver in the order the seat judges (Block 1 "most logical order"), and
+\`outOfScope\` is the page's "doesn't cover" list; the seat compares the introduction to those three."`
+    : `The page's plan, ${planPathFor(p)}, carries its order and the reason for it, each section's claim,
+and each fact's placement: Google's outline "as the narrative for your document" (${GOOGLE_LARGE_DOCS}).
+Read it whole before the page, then grade the page against its plan and this checklist, no longer
+against the outline's \`covers\` order. The introduction is still compared to the entry: \`job\` is the
+page's purpose, \`covers\` what it delivers, and \`outOfScope\` its "doesn't cover" list.`;
+  return `${head}
 
 ${common}
 The level, as the Editorial Freelancers Association defines it: "Developmental editors (also called
 'substantive,' 'structural,' or 'content' editors) deal with content, organization, and genre
 considerations." Your stance, from ${PRIOR_ART}, "## b. Structural edit seat": "an editor. It reads
 the whole page against the outline and this checklist, returns findings with \`file:line\`, and never
-edits." Grade the page at this level only.
-
+edits." Grade the ${plan ? "plan" : "page"} at this level only.
+${level}
 The page's outline entry${OUTLINE ? `, from ${OUTLINE}` : ""}:
 Job: ${p.job}
 Page type: ${p.pageType || "(none given)"}
@@ -1053,9 +1276,7 @@ Out of scope, owned by another page:
 ${bullets(p.outOfScope)}
 ${crossLinks}
 
-How the entry is read, from the same record: "the outline's \`job\` is the page's purpose, \`covers\`
-is the list the page must deliver in the order the seat judges (Block 1 "most logical order"), and
-\`outOfScope\` is the page's "doesn't cover" list; the seat compares the introduction to those three."
+${entryRead}
 Cross-links are the page's "See-also, next steps, related resources" ("## e. Outline fields").
 
 Read the section "## The page anatomies" of ${REGISTER}, by its exact heading. The introduction it
@@ -1078,7 +1299,7 @@ User stories
 - Troubleshooting and error recognition steps are included where appropriate.
 
 Block 2, Google Technical Writing Two, "Organizing large documents"
-(https://developers.google.com/tech-writing/two/large-docs). Check the introduction on every page.
+(${GOOGLE_LARGE_DOCS}). Check the introduction on every page.
 Its navigation item "a table of contents menu that shows users where they are in the document" is
 left out: the site renderer (cairn.pub) supplies the table of contents, not the page.
 "If readers of your documentation can't find relevance in the subject, they are likely to ignore it.
@@ -1101,7 +1322,7 @@ in your overview. Does your introduction provide an accurate overview of the top
 "Structure your outline so that your document introduces information when it's most relevant to your
 reader."
 
-A checklist item the page fails is a blocking finding: its file:line as location, the item it fails
+A checklist item the ${plan ? "plan" : "page"} fails is a blocking finding: its file:line as location, the item it fails
 and how, and in rewrite a suggestion for how to address it. Verdict "fix" if any blocking finding
 exists; otherwise "accept".`;
 }
@@ -1192,7 +1413,7 @@ async function runReads(p, pageInputs, round, names, scope, where) {
   const phaseName = round === "final" ? "Final read" : "Read";
   const tasks = [];
   if (names.includes("structural edit")) {
-    tasks.push(["structural edit", () => agent(structurePrompt(p), { label: `structure:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "general-purpose" })]);
+    tasks.push(["structural edit", () => agent(structurePrompt(p, "page"), { label: `structure:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "general-purpose" })]);
   }
   if (names.includes("register editor")) {
     tasks.push(["register editor", () => agent(editorPrompt(p, scope, where), { label: `editor:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "cairn-register-editor" })]);
@@ -1313,8 +1534,44 @@ function reworkInputs(p, state, head) {
   };
 }
 
+/**
+ * The plan step and its plan read: one agent writes the page plan, the runner writes the plan's
+ * dispositions back into the claim inventory, and the structural edit seat reads the plan before
+ * any prose. A "fix" takes one plan revision and one re-read; a second "fix" escalates, the shape
+ * of the chain's other seats. A plan that leaves a fact id undisposed escalates before its read.
+ * @param {Record<string, any>} p
+ * @param {Record<string, any>} pageInputs
+ * @param {Record<string, any>} record - gains `planStep`
+ * @returns {Promise<{ pageInputs: Record<string, any> } | { escalate: Record<string, any> }>} the
+ *   page inputs carrying the plan's dispositions, or the escalated record
+ */
+async function planStep(p, pageInputs, record) {
+  const step = { revised: false, reads: [], couldNotDo: [], frictionFiled: [] };
+  record.planStep = step;
+  const opts = (label) => ({ label, phase: "Plan", schema: PLAN_SCHEMA, model: PLAN_MODEL, effort: PLAN_EFFORT, agentType: "general-purpose" });
+  let plan = await agent(planPrompt(p, pageInputs), opts(`plan:${p.id}`));
+  for (const tag of ["plan", "plan2"]) {
+    if (!plan) return { escalate: { ...record, status: "escalate", reason: "the plan step returned nothing" } };
+    step.couldNotDo = plan.couldNotDo || [];
+    step.frictionFiled = [...step.frictionFiled, ...(plan.frictionFiled || [])];
+    const applied = applyPlan(p, pageInputs, plan.claimInventory);
+    if (applied.undisposed.length) {
+      return { escalate: { ...record, status: "escalate", reason: `the plan left fact ids undisposed: ${applied.undisposed.join(", ")}` } };
+    }
+    const read = await agent(structurePrompt(p, "plan"), { label: `structure:${p.id}:${tag}`, phase: "Plan", schema: READ_SCHEMA, model: REVIEWER, agentType: "general-purpose" });
+    if (!read) return { escalate: { ...record, status: "escalate", reason: "the plan read returned nothing" } };
+    step.reads.push(...readEntries([["structural edit", read]]));
+    if (read.verdict !== "fix") return { pageInputs: { ...pageInputs, claimInventory: applied.inventory } };
+    if (tag === "plan2") {
+      return { escalate: { ...record, status: "escalate", reason: "second fix verdict on the plan read", findings: combined([["structural edit", read]]) } };
+    }
+    step.revised = true;
+    plan = await agent(planPrompt(p, pageInputs, combined([["structural edit", read]])), opts(`replan:${p.id}`));
+  }
+}
+
 async function chain(p) {
-  const record = { id: p.id, path: p.path, brief: briefPathFor(p), rounds: [] };
+  const record = { id: p.id, path: p.path, brief: briefPathFor(p), plan: planPathFor(p), rounds: [] };
   const rework = typeof p.rework === "string" && p.rework !== "";
   let pageInputs;
   if (rework) {
@@ -1329,6 +1586,9 @@ async function chain(p) {
     if (!pageInputs) return { ...record, status: "escalate", reason: "page-inputs step returned nothing" };
     record.pageInputs = pageInputs;
   }
+  const planned = await planStep(p, pageInputs, record);
+  if (planned.escalate) return planned.escalate;
+  pageInputs = planned.pageInputs;
   // A rework page's reads are scoped to what changed; the structural edit seat reads it whole.
   const reworkFindings = rework ? `## rework\n${p.rework}\n\nScope: ${REWORK_SCOPE}` : undefined;
   const reworkWhere = rework

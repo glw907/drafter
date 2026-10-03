@@ -149,7 +149,10 @@ function reworkState(worktree, paths, briefs) {
     const out = { path: p, brief, state, cited: [] };
     try {
       const sentences = JSON.parse(fs.readFileSync(path.resolve(worktree, brief), "utf8")).sentences || [];
-      for (const x of sentences) if (typeof x.id === "string" && x.id.startsWith("f:") && !out.cited.includes(x.id)) out.cited.push(x.id);
+      // A sentence's id is one fact id, or an array of the ids a synthesizing sentence cites.
+      for (const x of sentences) {
+        for (const id of Array.isArray(x.id) ? x.id : [x.id]) if (typeof id === "string" && id.startsWith("f:") && !out.cited.includes(id)) out.cited.push(id);
+      }
     } catch (e) {
       out.error = `brief not readable: ${brief}: ${e.message}`;
     }

@@ -131,6 +131,19 @@ function helperLine(prompt, verb) {
 
 const ACCEPT = { verdict: "accept", findings: [], summary: "ok" };
 
+/** The fact ids a plan prompt asks the plan to dispose, read from its one list line. */
+function planIds(prompt) {
+  const m = prompt.match(/Fact ids the plan disposes, every one: ([^\n]*)/);
+  return m ? m[1].split(", ").filter((x) => x.startsWith("f:")) : [];
+}
+
+/** A stubbed plan step: writes the plan file and places every id it was asked to dispose. */
+function stubPlan(wt, prompt) {
+  const plan = prompt.match(/docs\/internal\/briefs\/\S+?\.plan\.md/)[0];
+  write(wt, plan, "# Plan\n");
+  return { plan, claimInventory: planIds(prompt).map((factId) => ({ claim: "a planned fact", disposition: "carried", factId, section: "Section A" })) };
+}
+
 /**
  * A stubbed agent: the outline probe runs its rendered command and returns the JSON verbatim;
  * page inputs echo the page's outline job; the drafter writes the page and runs its rendered
@@ -138,12 +151,13 @@ const ACCEPT = { verdict: "accept", findings: [], summary: "ok" };
  */
 function makeAgent(wt, home, calls, overrides = {}) {
   return async (prompt, opts) => {
-    calls.push({ label: opts.label, prompt });
+    calls.push({ label: opts.label, prompt, opts });
     const kind = opts.label.split(":")[0];
     if (overrides[kind]) return overrides[kind](prompt, opts);
     if (kind === "outline") return JSON.parse(runHelperLine(helperLine(prompt, "resolve"), home));
     if (kind === "rework-state") return JSON.parse(runHelperLine(helperLine(prompt, "rework-state"), home));
     if (kind === "inputs") return { job: "the job", pageType: "concept", factIds: ["f:a7qx4m"], claimInventory: [] };
+    if (kind === "plan" || kind === "replan") return stubPlan(wt, prompt);
     if (kind === "draft" || kind === "redraft" || kind === "reader-redraft" || kind === "rework") {
       const path = prompt.match(/(?:Draft the page|Redraft) (\S+)/)[1];
       write(wt, path, "# Architecture of cairn\n\nBody.\n");
@@ -432,7 +446,7 @@ check("dry run: one outline page resolves its entry, feeds the prompts, and link
   const calls = [];
   const out = await runRunner(args, makeAgent(wt, home, calls), parallel, noop, noop);
   assert.equal(out.accepted, 1);
-  assert.deepEqual(calls.map((c) => c.label), ["outline", "inputs:architecture", "draft:architecture", "structure:architecture:r1", "editor:architecture:r1", "facts:architecture:r1", "figure:architecture:r1", "reader:architecture"]);
+  assert.deepEqual(calls.map((c) => c.label), ["outline", "inputs:architecture", "plan:architecture", "structure:architecture:plan", "draft:architecture", "structure:architecture:r1", "editor:architecture:r1", "facts:architecture:r1", "figure:architecture:r1", "reader:architecture"]);
 
   const inputs = calls.find((c) => c.label.startsWith("inputs:")).prompt;
   assert.match(inputs, /Learn where cairn ends and your site begins\./);
@@ -681,7 +695,8 @@ async function seatDryRun(pagePath, overrides = {}, extraArgs = {}) {
   const out = await runRunner(baseArgs(wt, [{ id, path: pagePath, track: "extend" }], { outline: "docs/internal/outlines/extend.json", ...extraArgs }), makeAgent(wt, home, calls, overrides), parallel, noop, noop);
   const labels = calls.map((c) => c.label);
   const prompt = (label) => calls.find((c) => c.label === label).prompt;
-  return { out, record: out.pages[0], labels, prompt, flat: (label) => prompt(label).replace(/\s+/g, " ") };
+  const opts = (label) => calls.find((c) => c.label === label).opts;
+  return { out, record: out.pages[0], labels, prompt, opts, flat: (label) => prompt(label).replace(/\s+/g, " ") };
 }
 
 check("dry run: the structural edit seat runs in round 1 with the outline entry and the published checklist", async () => {
@@ -711,7 +726,7 @@ check("dry run: the structural edit seat runs in round 1 with the outline entry 
 
 check("dry run: the structural seat's fix reaches the redraft prompt and it re-reads in lean mode; the editor does not", async () => {
   let n = 0;
-  const { labels, flat, record } = await seatDryRun("docs/extend/architecture.md", { structure: async () => (++n === 1 ? STRUCT_FIX : ACCEPT) });
+  const { labels, flat, record } = await seatDryRun("docs/extend/architecture.md", { structure: async (p, o) => (o.label.endsWith(":r1") && ++n === 1 ? STRUCT_FIX : ACCEPT) });
   assert.match(flat("redraft:architecture"), /## structural edit: fix/);
   assert.match(flat("redraft:architecture"), /STRUCT-FINDING intro omits scope/);
   assert.ok(labels.includes("structure:architecture:r2"));
@@ -871,7 +886,7 @@ check("dry run: a rework page skips page inputs and the round-1 draft; its first
   assert.ok(!labels.some((l) => l.startsWith("inputs:")), "no page-inputs call");
   assert.ok(!labels.some((l) => l.startsWith("draft:")), "no round-1 draft call");
   assert.equal(labels[1], "rework-state", "one probe reads the page's git state and brief");
-  assert.equal(labels[2], "rework:architecture", "the rework redraft is the first page call");
+  assert.deepEqual(labels.slice(2, 5), ["plan:architecture", "structure:architecture:plan", "rework:architecture"], "the plan and its read, then the rework redraft as the first drafter call");
   const d = flat("rework:architecture");
   assert.match(d, /^Redraft docs\/extend\/architecture\.md once, on the combined findings below\./);
   assert.ok(d.includes(REWORK), "the rework text");
@@ -998,9 +1013,166 @@ check("dry run: a rework page reaches the final read on acceptance", async () =>
 
 check("dry run: a page without rework produces the same call labels as before, with no scope note", async () => {
   const { labels, flat } = await seatDryRun("docs/extend/architecture.md");
-  assert.deepEqual(labels, ["outline", "inputs:architecture", "draft:architecture", "structure:architecture:r1", "editor:architecture:r1", "facts:architecture:r1", "figure:architecture:r1", "reader:architecture"]);
+  assert.deepEqual(labels, ["outline", "inputs:architecture", "plan:architecture", "structure:architecture:plan", "draft:architecture", "structure:architecture:r1", "editor:architecture:r1", "facts:architecture:r1", "figure:architecture:r1", "reader:architecture"]);
   assert.doesNotMatch(flat("editor:architecture:r1"), /This read is scoped/);
   assert.doesNotMatch(flat("facts:architecture:r1"), /This read is scoped/);
+});
+
+// -------------------------------------------------------------------------------------------
+// Dry runs of the page plan: Google's outline, written down, read before any prose.
+// -------------------------------------------------------------------------------------------
+
+const PLAN_PATH = "docs/internal/briefs/extend/architecture.plan.md";
+const GOOGLE_LARGE_DOCS = "https://developers.google.com/tech-writing/two/large-docs";
+const SUBORDINATED = "subordinated: `docs/reference/sveltekit.md`, section Hooks, states it";
+
+/** A plan step that places f:a7qx4m under "Seams" and subordinates f:0duu5p. */
+async function placingPlan() {
+  return {
+    plan: PLAN_PATH,
+    claimInventory: [
+      { claim: "the seam", disposition: "carried", factId: "f:a7qx4m", section: "Seams" },
+      { claim: "the hook", disposition: "cut", factId: "f:0duu5p", reason: SUBORDINATED }
+    ],
+    couldNotDo: ["PLAN-COULD-NOT-DO docs/reference/sveltekit.md does not state f:zzz"],
+    frictionFiled: ["plan-friction"]
+  };
+}
+
+check("dry run: the plan step runs between page inputs and the draft, on Opus 5.5 at xhigh by default", async () => {
+  const { labels, opts, flat } = await seatDryRun("docs/extend/architecture.md");
+  const at = labels.indexOf("plan:architecture");
+  assert.ok(at > labels.indexOf("inputs:architecture"), "after page inputs");
+  assert.ok(at < labels.indexOf("draft:architecture"), "before the draft");
+  assert.equal(opts("plan:architecture").model, "claude-opus-5-5");
+  assert.equal(opts("plan:architecture").effort, "xhigh");
+  const p = flat("plan:architecture");
+  assert.ok(p.includes(PLAN_PATH), "the plan path");
+  assert.ok(p.includes("The page's job, from the stage outline: the job"), "the job");
+  assert.ok(p.includes("Page type: concept"), "the page type");
+  assert.ok(p.includes("## The page anatomies"), "the anatomy, by heading");
+  assert.ok(p.includes("Take: Take the code map."), "the exemplar takes");
+  assert.ok(p.includes("Fact ids the plan disposes, every one: f:a7qx4m, f:0duu5p"), "every fact id");
+  assert.ok(p.includes("Claim inventory"), "the claim inventory");
+  assert.ok(p.includes(GOOGLE_LARGE_DOCS), "Google's lesson, cited");
+  assert.ok(p.includes("think of an outline as the narrative for your document"));
+  for (const part of ["What the document covers.", "What prior knowledge you expect readers to have.", "What the document doesn't cover."]) {
+    assert.ok(p.includes(part), `the introduction's part: ${part}`);
+  }
+  assert.match(p, /its heading, the one sentence a reader takes from it, the fact ids it draws on, and its hand-off/);
+  assert.match(p, /the ending section the anatomy requires/i);
+  assert.match(p, /placed in a section; subordinated, a link to the reference page or entry that states it, named; or cut with a reason/);
+  assert.match(p, /a couldNotDo naming the reference page/);
+  assert.match(p, /never kept on the page/);
+});
+
+check("dry run: planModel and planEffort set the plan step's seat", async () => {
+  const { opts } = await seatDryRun("docs/extend/architecture.md", {}, { planModel: "fable", planEffort: "max" });
+  assert.equal(opts("plan:architecture").model, "fable");
+  assert.equal(opts("plan:architecture").effort, "max");
+});
+
+check("dry run: the structural seat reads the plan before any prose, at the plan level", async () => {
+  const { labels, flat } = await seatDryRun("docs/extend/architecture.md");
+  assert.ok(labels.indexOf("structure:architecture:plan") > labels.indexOf("plan:architecture"));
+  assert.ok(labels.indexOf("structure:architecture:plan") < labels.indexOf("draft:architecture"));
+  const s = flat("structure:architecture:plan");
+  assert.ok(s.includes(PLAN_PATH), "the plan path");
+  assert.match(s, /order, pace, user goal, and the introduction's three parts/);
+  assert.match(s, /Learn where cairn ends and your site begins\./, "the outline entry");
+  for (const item of ["Information is provided at the right pace.", "Information is presented in the most logical order and location.",
+    "The user goal is clear.", "What the document covers.", "What prior knowledge you expect readers to have.", "What the document doesn't cover."]) {
+    assert.ok(s.includes(item), `checklist item: ${item}`);
+  }
+  assert.ok(s.includes("in the order the seat judges"), "the plan read judges the order");
+});
+
+check("dry run: a plan read fix drives one plan revision and one re-read, then the draft", async () => {
+  const { labels, flat, record } = await seatDryRun("docs/extend/architecture.md", { structure: async (p, o) => (o.label.endsWith(":plan") ? STRUCT_FIX : ACCEPT) });
+  const at = labels.indexOf("plan:architecture");
+  assert.deepEqual(labels.slice(at, at + 5), ["plan:architecture", "structure:architecture:plan", "replan:architecture", "structure:architecture:plan2", "draft:architecture"]);
+  const r = flat("replan:architecture");
+  assert.match(r, /^Revise the page plan/);
+  assert.ok(r.includes("STRUCT-FINDING intro omits scope"), "the plan read's findings");
+  assert.ok(r.includes(PLAN_PATH));
+  assert.deepEqual(record.planStep.reads.map((x) => x.verdict), ["fix", "accept"]);
+  assert.equal(record.planStep.revised, true);
+  assert.equal(record.status, "accepted");
+});
+
+check("dry run: a second plan read fix escalates the page before any prose", async () => {
+  const { labels, record } = await seatDryRun("docs/extend/architecture.md", { structure: async (p, o) => (/:plan2?$/.test(o.label) ? STRUCT_FIX : ACCEPT) });
+  assert.equal(record.status, "escalate");
+  assert.match(record.reason, /plan read/);
+  assert.match(record.findings, /STRUCT-FINDING/);
+  assert.equal(labels[labels.length - 1], "structure:architecture:plan2");
+  assert.equal(labels.filter((l) => l.startsWith("replan:")).length, 1);
+  assert.ok(!labels.some((l) => l.startsWith("draft:")));
+});
+
+check("dry run: a plan that leaves an inventory fact id undisposed escalates before the plan read", async () => {
+  const { labels, record } = await seatDryRun("docs/extend/architecture.md", {
+    plan: async () => ({ plan: PLAN_PATH, claimInventory: [{ claim: "c", disposition: "carried", factId: "f:a7qx4m" }] })
+  });
+  assert.equal(record.status, "escalate");
+  assert.match(record.reason, /f:a7qx4m, f:0duu5p/, "a carried id with no section is undisposed too");
+  assert.ok(!labels.some((l) => l.startsWith("structure:") || l.startsWith("draft:")));
+});
+
+check("dry run: the drafter drafts from the plan, with its dispositions in the inventory and the brief contract", async () => {
+  const { flat } = await seatDryRun("docs/extend/architecture.md", { plan: placingPlan });
+  const d = flat("draft:architecture");
+  assert.ok(d.includes(PLAN_PATH), "the plan path");
+  assert.match(d, /source of the page's order, each section's claim, and each fact's placement/);
+  assert.match(d, /The register's drafting brief is the source of voice/);
+  assert.ok(d.includes('- [carried] the seam (f:a7qx4m) in section "Seams"'), "a placed fact");
+  assert.ok(d.includes(`- [cut] the hook (f:0duu5p) -- ${SUBORDINATED}`), "a subordinated fact");
+  assert.match(d, /an array of the fact ids it synthesizes/);
+  assert.match(d, /top-level "cuts" array/);
+});
+
+check("dry run: the fact read's inventory carries the plan's dispositions, and its coverage rule reads them", async () => {
+  const { flat } = await seatDryRun("docs/extend/architecture.md", { plan: placingPlan });
+  const f = flat("facts:architecture:r1");
+  assert.ok(f.includes('- [carried] the seam (f:a7qx4m) in section "Seams"'));
+  assert.ok(f.includes(`- [cut] the hook (f:0duu5p) -- ${SUBORDINATED}`));
+  assert.ok(f.includes(PLAN_PATH), "the plan path");
+  assert.match(f, /An outline id the plan subordinates or cuts with a reason is disposed, not dropped/);
+  assert.match(f, /an id the plan places in a section that the page omits is a blocking finding/);
+});
+
+check("dry run: the page-level structural read grades the page against its plan, not the outline's cover order", async () => {
+  const { flat } = await seatDryRun("docs/extend/architecture.md");
+  const s = flat("structure:architecture:r1");
+  assert.ok(s.includes(PLAN_PATH), "the plan path");
+  assert.match(s, /grade the page against its plan and this checklist/);
+  assert.ok(!s.includes("in the order the seat judges"), "no cover order");
+});
+
+check("dry run: the record carries the plan path beside the page and brief, and the plan's report", async () => {
+  const { record } = await seatDryRun("docs/extend/architecture.md", { plan: placingPlan });
+  assert.equal(record.path, "docs/extend/architecture.md");
+  assert.equal(record.brief, "docs/internal/briefs/extend/architecture.json");
+  assert.equal(record.plan, PLAN_PATH);
+  assert.deepEqual(record.planStep.couldNotDo, ["PLAN-COULD-NOT-DO docs/reference/sveltekit.md does not state f:zzz"]);
+  assert.deepEqual(record.planStep.frictionFiled, ["plan-friction"]);
+  assert.equal(record.planStep.revised, false);
+});
+
+check("dry run: a rework page runs the plan step, with its rework text, before its rework draft", async () => {
+  const { labels, flat } = await reworkDryRun();
+  assert.ok(labels.indexOf("plan:architecture") < labels.indexOf("rework:architecture"));
+  assert.ok(flat("plan:architecture").includes(REWORK), "the rework text");
+  assert.ok(flat("rework:architecture").includes(PLAN_PATH), "the rework draft drafts from the plan");
+});
+
+check("helper: rework-state counts every id a multi-id brief sentence cites", () => {
+  const wt = reworkWorktree({ cited: [] });
+  write(wt, BRIEF_PATH, JSON.stringify({ page: "docs/extend/architecture.md", sentences: [{ text: "s", id: ["f:aaaaaa", "f:bbbbbb"] }, { text: "t", id: "f:cccccc" }], cuts: [] }));
+  git(wt, "add -A");
+  git(wt, "commit -q -m brief");
+  const r = helper.reworkState(wt, ["docs/extend/architecture.md"], [BRIEF_PATH]);
+  assert.deepEqual(r.pages[0].cited, ["f:aaaaaa", "f:bbbbbb", "f:cccccc"]);
 });
 
 // -------------------------------------------------------------------------------------------
