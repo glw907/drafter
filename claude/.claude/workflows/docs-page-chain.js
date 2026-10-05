@@ -44,7 +44,7 @@
 //       pageInputsModel: "claude-opus-5-5", // optional; defaults to reviewModel
 //       planModel: "claude-opus-5-5",      // optional; the plan step's model, this is the default
 //       planEffort: "xhigh",               // optional; the plan step's effort, this is the default
-//       framingModel: "opus",              // optional; the framing step's model, this is the default
+//       framingModel: "claude-opus-5-5",   // optional; the framing step's model, this is the default
 //       framingEffort: "xhigh",            // optional; the framing step's effort, this is the default
 //       outline: "docs/internal/outlines/extend.json",   // optional; see "The outline" below
 //       optionMap: "docs/internal/option-map.json",       // optional; the option map, this is the default
@@ -146,7 +146,7 @@
 // page's introduction is not drafted like its body. The fact-driven chain writes strong bodies
 // and thin introductions, and an introduction takes high-level reasoning to get its framing and
 // background right. So one framing agent per page runs after the plan step and its plan read and
-// before the drafter, on `args.framingModel` at `args.framingEffort` (default `opus` at `xhigh`,
+// before the drafter, on `args.framingModel` at `args.framingEffort` (default `claude-opus-5-5` at `xhigh`,
 // set per agent through the runtime's `effort` option). It sits after the plan because it frames
 // the plan's introduction (the plan's three Google parts stand) and reads the plan's dispositions,
 // and before the drafter because the drafter writes the introduction from it. It reads the doc
@@ -175,7 +175,8 @@
 // from its intro plan, an imperative or page-describing opening are blocking). A rework page takes
 // the framing step too, revising any record already on disk. The record path is `record.framing`;
 // the step's readers, fact ids, filed facts, `couldNotDo`, and friction land in
-// `record.framingStep`. A framing agent that returns nothing escalates the page.
+// `record.framingStep`. A framing agent that returns nothing escalates the page, and so does one
+// whose record a probe (`probe:<id>:framing`, `test -f`) finds missing on disk at its reported path.
 //
 // Round 2 reads (draft-docs 2a run 2 measured about 2.4M tokens a page against the 1.3M budgeted;
 // `docs/superpowers/research/2026-10-03-draft-docs-2a-targeted-close-record.md` on
@@ -188,8 +189,10 @@
 // re-runs a rework page's `git diff` scope against HEAD. The fact read still reads the option map
 // live for rows pending the page's slug. Under `bothReviewers`, a seat that accepted in round 1
 // reads the changed sentences for a defect the fixes introduced, so `crossRegression` still
-// measures a fix's regression on the narrowed input. A redraft with no well-formed `baseline`
-// falls back to whole-page round-2 reads, logged; `rounds[1].scope` records which ran.
+// measures a fix's regression on the narrowed input. A `baseline` must be exactly 40 or 64 hex
+// digits and resolve in the repo (a probe, `probe:<id>:baseline`, runs `git cat-file -e`); a
+// redraft whose baseline fails either test falls back to whole-page round-2 reads, logged, and
+// `rounds[1].scope` records which ran.
 //
 // Design friction: page inputs, the plan step, the framing step, the drafter, and the fact read,
 // the agents that meet the code, file a friction entry in `docs/internal/docs-friction-log.md` for a hedge, a
@@ -291,7 +294,7 @@ export const meta = {
     { title: "Outline", detail: "with args.outline, one probe resolves every page's outline entry" },
     { title: "Page inputs", detail: "one agent per page: job, type, fact ids, claim inventory" },
     { title: "Plan", detail: "one agent writes the page plan; the structural edit seat reads it before any prose, one revision on fix" },
-    { title: "Framing", detail: "one agent reads the doc set's map and writes the framing record the introduction is drafted from", model: "opus" },
+    { title: "Framing", detail: "one agent reads the doc set's map and writes the framing record the introduction is drafted from", model: "claude-opus-5-5" },
     { title: "Draft", detail: "the drafter writes the introduction from the framing record, the body from the plan, and runs the docs gate itself" },
     { title: "Read", detail: "structural edit, register editor, and fact read in parallel, all Opus, plus a figure read when the page carries one" },
     { title: "Redraft", detail: "one round on the combined findings; re-readers verify their round-1 fixes and read changed sentences only" },
@@ -341,6 +344,13 @@ const FRAMING_SCHEMA = {
     frictionFiled: { type: "array", items: { type: "string" } }
   },
   required: ["framing", "readers", "factIds"]
+};
+
+// An existence probe's report: whether the command it ran exited zero.
+const EXISTS_SCHEMA = {
+  type: "object",
+  properties: { exists: { type: "boolean" }, output: { type: "string" } },
+  required: ["exists"]
 };
 
 // One option-map row as read: its path key and its value, verbatim.
@@ -512,7 +522,7 @@ const PLAN_MODEL = a.planModel || "claude-opus-5-5";
 const PLAN_EFFORT = a.planEffort || "xhigh";
 // The framing step decides an introduction's framing, which takes high-level reasoning the
 // fact-driven seats do not (Geoff, 2026-10-04), so it too runs at the top tier.
-const FRAMING_MODEL = a.framingModel || "opus";
+const FRAMING_MODEL = a.framingModel || "claude-opus-5-5";
 const FRAMING_EFFORT = a.framingEffort || "xhigh";
 const BOTH_REVIEWERS = a.bothReviewers === true;
 const PAGES_ARG = a.pages || [];
@@ -1278,6 +1288,26 @@ function applyFraming(pageInputs, ids) {
 }
 
 /**
+ * Asks a probe agent whether one command exits zero, since the runtime itself has no filesystem or
+ * exec access. A probe that returns nothing counts as a miss, so the caller fails closed.
+ * @param {string} label
+ * @param {string} command - run from the worktree, read-only
+ * @returns {Promise<boolean>}
+ */
+async function probeExists(label, command) {
+  const r = await agent(
+    `Run exactly this command, once, from the worktree ${WT}:
+
+  ${command}
+
+Return exists: true if it exited with status 0, otherwise exists: false, and its output, if any,
+as output. Run no other command and modify no file.`,
+    { label, phase: "Read", schema: EXISTS_SCHEMA, model: "sonnet", effort: "low" }
+  );
+  return Boolean(r && r.exists === true);
+}
+
+/**
  * The framing step: one agent decides the introduction's framing and writes its record, and the
  * runner writes the record's fact ids back into the page inputs. Nothing reviews the record
  * before the draft; the structural edit seat and the register editor grade the introduction
@@ -1290,6 +1320,10 @@ function applyFraming(pageInputs, ids) {
 async function framingStep(p, pageInputs, record) {
   const f = await agent(framingPrompt(p, pageInputs), { label: `framing:${p.id}`, phase: "Framing", schema: FRAMING_SCHEMA, model: FRAMING_MODEL, effort: FRAMING_EFFORT, agentType: "general-purpose" });
   if (!f) return { escalate: { ...record, status: "escalate", reason: "the framing step returned nothing" } };
+  const path = String(f.framing || "").trim();
+  if (!path || !(await probeExists(`probe:${p.id}:framing`, `test -f '${path}'`))) {
+    return { escalate: { ...record, status: "escalate", reason: `the framing step reported a record not on disk: ${path || "(no path)"}` } };
+  }
   record.framingStep = {
     readers: f.readers || [],
     factIds: f.factIds || [],
@@ -1952,9 +1986,10 @@ async function chain(p) {
   if (!d2) return { ...record, status: "escalate", reason: "redrafter returned nothing" };
   // Round 2 narrows to round-1 fixes and changed sentences when the redrafter recorded the page as
   // round 1 read it; without that baseline it falls back to whole-page reads.
-  const baseline = typeof d2.baseline === "string" && /^[0-9a-f]{40,64}$/.test(d2.baseline.trim()) ? d2.baseline.trim() : "";
+  const shaped = typeof d2.baseline === "string" && /^([0-9a-f]{40}|[0-9a-f]{64})$/.test(d2.baseline.trim()) ? d2.baseline.trim() : "";
+  const baseline = shaped && (await probeExists(`probe:${p.id}:baseline`, `git cat-file -e ${shaped}`)) ? shaped : "";
   record.rounds.push({ round: 2, draft: d2, scope: baseline ? `changed sentences since ${baseline}` : "whole page (no baseline from the redraft)" });
-  if (!baseline) log(`${p.id}: the redraft reported no baseline; round 2 reads the whole page`);
+  if (!baseline) log(`${p.id}: the redraft reported no baseline that resolves; round 2 reads the whole page`);
   const r2 = baseline
     ? await runReads(p, pageInputs, 2, rereviewNames, undefined, undefined, { baseline, round1: r1.list })
     : await runReads(p, pageInputs, 2, rereviewNames, reworkFindings, reworkWhere);
