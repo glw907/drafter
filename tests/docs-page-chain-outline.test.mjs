@@ -158,6 +158,7 @@ function makeAgent(wt, home, calls, overrides = {}) {
     if (kind === "rework-state") return JSON.parse(runHelperLine(helperLine(prompt, "rework-state"), home));
     if (kind === "inputs") return { job: "the job", pageType: "concept", factIds: ["f:a7qx4m"], claimInventory: [] };
     if (kind === "plan" || kind === "replan") return stubPlan(wt, prompt);
+    if (kind === "framing") return { framing: prompt.match(/docs\/internal\/briefs\/\S+?\.framing\.md/)[0], readers: ["a reader"], factIds: [] };
     if (kind === "draft" || kind === "redraft" || kind === "reader-redraft" || kind === "rework") {
       const path = prompt.match(/(?:Draft the page|Redraft) (\S+)/)[1];
       write(wt, path, "# Architecture of cairn\n\nBody.\n");
@@ -446,7 +447,7 @@ check("dry run: one outline page resolves its entry, feeds the prompts, and link
   const calls = [];
   const out = await runRunner(args, makeAgent(wt, home, calls), parallel, noop, noop);
   assert.equal(out.accepted, 1);
-  assert.deepEqual(calls.map((c) => c.label), ["outline", "inputs:architecture", "plan:architecture", "structure:architecture:plan", "draft:architecture", "structure:architecture:r1", "editor:architecture:r1", "facts:architecture:r1", "figure:architecture:r1", "reader:architecture"]);
+  assert.deepEqual(calls.map((c) => c.label), ["outline", "inputs:architecture", "plan:architecture", "structure:architecture:plan", "framing:architecture", "draft:architecture", "structure:architecture:r1", "editor:architecture:r1", "facts:architecture:r1", "figure:architecture:r1", "reader:architecture"]);
 
   const inputs = calls.find((c) => c.label.startsWith("inputs:")).prompt;
   assert.match(inputs, /Learn where cairn ends and your site begins\./);
@@ -886,7 +887,7 @@ check("dry run: a rework page skips page inputs and the round-1 draft; its first
   assert.ok(!labels.some((l) => l.startsWith("inputs:")), "no page-inputs call");
   assert.ok(!labels.some((l) => l.startsWith("draft:")), "no round-1 draft call");
   assert.equal(labels[1], "rework-state", "one probe reads the page's git state and brief");
-  assert.deepEqual(labels.slice(2, 5), ["plan:architecture", "structure:architecture:plan", "rework:architecture"], "the plan and its read, then the rework redraft as the first drafter call");
+  assert.deepEqual(labels.slice(2, 6), ["plan:architecture", "structure:architecture:plan", "framing:architecture", "rework:architecture"], "the plan and its read, the framing step, then the rework redraft as the first drafter call");
   const d = flat("rework:architecture");
   assert.match(d, /^Redraft docs\/extend\/architecture\.md once, on the combined findings below\./);
   assert.ok(d.includes(REWORK), "the rework text");
@@ -1013,7 +1014,7 @@ check("dry run: a rework page reaches the final read on acceptance", async () =>
 
 check("dry run: a page without rework produces the same call labels as before, with no scope note", async () => {
   const { labels, flat } = await seatDryRun("docs/extend/architecture.md");
-  assert.deepEqual(labels, ["outline", "inputs:architecture", "plan:architecture", "structure:architecture:plan", "draft:architecture", "structure:architecture:r1", "editor:architecture:r1", "facts:architecture:r1", "figure:architecture:r1", "reader:architecture"]);
+  assert.deepEqual(labels, ["outline", "inputs:architecture", "plan:architecture", "structure:architecture:plan", "framing:architecture", "draft:architecture", "structure:architecture:r1", "editor:architecture:r1", "facts:architecture:r1", "figure:architecture:r1", "reader:architecture"]);
   assert.doesNotMatch(flat("editor:architecture:r1"), /This read is scoped/);
   assert.doesNotMatch(flat("facts:architecture:r1"), /This read is scoped/);
 });
@@ -1090,7 +1091,7 @@ check("dry run: the structural seat reads the plan before any prose, at the plan
 check("dry run: a plan read fix drives one plan revision and one re-read, then the draft", async () => {
   const { labels, flat, record } = await seatDryRun("docs/extend/architecture.md", { structure: async (p, o) => (o.label.endsWith(":plan") ? STRUCT_FIX : ACCEPT) });
   const at = labels.indexOf("plan:architecture");
-  assert.deepEqual(labels.slice(at, at + 5), ["plan:architecture", "structure:architecture:plan", "replan:architecture", "structure:architecture:plan2", "draft:architecture"]);
+  assert.deepEqual(labels.slice(at, at + 6), ["plan:architecture", "structure:architecture:plan", "replan:architecture", "structure:architecture:plan2", "framing:architecture", "draft:architecture"]);
   const r = flat("replan:architecture");
   assert.match(r, /^Revise the page plan/);
   assert.ok(r.includes("STRUCT-FINDING intro omits scope"), "the plan read's findings");
@@ -1203,6 +1204,104 @@ for (const { name, fn } of pending) {
 for (const d of scratch) rmSync(d, { recursive: true, force: true });
 
 console.log("");
+// -------------------------------------------------------------------------------------------
+// The framing step and the narrowed round-2 reads.
+// -------------------------------------------------------------------------------------------
+
+const FRAMING_PATH = "docs/internal/briefs/extend/architecture.framing.md";
+
+check("dry run: the framing step runs after the plan read and before the draft, on opus at xhigh, from the doc set's map", async () => {
+  const { labels, opts, flat, record } = await seatDryRun("docs/extend/architecture.md");
+  const at = labels.indexOf("framing:architecture");
+  assert.ok(at > labels.indexOf("structure:architecture:plan"), "after the plan read");
+  assert.ok(at < labels.indexOf("draft:architecture"), "before the draft");
+  assert.equal(opts("framing:architecture").model, "opus");
+  assert.equal(opts("framing:architecture").effort, "xhigh");
+  const f = flat("framing:architecture");
+  assert.ok(f.includes(FRAMING_PATH), "the record path");
+  assert.ok(f.includes("docs/internal/outlines/extend.json whole"), "the outline as the doc set's map");
+  assert.ok(f.includes("### The introduction"), "the register's introduction section");
+  assert.ok(f.includes("docs/internal/briefs/extend/architecture.plan.md"), "the page plan");
+  assert.ok(f.includes("never on an imperative"));
+  assert.ok(f.includes("## Who arrives, from where, and why"));
+  assert.equal(record.framing, FRAMING_PATH);
+  assert.deepEqual(record.framingStep.readers, ["a reader"]);
+});
+
+check("dry run: the drafter writes the intro from the framing record, and the structural and register reads grade it against the record", async () => {
+  const { flat } = await seatDryRun("docs/extend/architecture.md");
+  assert.ok(flat("draft:architecture").includes(`The framing record at ${FRAMING_PATH} is the source of the introduction`));
+  for (const l of ["structure:architecture:r1", "editor:architecture:r1"]) assert.ok(flat(l).includes(`The framing record ${FRAMING_PATH} decides the introduction`), l);
+  assert.ok(!flat("structure:architecture:plan").includes(FRAMING_PATH), "the plan read precedes the record");
+});
+
+check("dry run: the framing record's fact ids join the drafter's ids and the inventory in the introduction, a plan cut re-placed", async () => {
+  const { flat } = await seatDryRun("docs/extend/architecture.md", {
+    plan: async (prompt) => ({ plan: "docs/internal/briefs/extend/architecture.plan.md", claimInventory: [{ claim: "c", disposition: "carried", factId: "f:a7qx4m", section: "S" }, { claim: "d", disposition: "cut", factId: "f:0duu5p", reason: "subordinated" }] }),
+    framing: async () => ({ framing: FRAMING_PATH, readers: ["r"], factIds: ["f:0duu5p", "f:newbg1", "f:a7qx4m"] })
+  });
+  const d = flat("draft:architecture");
+  assert.ok(/Fact ids to draw on: [^\n]*f:newbg1/.test(d), "a filed background id joins the drafter's ids");
+  assert.ok(d.includes('(f:0duu5p) in section "Introduction"'), "the cut id is re-placed in the introduction");
+  assert.ok(d.includes('(f:newbg1) in section "Introduction"'), "a new id is carried in the introduction");
+  assert.ok(d.includes('(f:a7qx4m) in section "S"'), "a carried id keeps its section");
+  assert.ok(flat("facts:architecture:r1").includes('(f:0duu5p) in section "Introduction"'), "the fact read holds the intro to it");
+});
+
+check("dry run: a framing step that returns nothing escalates the page before the draft", async () => {
+  const { labels, record } = await seatDryRun("docs/extend/architecture.md", { framing: async () => null });
+  assert.equal(record.status, "escalate");
+  assert.match(record.reason, /framing step/);
+  assert.ok(!labels.some((l) => l.startsWith("draft:")));
+});
+
+const BASELINE = "0123456789abcdef0123456789abcdef01234567";
+const withBaseline = (base) => async (prompt) => {
+  const r = await base(prompt);
+  return { ...r, baseline: BASELINE };
+};
+
+check("dry run: round 2 is narrowed to the seat's round-1 findings and the diff since the redrafter's baseline", async () => {
+  const home = makeHome();
+  const wt = makeWorktree();
+  const inner = makeAgent(wt, home, []);
+  const EFIX = { verdict: "fix", findings: [{ location: "docs/extend/architecture.md:4", finding: "EDITOR-R1-FINDING", blocking: true }], summary: "fix" };
+  const { labels, flat, record } = await seatDryRun("docs/extend/architecture.md", {
+    editor: async (p, o) => (o.label.endsWith(":r1") ? EFIX : ACCEPT),
+    redraft: withBaseline((prompt) => inner(prompt, { label: "redraft:architecture" }))
+  });
+  assert.ok(flat("redraft:architecture").includes("git hash-object -w -- docs/extend/architecture.md"), "the redrafter records the baseline first");
+  assert.ok(!flat("draft:architecture").includes("git hash-object"), "the round-1 draft takes no baseline");
+  const e = flat("editor:architecture:r2");
+  assert.ok(e.includes(`git cat-file blob ${BASELINE} | diff -u --label round-1 --label round-2 - docs/extend/architecture.md`));
+  assert.ok(e.includes("EDITOR-R1-FINDING"), "the seat's own round-1 finding");
+  assert.ok(e.includes("Do not re-read the whole page"));
+  assert.ok(!labels.includes("structure:architecture:r2"), "lean mode re-reads only the fix seat");
+  assert.equal(record.rounds[1].scope, `changed sentences since ${BASELINE}`);
+  assert.equal(record.status, "accepted");
+});
+
+check("dry run: under bothReviewers a round-1 accepter reads the changed sentences for a fix's regression, and the flag still measures", async () => {
+  const home = makeHome();
+  const wt = makeWorktree();
+  const inner = makeAgent(wt, home, []);
+  const { flat, record } = await seatDryRun("docs/extend/debug-your-site.md", {
+    editor: async (p, o) => (o.label.endsWith(":r1") ? FIX : ACCEPT),
+    structure: async (p, o) => (o.label.endsWith(":r2") ? FIX : ACCEPT),
+    redraft: withBaseline((prompt) => inner(prompt, { label: "redraft:debug-your-site" }))
+  }, { bothReviewers: true });
+  const s = flat("structure:debug-your-site:r2");
+  assert.ok(s.includes("You accepted in round 1. Read only the changed sentences, for a defect the fixes introduced"));
+  assert.ok(s.includes(`git cat-file blob ${BASELINE}`));
+  assert.equal(record.crossRegression, true);
+});
+
+check("dry run: a redraft with no baseline falls back to whole-page round-2 reads", async () => {
+  const { flat, record } = await seatDryRun("docs/extend/architecture.md", { editor: async (p, o) => (o.label.endsWith(":r1") ? FIX : ACCEPT) });
+  assert.ok(!flat("editor:architecture:r2").includes("git cat-file blob"));
+  assert.equal(record.rounds[1].scope, "whole page (no baseline from the redraft)");
+});
+
 if (failures.length) {
   console.log(`${failures.length} FAILING: ${failures.join(", ")}`);
   process.exit(1);

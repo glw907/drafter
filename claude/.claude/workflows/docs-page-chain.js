@@ -6,18 +6,22 @@
 // (carried by a cited fact, newly filed, or cut with a reason), filing any new fact itself with
 // the Edit tool as `[verified]` (a `Source:` line) or `[external]` (the vendor URL), never
 // `[candidate]`. The plan step then writes the page plan, and the structural edit seat reads it
-// before any prose (see "The page plan" below). The drafter (`cairn-docs-drafter` by default)
-// writes the page and its sentence-to-fact brief from the plan and that record and files no fact
+// before any prose (see "The page plan" below). The framing step then decides the page's
+// introduction from its readers and writes the framing record (see "The framing step" below).
+// The drafter (`cairn-docs-drafter` by default)
+// writes the page and its sentence-to-fact brief, the introduction from the framing record and
+// the body from the plan and that record, and files no fact
 // of its own; it runs the docs gate itself as its last act and reports the result; it reads the
 // page's exemplar sources whole. The structural edit seat, the register editor, and a fact read
 // run in parallel, all Opus 5.5, plus a figure-verifier read for a page carrying a figure. One redraft
 // round on the combined findings, gated and re-read; by default only the reviewer(s) that
 // returned "fix" re-read (`args.bothReviewers` re-reads every reviewer instead and the record
 // carries a cross-regression flag: a reviewer that accepted in round 1 and returned "fix" in
-// round 2). A second "fix" from a re-reader escalates to the conductor; there is no third round.
+// round 2). Round 2's reads are narrowed to round-1 fixes and changed sentences (see "Round 2
+// reads" below). A second "fix" from a re-reader escalates to the conductor; there is no third round.
 // A page every read accepts then takes the final reader read, last. The conductor reads only the
 // per-page records returned. Each record carries the files the run leaves for commit: the page
-// (`path`), its brief (`brief`), and its plan (`plan`).
+// (`path`), its brief (`brief`), its plan (`plan`), and its framing record (`framing`).
 //
 // Invoke by name from the conductor session:
 //
@@ -40,6 +44,8 @@
 //       pageInputsModel: "claude-opus-5-5", // optional; defaults to reviewModel
 //       planModel: "claude-opus-5-5",      // optional; the plan step's model, this is the default
 //       planEffort: "xhigh",               // optional; the plan step's effort, this is the default
+//       framingModel: "opus",              // optional; the framing step's model, this is the default
+//       framingEffort: "xhigh",            // optional; the framing step's effort, this is the default
 //       outline: "docs/internal/outlines/extend.json",   // optional; see "The outline" below
 //       optionMap: "docs/internal/option-map.json",       // optional; the option map, this is the default
 //       pages: [
@@ -134,17 +140,69 @@
 // one plan revision (`replan:<id>`) and one re-read, and a second "fix" escalates. The record
 // carries the plan's reads, `couldNotDo`, and friction in `record.planStep`.
 //
-// Design friction: page inputs, the plan step, the drafter, and the fact read, the agents that
-// meet the code, file a friction entry in `docs/internal/docs-friction-log.md` for a hedge, a
+// The framing step (owner ruling, Geoff, 2026-10-04, confirmed 2026-10-05 after the intro-only
+// round, proven by hand in `9ca04531` on `draft-docs-2a`, whose six
+// `docs/internal/briefs/extend/<page>.framing.md` records are the exemplars of its output): a
+// page's introduction is not drafted like its body. The fact-driven chain writes strong bodies
+// and thin introductions, and an introduction takes high-level reasoning to get its framing and
+// background right. So one framing agent per page runs after the plan step and its plan read and
+// before the drafter, on `args.framingModel` at `args.framingEffort` (default `opus` at `xhigh`,
+// set per agent through the runtime's `effort` option). It sits after the plan because it frames
+// the plan's introduction (the plan's three Google parts stand) and reads the plan's dispositions,
+// and before the drafter because the drafter writes the introduction from it. It reads the doc
+// set's map: with `args.outline`, the stage outline file whole (`groups` with their titles, every
+// page's `slug`, `title`, `job`, `covers`, and `outOfScope`, and `crossLinks`, the one input the
+// chain holds that lists every page and its job) plus the arm index the outline names and the
+// other arms' indexes under `docs/`; without one, the run's own page list (each path and job) in
+// its prompt, plus those indexes. It also reads the register's "### The introduction" section,
+// the page anatomies, the page plan, and the facts it leans on. Starting from the reader (who
+// arrives at the page, from where, and what each is looking for, since a page can serve several
+// readers and the introduction names each reason), it decides the background (the general model,
+// where SvelteKit, Cloudflare, and GitHub fit when the page touches them, and why the thing the
+// page covers exists), the page's place in the doc set, and an intro plan of numbered paragraphs:
+// two or three when the framing needs them, opening on a statement, never an imperative and
+// never a sentence about the page. Each page's framing is reasoned fresh, never from a template.
+// It writes `docs/internal/briefs/<track>/<slug>.framing.md`, beside the brief, in the exemplars'
+// shape: "Who arrives, from where, and why", "Background the page rests on" (fact ids), "Place in
+// the doc set", "Intro plan", and "Departures from the plan's introduction" when it departs. A
+// background point with no fact is filed `[verified]` or `[external]` with the Edit tool, as page
+// inputs files, or reported as `couldNotDo`. The runner adds every fact id the framing names to
+// the drafter's fact ids and to the claim inventory as "carried" in section "Introduction" (an
+// id the plan cut is re-placed there; one already carried keeps its section), so the fact read
+// holds the introduction to it. The drafter writes the introduction from the record and the body
+// from the plan; the structural edit seat and the register editor read the record and grade the
+// introduction against it (a reader's reason missing, background dropped, an undeclared departure
+// from its intro plan, an imperative or page-describing opening are blocking). A rework page takes
+// the framing step too, revising any record already on disk. The record path is `record.framing`;
+// the step's readers, fact ids, filed facts, `couldNotDo`, and friction land in
+// `record.framingStep`. A framing agent that returns nothing escalates the page.
+//
+// Round 2 reads (draft-docs 2a run 2 measured about 2.4M tokens a page against the 1.3M budgeted;
+// `docs/superpowers/research/2026-10-03-draft-docs-2a-targeted-close-record.md` on
+// `draft-docs-2a`): the round-2 redrafter runs `git hash-object -w -- <page>` before any edit and
+// reports the blob as `baseline`, the page as round 1 read it. Each round-2 seat then receives its
+// own round-1 findings and the command that prints the diff since round 1
+// (`git cat-file blob <baseline> | diff -u - <page>`), verifies each of its round-1 findings'
+// fixes, and reads only the changed sentences (deleted lines included) for new defects. Round 2
+// no longer re-reads the whole page, no longer re-grades unchanged sentences, and no longer
+// re-runs a rework page's `git diff` scope against HEAD. The fact read still reads the option map
+// live for rows pending the page's slug. Under `bothReviewers`, a seat that accepted in round 1
+// reads the changed sentences for a defect the fixes introduced, so `crossRegression` still
+// measures a fix's regression on the narrowed input. A redraft with no well-formed `baseline`
+// falls back to whole-page round-2 reads, logged; `rounds[1].scope` records which ran.
+//
+// Design friction: page inputs, the plan step, the framing step, the drafter, and the fact read,
+// the agents that meet the code, file a friction entry in `docs/internal/docs-friction-log.md` for a hedge, a
 // caveat, an exception, a workaround, a surprising default, or two seams naming or behaving the
 // same thing differently, naming the fact ids or `file:line` involved, and list it in
 // `frictionFiled`. An entry never blocks the page. The record carries page inputs' list in
-// `record.pageInputs`, the plan step's in `record.planStep`, the drafter's in `rounds[].draft`, and the fact read's, copied by the runner, on its entry in
+// `record.pageInputs`, the plan step's in `record.planStep`, the framing step's in
+// `record.framingStep`, the drafter's in `rounds[].draft`, and the fact read's, copied by the runner, on its entry in
 // `rounds[].reads`; the register editor and the figure verifier do not report friction.
 //
 // The drafter gets the outline entry's `title` as the page's H1 (the title is in the entry
 // checksum), the page plan's path as the source of the page's order, each section's claim, and
-// each fact's placement, the voice source (the register's drafting brief and its primary exemplar
+// each fact's placement, the framing record's path as the source of the introduction, the voice source (the register's drafting brief and its primary exemplar
 // only; the page's exemplars give structure and detail per step), and, on a figure page, the
 // `cairn-figure` skill file to read and follow.
 //
@@ -227,15 +285,16 @@
 
 export const meta = {
   name: "docs-page-chain",
-  description: "Drafts docs pages through page inputs, drafter, gate, register editor, fact read, and one scoped redraft.",
+  description: "Drafts docs pages through page inputs, plan, intro framing, drafter, gate, register editor, fact read, and one scoped redraft.",
   whenToUse: "A draft-docs pass plan names this workflow for its page tasks.",
   phases: [
     { title: "Outline", detail: "with args.outline, one probe resolves every page's outline entry" },
     { title: "Page inputs", detail: "one agent per page: job, type, fact ids, claim inventory" },
     { title: "Plan", detail: "one agent writes the page plan; the structural edit seat reads it before any prose, one revision on fix" },
-    { title: "Draft", detail: "the drafter writes the page and runs the docs gate itself" },
+    { title: "Framing", detail: "one agent reads the doc set's map and writes the framing record the introduction is drafted from", model: "opus" },
+    { title: "Draft", detail: "the drafter writes the introduction from the framing record, the body from the plan, and runs the docs gate itself" },
     { title: "Read", detail: "structural edit, register editor, and fact read in parallel, all Opus, plus a figure read when the page carries one" },
-    { title: "Redraft", detail: "one round on the combined findings; only the reviewer(s) that returned fix re-read by default" },
+    { title: "Redraft", detail: "one round on the combined findings; re-readers verify their round-1 fixes and read changed sentences only" },
     { title: "Final read", detail: "one reader read on an accepted page; its fix takes one scoped redraft, scoped reads, and one re-test" },
     { title: "Report", detail: "per-page records for the conductor" }
   ]
@@ -267,6 +326,21 @@ const PLAN_SCHEMA = {
     frictionFiled: { type: "array", items: { type: "string" } }
   },
   required: ["plan", "claimInventory"]
+};
+
+// The framing step's report: the record's path, one line per reader it frames for, and the fact
+// ids the introduction draws on, filed ones included.
+const FRAMING_SCHEMA = {
+  type: "object",
+  properties: {
+    framing: { type: "string" },
+    readers: { type: "array", items: { type: "string" } },
+    factIds: { type: "array", items: { type: "string" } },
+    factsFiled: { type: "array", items: { type: "string" } },
+    couldNotDo: { type: "array", items: { type: "string" } },
+    frictionFiled: { type: "array", items: { type: "string" } }
+  },
+  required: ["framing", "readers", "factIds"]
 };
 
 // One option-map row as read: its path key and its value, verbatim.
@@ -320,6 +394,7 @@ const DRAFT_SCHEMA = {
     gateCommand: { type: "string" },
     gateTail: { type: "string" },
     indexLink: { type: "string" },
+    baseline: { type: "string" },
     frictionFiled: { type: "array", items: { type: "string" } },
     couldNotDo: { type: "array", items: { type: "string" } }
   },
@@ -435,6 +510,10 @@ const PAGE_INPUTS_MODEL = a.pageInputsModel || REVIEWER;
 // The plan step is the chain's one judgment seat, so it defaults to the strongest seat.
 const PLAN_MODEL = a.planModel || "claude-opus-5-5";
 const PLAN_EFFORT = a.planEffort || "xhigh";
+// The framing step decides an introduction's framing, which takes high-level reasoning the
+// fact-driven seats do not (Geoff, 2026-10-04), so it too runs at the top tier.
+const FRAMING_MODEL = a.framingModel || "opus";
+const FRAMING_EFFORT = a.framingEffort || "xhigh";
 const BOTH_REVIEWERS = a.bothReviewers === true;
 const PAGES_ARG = a.pages || [];
 const OUTLINE = a.outline || "";
@@ -716,6 +795,15 @@ function briefPathFor(p) {
  */
 function planPathFor(p) {
   return `docs/internal/briefs/${p.track}/${baseNoExt(p.path)}.plan.md`;
+}
+
+/**
+ * The framing record's path, beside the page's brief and plan.
+ * @param {{ path: string, track: string }} p
+ * @returns {string}
+ */
+function framingPathFor(p) {
+  return `docs/internal/briefs/${p.track}/${baseNoExt(p.path)}.framing.md`;
 }
 
 /**
@@ -1054,6 +1142,193 @@ Commit nothing; leave the plan file in place. Return the structured report only:
 claimInventory, couldNotDo, and frictionFiled.`;
 }
 
+// The register heading that holds the house rulings on introductions, read by the framing step.
+const INTRO_HEADING = "### The introduction";
+
+/**
+ * The doc set's map for the framing step: the stage outline whole when the run has one, the one
+ * input that lists every page and its job; otherwise the run's own page list, inline.
+ * @returns {string}
+ */
+function docMapLine() {
+  const indexes = `Then read the arm indexes under docs/ (each docs/<arm>/README.md that exists, and
+docs/README.md), for the pages outside this run that link to this page or that it links to.`;
+  if (OUTLINE) {
+    return `Read the stage outline ${OUTLINE} whole: its groups and their titles, every page's slug,
+title, job, covers, and outOfScope, and its crossLinks (each names a page that links another, and
+why). ${INDEX ? `Read the arm index ${INDEX} it names. ` : ""}${indexes}`;
+  }
+  return `The pages this run drafts, each with its job:
+${PAGES.map((q) => `- ${q.path}: ${q.job}`).join("\n")}
+${indexes}`;
+}
+
+/**
+ * The framing step's prompt: decide the introduction's framing from the reader, before the
+ * drafter writes it, and record it beside the brief. The method was proven by hand in the
+ * 2026-10-04 intro round (`9ca04531` on `draft-docs-2a`), whose records set the output's shape.
+ * @param {Record<string, any>} p
+ * @param {Record<string, any>} pageInputs - carrying the plan's dispositions
+ * @returns {string}
+ */
+function framingPrompt(p, pageInputs) {
+  const out = framingPathFor(p);
+  return `Frame the introduction of ${p.path} in ${WT}, and write the framing record at ${out}. You are
+the framing step of the docs page chain: you write no page prose, you leave the page plan as it is,
+and you do not run a gate.
+
+${common}
+Why this step exists (house ruling, Geoff, 2026-10-04): a page's introduction is not drafted like
+its body. The body is fact-driven. The introduction carries the high-level reasoning a body leaves
+out, and getting its framing and background right takes judgment, which you supply before the
+drafter writes a word. Reason this page's framing fresh: introductions follow no fixed pattern, and
+another page's framing record is never a template for this one.
+
+Read these sections of ${REGISTER}, each by its exact heading:
+- ${INTRO_HEADING} (under "## Drafting brief: developer docs"), whole: the source of every rule below
+- ## The page anatomies, for this page type's introduction
+${p.track === "editors" ? "- ## Drafting brief: editor docs, for this track's voice\n" : ""}
+The doc set's map. ${docMapLine()}
+
+${p.title ? `The page's title: ${p.title}\n` : ""}The page's job: ${pageInputs.job}
+Page type: ${pageInputs.pageType}
+${scopeLines(p)}
+The page plan ${planPathFor(p)}: read it whole. Its introduction's three parts (what the page
+covers, the prior knowledge it expects, what it leaves out) stand, and its body sections are
+fixed; the framing builds the introduction around them.
+
+Fact ids the page carries: ${(pageInputs.factIds || []).join(", ") || "(none)"}
+Claim inventory, with the plan's dispositions:
+${inventoryLines(pageInputs) || "(none recorded)"}
+Read each fact's bullet in docs/internal/facts/ (search for its id) before you lean on it.
+
+Work in this order.
+1. Readers. From the map, work out who arrives at this page, from where (which pages link here,
+   which index group lists it, a search, the setup command's output), what each is looking for,
+   what each already knows, and what each lacks that the page assumes. A page can serve several
+   readers with different reasons; name each one. When the map shows a reader likely to arrive in
+   the wrong place, name them and the page they belong on.
+2. Background. Decide the general model the page sits in; where SvelteKit, Cloudflare, and GitHub
+   fit when the page touches them (say so when one is left out on purpose, and why); and why the
+   thing the page covers exists (why a default is what it is, before a page that changes it).
+   Back each point with a fact id. When a point the readers need has no fact, trace it to code,
+   config, or a vendor doc and file a new bullet with the Edit tool (never a shell append), tagged
+   [verified] with a Source: line, or [external] with the vendor's URL, never [candidate]; list it
+   in factsFiled. A point you cannot back is a couldNotDo, never a point in the record.
+3. Place in the doc set: the page's group and neighbors, what links in and why, and what sibling
+   pages own, so the introduction words a shared idea fresh instead of repeating a neighbor's
+   opening. You may read a sibling page or its framing record on disk for that, never to copy its
+   shape.
+4. Intro plan: the introduction as numbered paragraphs, two or three when the framing needs them,
+   ahead of the plan's bounds lists. It opens on a statement about the subject, from the reader's
+   situation, never on an imperative and never on a sentence about the page itself. It names each
+   reader's reason, so every reader learns early whether the page answers it. It keeps the plan's
+   three introduction parts, and on a task guide it keeps the anatomy's one-line contract, the
+   sentence that names what the reader accomplishes. Name the fact ids each paragraph draws on.
+
+The record is agent-facing markdown, under these headings:
+- "# Framing record: <the page's title>", then one line: agent-facing; drives the introduction of
+  ${p.path} only; the body follows the page plan.
+- "## Who arrives, from where, and why": one entry per reader (a list or a table, whichever reads
+  better), each with who they are, where they arrive from, what they came for, what they know, and
+  what they lack.
+- "## Background the page rests on": each point with its fact ids.
+- "## Place in the doc set".
+- "## Intro plan".
+- "## Departures from the plan's introduction", only when the intro plan departs from the page
+  plan's introduction: how, and why.
+Name every file in a code span, never as a Markdown link: the docs link gate walks docs/. If a
+framing record already exists at ${out}, read it, then reason the framing fresh against the current
+plan, keep what still holds, and overwrite it.
+
+${frictionLine()}
+
+Commit nothing; leave the record in place. Return the structured report only: the record's path as
+framing, one line per reader as readers, every fact id the intro plan draws on as factIds (filed
+ones included), factsFiled, couldNotDo, and frictionFiled.`;
+}
+
+// The section a fact the framing record draws on is placed in.
+const INTRO_SECTION = "Introduction";
+
+/**
+ * Writes the framing record's fact ids into the page inputs: each joins the drafter's fact ids,
+ * and the claim inventory carries it in the introduction. An id already carried or filed keeps
+ * its entry; an id the plan cut is re-placed in the introduction; an id the inventory lacks is
+ * appended.
+ * @param {Record<string, any>} pageInputs - carrying the plan's dispositions
+ * @param {string[]} ids - the framing step's factIds
+ * @returns {Record<string, any>}
+ */
+function applyFraming(pageInputs, ids) {
+  let inventory = (pageInputs.claimInventory || []).slice();
+  for (const id of ids || []) {
+    if (!id) continue;
+    const entries = inventory.filter((c) => c.factId === id);
+    if (entries.some((c) => c.disposition === "carried" || c.disposition === "filed")) continue;
+    const intro = { factId: id, disposition: "carried", section: INTRO_SECTION };
+    if (entries.some((c) => c.disposition === "cut")) {
+      inventory = inventory.map((c) => (c.factId === id && c.disposition === "cut" ? { claim: c.claim, ...intro } : c));
+    } else {
+      inventory.push({ claim: "background the framing record places in the introduction", ...intro });
+    }
+  }
+  const factIds = [...new Set([...(pageInputs.factIds || []), ...(ids || []).filter(Boolean)])];
+  return { ...pageInputs, factIds, claimInventory: inventory };
+}
+
+/**
+ * The framing step: one agent decides the introduction's framing and writes its record, and the
+ * runner writes the record's fact ids back into the page inputs. Nothing reviews the record
+ * before the draft; the structural edit seat and the register editor grade the introduction
+ * against it.
+ * @param {Record<string, any>} p
+ * @param {Record<string, any>} pageInputs - carrying the plan's dispositions
+ * @param {Record<string, any>} record - gains `framingStep`
+ * @returns {Promise<{ pageInputs: Record<string, any> } | { escalate: Record<string, any> }>}
+ */
+async function framingStep(p, pageInputs, record) {
+  const f = await agent(framingPrompt(p, pageInputs), { label: `framing:${p.id}`, phase: "Framing", schema: FRAMING_SCHEMA, model: FRAMING_MODEL, effort: FRAMING_EFFORT, agentType: "general-purpose" });
+  if (!f) return { escalate: { ...record, status: "escalate", reason: "the framing step returned nothing" } };
+  record.framingStep = {
+    readers: f.readers || [],
+    factIds: f.factIds || [],
+    factsFiled: f.factsFiled || [],
+    couldNotDo: f.couldNotDo || [],
+    frictionFiled: f.frictionFiled || []
+  };
+  return { pageInputs: applyFraming(pageInputs, f.factIds) };
+}
+
+/**
+ * The framing record's instruction for the drafter: the introduction comes from the record, the
+ * body from the plan.
+ * @param {{ path: string, track: string }} p
+ * @returns {string}
+ */
+function framingDraftLine(p) {
+  return `The framing record at ${framingPathFor(p)} is the source of the introduction: read it whole
+before you draft, and write the introduction from its intro plan, naming each reader's reason it
+names and carrying the background it decides, with the fact ids it gives each paragraph. The
+introduction opens on a statement, never an imperative and never a sentence about the page; it may
+run two or three paragraphs, and it keeps the plan's three introduction parts. The body stays
+fact-driven, drafted from the page plan.`;
+}
+
+/**
+ * The instruction a page read gets to grade the introduction against the framing record.
+ * @param {{ path: string, track: string }} p
+ * @returns {string}
+ */
+function framingReadLine(p) {
+  return `The framing record ${framingPathFor(p)} decides the introduction: its readers, the background the
+page rests on, the page's place in the doc set, and its intro plan. Read it before the page, and
+grade the introduction against it and the register's "${INTRO_HEADING}" section. Each of these is a
+blocking finding: a reader's reason the record names that the introduction omits; background the
+record decides that the introduction drops; a departure from its intro plan the record does not
+declare; an opening on an imperative or on a sentence about the page itself.`;
+}
+
 /**
  * The drafter's prompt for a first draft, the round-2 redraft, or the one redraft after the final
  * reader read, which changes only the spots that read cites.
@@ -1062,17 +1337,25 @@ claimInventory, couldNotDo, and frictionFiled.`;
  * @param {number} round
  * @param {string} [findings] - the combined findings a redraft works from
  * @param {boolean} [afterFinalRead] - the redraft is the final reader read's
+ * @param {boolean} [snapshot] - the chain's round-2 redraft, which first records the page as round
+ *   1 read it, the baseline the narrowed round-2 reads diff against
  * @returns {string}
  */
-function draftPrompt(p, pageInputs, round, findings, afterFinalRead = false) {
+function draftPrompt(p, pageInputs, round, findings, afterFinalRead = false, snapshot = false) {
   const head = round === 1
     ? `Draft the page ${p.path} at its final path, from its page plan and the page inputs below and nothing else.`
     : afterFinalRead
       ? `Redraft ${p.path} once, on the final reader read's findings below. Change only the spots they cite and leave the rest of the page as it stands.`
       : `Redraft ${p.path} once, on the combined findings below. Fix every blocking finding; take a non-blocking one when it is right. Do not widen the page.`;
   const inventory = inventoryLines(pageInputs);
+  const baseline = snapshot
+    ? `\nBefore you edit anything, run exactly this from the worktree:
+  git hash-object -w -- ${p.path}
+and report the hex object name it prints, verbatim, as baseline: the page as the round-1 reads saw
+it, which the round-2 reads diff against. Run it once, before your first edit.\n`
+    : "";
   return `${head}
-
+${baseline}
 ${common}
 ${registerLine(p, "drafter")}
 The page plan at ${planPathFor(p)} is the source of the page's order, each section's claim, and each
@@ -1080,6 +1363,7 @@ fact's placement: read it whole before you draft, and draft its sections in its 
 on the sentence the plan gives it. The register's drafting brief is the source of voice. Voice comes
 only from the register's drafting brief and its primary exemplar, docs/extend/choose-an-ai-posture.md;
 the page's exemplars below supply structure and detail per step, never voice or wording.
+${framingDraftLine(p)}
 ${p.title ? `\nThe page's H1, verbatim: # ${p.title}\n` : ""}
 The page's job: ${pageInputs.job}
 Page type: ${pageInputs.pageType}
@@ -1140,26 +1424,60 @@ ${scope}
 `;
 }
 
-function editorPrompt(p, scope, where) {
+/**
+ * The note that narrows a round-2 read: the seat verifies its own round-1 findings' fixes and
+ * reads only the sentences the redraft changed, by the diff against the redrafter's baseline.
+ * Under `bothReviewers` a seat that accepted in round 1 still reads the changed sentences, for a
+ * defect the fixes introduced, which keeps the cross-regression flag measuring.
+ * @param {{ path: string }} p
+ * @param {{ baseline: string, own?: { verdict: string, summary: string, findings: Array<Record<string, any>> } }} [narrow]
+ * @param {string} name - the seat's name in the round-1 findings
+ * @returns {string}
+ */
+function roundTwoNote(p, narrow, name) {
+  if (!narrow) return "";
+  const own = narrow.own;
+  const findings = own ? combined([[name, { ...own, findings: own.findings || [] }]]) : "";
+  const task = own && own.verdict === "fix"
+    ? `1. Verify each of your blocking round-1 findings below: fixed, or still open (still blocking).
+   Read around a finding's location only as far as judging its fix needs.
+2. Read only the changed sentences, for a new defect under your checklist, a defect a fix
+   introduced included.`
+    : `You accepted in round 1. Read only the changed sentences, for a defect the fixes introduced,
+under your checklist.`;
+  return `
+This is a round-2 read, narrowed to the redraft. Do not re-read the whole page. Run exactly this
+from the worktree:
+  git cat-file blob ${narrow.baseline} | diff -u --label round-1 --label round-2 - ${p.path}
+It prints every line the redraft changed, against the page as round 1 read it; no output means the
+redraft changed nothing, so every blocking round-1 finding stands. A deleted line is a changed
+line: judge what its removal costs.
+${task}
+An unchanged sentence stays as round 1 graded it.
+${findings ? `\nYour round-1 findings:\n${findings}\n` : ""}`;
+}
+
+function editorPrompt(p, scope, where, narrow) {
   return `Adversarial register edit of ${p.path} in ${WT}.
 
 ${common}
 ${registerLine(p, "editor")}
-${scopeNote(scope, where)}
+${framingReadLine(p)}
+${scopeNote(scope, where)}${roundTwoNote(p, narrow, "register editor")}
 Run plain \`vale ${p.path}\` from the worktree, never the docs gate, and read every alert it
-prints. Read the page, then grade the brief's structure checklist, the brief's tells, and Vale's
+prints${narrow ? " (on a narrowed read, grade only the alerts on changed lines)" : ""}. Read the page, then grade the brief's structure checklist, the brief's tells, and Vale's
 alerts together, with the Names section, logic, and facts-adjacent phrasing. Return ranked
 findings with a proposed rewrite each, and a verdict: "fix" if any finding is blocking.`;
 }
 
-function factPrompt(p, pageInputs, scope, where) {
+function factPrompt(p, pageInputs, scope, where, narrow) {
   const inventory = inventoryLines(pageInputs);
   return `Fact read of ${p.path} in ${WT}. The page's claim inventory from its page-inputs step, with
 the dispositions of its page plan, ${planPathFor(p)}: a "carried" claim names the section the plan
 places it in, and a subordinated fact is "cut" with a reason naming the reference page or entry
 that states it.
 ${inventory || "(none recorded)"}
-${outlineCoverage(p)}${scopeNote(scope, where)}
+${outlineCoverage(p)}${scopeNote(scope, where)}${roundTwoNote(p, narrow, "fact read")}
 Check every claim on the page against its cited fact id, retrace every cited fact against its
 source and fix or retag it [docs-drift] in the same chain when it no longer matches, and confirm
 every claim the inventory marks "carried" or "filed" still appears on the page. A claim on the
@@ -1208,10 +1526,10 @@ finding.`
   return `\n${[idPart, absorbPart].filter(Boolean).join("\n\n")}\n`;
 }
 
-function figurePrompt(p) {
+function figurePrompt(p, narrow) {
   return `Verify every figure on ${p.path} in ${WT} against the two figure tests and the
 2026-08-15 visual-layer rulings. A failed figure is a blocking finding. Verdict "fix" if any
-figure fails; otherwise "accept".${p.figureNote ? `\n\nFigure note, from the outline: ${p.figureNote}` : ""}`;
+figure fails; otherwise "accept".${p.figureNote ? `\n\nFigure note, from the outline: ${p.figureNote}` : ""}${roundTwoNote(p, narrow, "figure verifier")}`;
 }
 
 // The prior-art record the structural edit seat and the final reader read quote: the only source
@@ -1227,9 +1545,10 @@ const PRIOR_ART = "docs/superpowers/research/2026-09-30-page-level-review-prior-
  * carries the order and its reason, Google's outline "as the narrative for your document".
  * @param {Record<string, any>} p
  * @param {"plan" | "page"} [mode]
+ * @param {{ baseline: string, own?: Record<string, any> }} [narrow] - a narrowed round-2 read
  * @returns {string}
  */
-function structurePrompt(p, mode = "page") {
+function structurePrompt(p, mode = "page", narrow) {
   const bullets = (xs) => (xs || []).map((x) => `- ${x}`).join("\n") || "(none listed)";
   const plan = mode === "plan";
   const crossLinks = OUTLINE
@@ -1279,6 +1598,7 @@ ${bullets(p.outOfScope)}
 ${crossLinks}
 
 ${entryRead}
+${plan ? "" : `${framingReadLine(p)}\n`}${roundTwoNote(p, narrow, "structural edit")}
 Cross-links are the page's "See-also, next steps, related resources" ("## e. Outline fields").
 
 Read the section "## The page anatomies" of ${REGISTER}, by its exact heading. The introduction it
@@ -1408,23 +1728,30 @@ function reviewNames(p) {
  * @param {string[]} names
  * @param {string} [scope]
  * @param {string} [where] - where the changed sentences are, for a rework page's scoped reads
+ * @param {{ baseline: string, round1: Array<[string, any]> }} [narrowed] - a narrowed round 2: the
+ *   redrafter's baseline and the round-1 reads, from which each seat takes its own findings
  * @returns {Promise<{ list: Array<[string, any]>, missing: number, anyFix: boolean }>}
  */
-async function runReads(p, pageInputs, round, names, scope, where) {
+async function runReads(p, pageInputs, round, names, scope, where, narrowed) {
   const tag = round === "final" ? "final" : `r${round}`;
   const phaseName = round === "final" ? "Final read" : "Read";
+  const narrow = (name) => {
+    if (!narrowed) return undefined;
+    const own = narrowed.round1.find(([n]) => n === name);
+    return { baseline: narrowed.baseline, own: own ? own[1] : undefined };
+  };
   const tasks = [];
   if (names.includes("structural edit")) {
-    tasks.push(["structural edit", () => agent(structurePrompt(p, "page"), { label: `structure:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "general-purpose" })]);
+    tasks.push(["structural edit", () => agent(structurePrompt(p, "page", narrow("structural edit")), { label: `structure:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "general-purpose" })]);
   }
   if (names.includes("register editor")) {
-    tasks.push(["register editor", () => agent(editorPrompt(p, scope, where), { label: `editor:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "cairn-register-editor" })]);
+    tasks.push(["register editor", () => agent(editorPrompt(p, scope, where, narrow("register editor")), { label: `editor:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "cairn-register-editor" })]);
   }
   if (names.includes("fact read")) {
-    tasks.push(["fact read", () => agent(factPrompt(p, pageInputs, scope, where), { label: `facts:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "general-purpose" })]);
+    tasks.push(["fact read", () => agent(factPrompt(p, pageInputs, scope, where, narrow("fact read")), { label: `facts:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "general-purpose" })]);
   }
   if (names.includes("figure verifier")) {
-    tasks.push(["figure verifier", () => agent(figurePrompt(p), { label: `figure:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "figure-verifier" })]);
+    tasks.push(["figure verifier", () => agent(figurePrompt(p, narrow("figure verifier")), { label: `figure:${p.id}:${tag}`, phase: phaseName, schema: READ_SCHEMA, model: REVIEWER, agentType: "figure-verifier" })]);
   }
   const results = await parallel(tasks.map(([, fn]) => fn));
   const list = tasks.map(([name], i) => [name, results[i]]).filter(([, r]) => r);
@@ -1579,6 +1906,7 @@ async function planStep(p, pageInputs, record) {
 
 async function chain(p) {
   const record = { id: p.id, path: p.path, brief: briefPathFor(p), plan: planPathFor(p), rounds: [] };
+  record.framing = framingPathFor(p);
   const rework = typeof p.rework === "string" && p.rework !== "";
   let pageInputs;
   if (rework) {
@@ -1596,6 +1924,9 @@ async function chain(p) {
   const planned = await planStep(p, pageInputs, record);
   if (planned.escalate) return planned.escalate;
   pageInputs = planned.pageInputs;
+  const framed = await framingStep(p, pageInputs, record);
+  if (framed.escalate) return framed.escalate;
+  pageInputs = framed.pageInputs;
   // A rework page's reads are scoped to what changed; the structural edit seat reads it whole.
   const reworkFindings = rework ? `## rework\n${p.rework}\n\nScope: ${REWORK_SCOPE}` : undefined;
   const reworkWhere = rework
@@ -1617,10 +1948,16 @@ async function chain(p) {
   const rereviewNames = BOTH_REVIEWERS ? allNames : r1.list.filter(([, r]) => r.verdict === "fix").map(([n]) => n);
   const findings = combined(r1.list) + (d1.gate !== "pass" ? `\n\n## gate: ${d1.gate}\n${d1.gateTail || ""}` : "") +
     (rework ? `\n\nScope: ${REWORK_SCOPE}` : "");
-  const d2 = await agent(draftPrompt(p, pageInputs, 2, findings), { label: `redraft:${p.id}`, phase: "Redraft", schema: DRAFT_SCHEMA, model: DRAFTER, agentType: DRAFTER_TYPE });
+  const d2 = await agent(draftPrompt(p, pageInputs, 2, findings, false, true), { label: `redraft:${p.id}`, phase: "Redraft", schema: DRAFT_SCHEMA, model: DRAFTER, agentType: DRAFTER_TYPE });
   if (!d2) return { ...record, status: "escalate", reason: "redrafter returned nothing" };
-  record.rounds.push({ round: 2, draft: d2 });
-  const r2 = await runReads(p, pageInputs, 2, rereviewNames, reworkFindings, reworkWhere);
+  // Round 2 narrows to round-1 fixes and changed sentences when the redrafter recorded the page as
+  // round 1 read it; without that baseline it falls back to whole-page reads.
+  const baseline = typeof d2.baseline === "string" && /^[0-9a-f]{40,64}$/.test(d2.baseline.trim()) ? d2.baseline.trim() : "";
+  record.rounds.push({ round: 2, draft: d2, scope: baseline ? `changed sentences since ${baseline}` : "whole page (no baseline from the redraft)" });
+  if (!baseline) log(`${p.id}: the redraft reported no baseline; round 2 reads the whole page`);
+  const r2 = baseline
+    ? await runReads(p, pageInputs, 2, rereviewNames, undefined, undefined, { baseline, round1: r1.list })
+    : await runReads(p, pageInputs, 2, rereviewNames, reworkFindings, reworkWhere);
   record.rounds[1].reads = readEntries(r2.list);
   const cr = deriveCrossRegression(record, BOTH_REVIEWERS);
   if (cr !== undefined) record.crossRegression = cr;
