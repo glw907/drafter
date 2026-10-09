@@ -43,7 +43,7 @@
 //       reviewModel: "claude-opus-5-5",    // optional; default, also the page-inputs step's model
 //       pageInputsModel: "claude-opus-5-5", // optional; defaults to reviewModel
 //       planModel: "claude-opus-5-5",      // optional; the plan step's model, this is the default
-//       planEffort: "xhigh",               // optional; the plan step's effort, this is the default
+//       planEffort: "high",                // optional; the plan step's effort, this is the default
 //       framingModel: "claude-opus-5-5",   // optional; the framing step's model, this is the default
 //       framingEffort: "xhigh",            // optional; the framing step's effort, this is the default
 //       outline: "docs/internal/outlines/extend.json",   // optional; see "The outline" below
@@ -121,7 +121,7 @@
 // The page plan (`docs/superpowers/research/2026-10-01-draft-docs-2a-page-plan-diagnosis.md`):
 // the chain carried no artifact that holds a page's argument, so one plan step runs after page
 // inputs (or a rework page's inventory) and before the draft, on `args.planModel` at
-// `args.planEffort` (default Opus 5.5 at `xhigh`, the chain's one judgment seat). It writes
+// `args.planEffort` (default Opus 5.5 at `high`, the chain's plan seat). It writes
 // `docs/internal/briefs/<track>/<slug>.plan.md`, Google's outline written down (Google Technical
 // Writing Two, "Organizing large documents": "think of an outline as the narrative for your
 // document"), from the job, page type, register anatomy, exemplar takes, fact ids, and claim
@@ -519,7 +519,7 @@ const PAGE_INPUTS_TYPE = a.pageInputsType || "general-purpose";
 const PAGE_INPUTS_MODEL = a.pageInputsModel || REVIEWER;
 // The plan step is the chain's one judgment seat, so it defaults to the strongest seat.
 const PLAN_MODEL = a.planModel || "claude-opus-5-5";
-const PLAN_EFFORT = a.planEffort || "xhigh";
+const PLAN_EFFORT = a.planEffort || "high";
 // The framing step decides an introduction's framing, which takes high-level reasoning the
 // fact-driven seats do not (Geoff, 2026-10-04), so it too runs at the top tier.
 const FRAMING_MODEL = a.framingModel || "claude-opus-5-5";

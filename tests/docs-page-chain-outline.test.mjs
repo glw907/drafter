@@ -1041,13 +1041,13 @@ async function placingPlan() {
   };
 }
 
-check("dry run: the plan step runs between page inputs and the draft, on Opus 5.5 at xhigh by default", async () => {
+check("dry run: the plan step runs between page inputs and the draft, on Opus 5.5 at high by default", async () => {
   const { labels, opts, flat } = await seatDryRun("docs/extend/architecture.md");
   const at = labels.indexOf("plan:architecture");
   assert.ok(at > labels.indexOf("inputs:architecture"), "after page inputs");
   assert.ok(at < labels.indexOf("draft:architecture"), "before the draft");
   assert.equal(opts("plan:architecture").model, "claude-opus-5-5");
-  assert.equal(opts("plan:architecture").effort, "xhigh");
+  assert.equal(opts("plan:architecture").effort, "high");
   const p = flat("plan:architecture");
   assert.ok(p.includes(PLAN_PATH), "the plan path");
   assert.ok(p.includes("The page's job, from the stage outline: the job"), "the job");
