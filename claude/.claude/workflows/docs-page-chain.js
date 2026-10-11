@@ -18,12 +18,12 @@
 // returned "fix" re-read (`args.bothReviewers` re-reads every reviewer instead and the record
 // carries a cross-regression flag: a reviewer that accepted in round 1 and returned "fix" in
 // round 2). Round 2's reads are narrowed to round-1 fixes and changed sentences (see "Round 2
-// reads" below). A second "fix" from a re-reader escalates to the conductor; there is no third round.
-// A page every read accepts then takes the final reader read, last. The conductor reads only the
+// reads" below). A second "fix" from a re-reader escalates to the invoking session; there is no third round.
+// A page every read accepts then takes the final reader read, last. The invoking session reads only the
 // per-page records returned. Each record carries the files the run leaves for commit: the page
 // (`path`), its brief (`brief`), its plan (`plan`), and its framing record (`framing`).
 //
-// Invoke by name from the conductor session:
+// Invoke by name from the planning session:
 //
 //   Workflow({
 //     scriptPath: "docs-page-chain",
@@ -284,7 +284,7 @@
 // never a count against a pass ceiling. It is null when the runtime supplies no `budget`.
 //
 // Every agent starts with zero context. The runner renders each stage's prompt from args and
-// the page record; nothing load-bearing may live only in the conductor's conversation.
+// the page record; nothing load-bearing may live only in the invoking session's conversation.
 
 export const meta = {
   name: "docs-page-chain",
@@ -299,7 +299,7 @@ export const meta = {
     { title: "Read", detail: "structural edit, register editor, and fact read in parallel, all Opus, plus a figure read when the page carries one" },
     { title: "Redraft", detail: "one round on the combined findings; re-readers verify their round-1 fixes and read changed sentences only" },
     { title: "Final read", detail: "one reader read on an accepted page; its fix takes one scoped redraft, scoped reads, and one re-test" },
-    { title: "Report", detail: "per-page records for the conductor" }
+    { title: "Report", detail: "per-page records for the invoking session" }
   ]
 };
 
@@ -887,7 +887,7 @@ failure (another page in flight wrote the map) re-read the file and redo the edi
 }
 
 /**
- * The gate string for one page: the conductor's template with `{page}` and `{brief}`
+ * The gate string for one page: the invoking session's template with `{page}` and `{brief}`
  * substituted, plus the tool gate for a page carrying pinned slugs.
  * @param {{ path: string, track: string, pinned?: string[] }} p
  * @returns {string}
@@ -1427,7 +1427,7 @@ synthesizes when it states two or more together, or "no-claim". The brief also c
 "cuts" array mirroring the plan's cut dispositions: one { "id", "reason" } entry per fact id the
 claim inventory above marks "cut", its reason verbatim. File no fact yourself, new or retagged. A claim the page needs whose
 fact is not among the ids above is a couldNotDo naming the missing fact; do not draft that claim
-and do not file its fact yourself, since the conductor re-runs page inputs for it.
+and do not file its fact yourself, since the invoking session re-runs page inputs for it.
 
 ${frictionLine()}
 
