@@ -47,6 +47,7 @@
 //       framingModel: "claude-opus-5-5",   // optional; the framing step's model, this is the default
 //       framingEffort: "xhigh",            // optional; the framing step's effort, this is the default
 //       outline: "docs/internal/outlines/extend.json",   // optional; see "The outline" below
+//       planFormat: "yaml",                // optional; "yaml" (default) or "markdown"; see "The page plan"
 //       optionMap: "docs/internal/option-map.json",       // optional; the option map, this is the default
 //       pages: [
 //         { id: "architecture", path: "docs/extend/architecture.md", track: "extend" },   // with an outline
@@ -122,7 +123,7 @@
 // the chain carried no artifact that holds a page's argument, so one plan step runs after page
 // inputs (or a rework page's inventory) and before the draft, on `args.planModel` at
 // `args.planEffort` (default Opus 5.5 at `high`, the chain's plan seat). It writes
-// `docs/internal/briefs/<track>/<slug>.plan.md`, Google's outline written down (Google Technical
+// `docs/internal/briefs/<track>/<slug>.plan.yaml` (`.plan.md` under `planFormat: "markdown"`), Google's outline written down (Google Technical
 // Writing Two, "Organizing large documents": "think of an outline as the narrative for your
 // document"), from the job, page type, register anatomy, exemplar takes, fact ids, and claim
 // inventory: the introduction's three parts, the sections in the order it argues for (each with
@@ -139,6 +140,20 @@
 // and the introduction's three parts at the plan level against the outline entry; its "fix" takes
 // one plan revision (`replan:<id>`) and one re-read, and a second "fix" escalates. The record
 // carries the plan's reads, `couldNotDo`, and friction in `record.planStep`.
+//
+// The plan format (`args.planFormat`, `"yaml"` by default): in YAML mode the plan step writes the
+// plan in the format `~/Projects/drafter/docs/plan-format.md` documents, every prose field a `|`
+// block, and ends each write by running `drafter check-plan --facts docs/internal/facts <plan>`
+// (with `--outline <outline>` when the run has `args.outline`). It runs the validator at most three
+// times per write, fixing the findings between runs; when the third run still exits nonzero it
+// lists the remaining findings in `couldNotDo`. It returns the final run's exit code and output as
+// `checkPlan`. The runtime has no exec access to rerun the validator, so `planStep` takes that
+// report on trust and escalates the page when `checkPlan` is missing or its exit is nonzero,
+// naming the output. In YAML mode the plan read also grades the plan's `step` and `failure` items
+// for completeness, since the validator proves them consistent only. `"markdown"` keeps the
+// earlier `.plan.md` prompts and path for a run already in flight. The rework case: a page whose
+// committed `.plan.md` exists has it read as the prior plan, and the step deletes it once the
+// `.plan.yaml` is written, so each page keeps one plan.
 //
 // The framing step (owner ruling, Geoff, 2026-10-04, confirmed 2026-10-05 after the intro-only
 // round, proven by hand in `9ca04531` on `draft-docs-2a`, whose six
@@ -317,6 +332,7 @@ const CLAIM = {
 };
 
 // The plan step's report: the plan's path and its dispositions, in the existing dispositions only.
+// `checkPlan` is the last `drafter check-plan` run's exit code and output (YAML mode).
 const PLAN_SCHEMA = {
   type: "object",
   properties: {
@@ -326,7 +342,12 @@ const PLAN_SCHEMA = {
       items: { ...CLAIM, properties: { ...CLAIM.properties, disposition: { type: "string", enum: ["carried", "cut"] } }, required: ["claim", "disposition", "factId"] }
     },
     couldNotDo: { type: "array", items: { type: "string" } },
-    frictionFiled: { type: "array", items: { type: "string" } }
+    frictionFiled: { type: "array", items: { type: "string" } },
+    checkPlan: {
+      type: "object",
+      properties: { exit: { type: "integer" }, output: { type: "string" } },
+      required: ["exit", "output"]
+    }
   },
   required: ["plan", "claimInventory"]
 };
@@ -527,6 +548,11 @@ const FRAMING_EFFORT = a.framingEffort || "xhigh";
 const BOTH_REVIEWERS = a.bothReviewers === true;
 const PAGES_ARG = a.pages || [];
 const OUTLINE = a.outline || "";
+const PLAN_FORMAT = a.planFormat === undefined ? "yaml" : a.planFormat;
+if (PLAN_FORMAT !== "yaml" && PLAN_FORMAT !== "markdown") {
+  throw new Error(`docs-page-chain: args.planFormat must be "yaml" or "markdown", not ${JSON.stringify(PLAN_FORMAT)}`);
+}
+const YAML_PLAN = PLAN_FORMAT === "yaml";
 const OPTION_MAP = a.optionMap || "docs/internal/option-map.json";
 // The runtime's budget is absent outside it (a dry run), so `spent` is guarded, not assumed.
 const HAS_BUDGET = typeof budget !== "undefined" && budget !== null && typeof budget.spent === "function";
@@ -801,10 +827,11 @@ function briefPathFor(p) {
 /**
  * The page plan's path, beside the page's brief.
  * @param {{ path: string, track: string }} p
+ * @param {"yaml" | "markdown"} [format] - defaults to the run's `planFormat`
  * @returns {string}
  */
-function planPathFor(p) {
-  return `docs/internal/briefs/${p.track}/${baseNoExt(p.path)}.plan.md`;
+function planPathFor(p, format = PLAN_FORMAT) {
+  return `docs/internal/briefs/${p.track}/${baseNoExt(p.path)}.plan.${format === "yaml" ? "yaml" : "md"}`;
 }
 
 /**
@@ -1083,6 +1110,35 @@ const CAP_SCOPE = "The 26-word cap counts each sentence on its own and applies o
 const HANDOFF_OWNER = "Section hand-offs belong to the page plan: a hand-off the plan places is not a tell, and a read of the page grades its wording, never whether it is there or where it sits.";
 
 /**
+ * The YAML-mode paragraphs of the plan step's prompt: the format reference, the validator command
+ * and its three-run cap, and the prior markdown plan's deletion.
+ * @param {{ path: string, track: string }} p
+ * @returns {string}
+ */
+function yamlPlanLines(p) {
+  const out = planPathFor(p);
+  const prior = planPathFor(p, "markdown");
+  const check = `drafter check-plan --facts docs/internal/facts${OUTLINE ? ` --outline ${OUTLINE}` : ""} ${out}`;
+  return `Write the plan as YAML, in the format ~/Projects/drafter/docs/plan-format.md documents (read it
+first; its schema is ~/Projects/drafter/schema/plan.schema.json). The parts listed above are what the
+plan holds, and that format says where each one goes. Write every prose field as a \`|\` block scalar,
+never a plain or quoted scalar: a plain scalar silently drops everything after a \`#\`, and a colon
+in it fails the parse.
+
+If ${prior} exists, it is this page's earlier plan in the markdown format. Read it as the prior plan,
+keeping what it decided unless the page's job or the facts above change it. Once ${out} is written,
+delete ${prior}, so the page keeps one plan.
+
+When the plan is written, run this from the worktree, on one line:
+\`${check}\`
+It exits 0 on a clean plan, and otherwise exits nonzero and prints its findings. Fix every finding
+in ${out}, then run it again. Run it at most three times for each write of the plan. When the third
+run still exits nonzero, stop editing and add each remaining finding to couldNotDo, one entry per
+finding. Whatever the last run did, return its exit code and its full output as
+checkPlan: { exit, output }, and never report a run you did not make.`;
+}
+
+/**
  * The plan step's prompt, for the first plan or its one revision on the plan read's findings. The
  * plan is Google's outline written down, per the 2026-10-01 page-plan diagnosis
  * (docs/superpowers/research/2026-10-01-draft-docs-2a-page-plan-diagnosis.md): the chain carried
@@ -1095,10 +1151,14 @@ const HANDOFF_OWNER = "Section hand-offs belong to the page plan: a hand-off the
 function planPrompt(p, pageInputs, findings) {
   const head = findings
     ? `Revise the page plan ${planPathFor(p)} for ${p.path} once, on the structural edit's findings below. Fix every blocking finding, keep the plan's dispositions in step with the revision, and return the whole report again.`
-    : `Write the page plan for ${p.path} at ${planPathFor(p)}. You are the plan step of the docs page chain: you write no page prose and you run no gate, only the extractor named below.`;
+    : `Write the page plan for ${p.path} at ${planPathFor(p)}. You are the plan step of the docs page chain: you write no page prose and you run no gate, only ${YAML_PLAN ? "the plan validator and the extractor" : "the extractor"} named below.`;
   const rework = typeof p.rework === "string" && p.rework !== ""
     ? `\nThis page is committed and is being reworked. Its job-read findings and owner rulings, verbatim:\n\n${p.rework}\n`
     : "";
+  const yamlBlock = YAML_PLAN ? `\n${yamlPlanLines(p)}\n` : "";
+  const tail = YAML_PLAN
+    ? "the plan's path,\nclaimInventory, checkPlan, couldNotDo, and frictionFiled"
+    : "the plan's path,\nclaimInventory, couldNotDo, and frictionFiled";
   return `${head}
 
 ${common}
@@ -1158,15 +1218,14 @@ From the worktree, run this on one line:
 It prints one row per fact it finds, and nothing for a clean line. For each row, cite the fact's id, reword the sentence, or, for a path
 or name the page has the reader create, mark it for the brief's \`local\` array. The extractor is not
 a gate: it exits 0 whatever it finds.
-
+${yamlBlock}
 Return claimInventory with one entry per fact id you dispose, in the existing dispositions only:
 "carried" with its factId and the section heading it is placed under, or "cut" with its factId and
 the reason (a subordinated fact's reason names the reference page or entry that states it).
 ${findings ? `\nThe structural edit's findings on the plan:\n${findings}\n` : ""}
 ${frictionLine()}
 
-Commit nothing; leave the plan file in place. Return the structured report only: the plan's path,
-claimInventory, couldNotDo, and frictionFiled.`;
+Commit nothing; leave the plan file in place. Return the structured report only: ${tail}.`;
 }
 
 // The register heading that holds the house rulings on introductions, read by the framing step.
@@ -1625,7 +1684,16 @@ introduces information when it's most relevant to your reader." At the plan leve
 pace, user goal, and the introduction's three parts: Block 1's "Information is presented in the
 most logical order and location.", "Information is provided at the right pace.", and "The user
 goal is clear.", and Block 2's three introduction items, read against the plan's introduction.
-`
+${YAML_PLAN ? `
+The plan is YAML, and its items carry a kind. Grade its \`step\` and \`failure\` items too.
+\`drafter check-plan\` has already walked the reader state (every step's \`requires\` is produced by
+an earlier step or listed as a precondition) and the recovery matrix (every step marked \`canFail\`
+has a \`failure\` item, and every handler exists). That walk proves the plan consistent, not
+complete: a page with no deploy step passes unless some step declares that it requires a
+deployment. So judge completeness yourself. Return a blocking finding for each step the page's job
+needs that the plan lacks, and for each failure a reader following the steps could meet that has no
+\`failure\` item, naming the missing step or failure and where in the plan it belongs.
+` : ""}`
     : "";
   const entryRead = plan
     ? `How the entry is read, from the same record: "the outline's \`job\` is the page's purpose, \`covers\`
@@ -1943,6 +2011,12 @@ async function planStep(p, pageInputs, record) {
     if (!plan) return { escalate: { ...record, status: "escalate", reason: "the plan step returned nothing" } };
     step.couldNotDo = plan.couldNotDo || [];
     step.frictionFiled = [...step.frictionFiled, ...(plan.frictionFiled || [])];
+    // The runtime cannot rerun the validator, so the step's own report is the only evidence.
+    if (YAML_PLAN) {
+      const c = plan.checkPlan;
+      if (!c) return { escalate: { ...record, status: "escalate", reason: "the plan step reported no drafter check-plan run" } };
+      if (c.exit !== 0) return { escalate: { ...record, status: "escalate", reason: `drafter check-plan exited ${c.exit}: ${c.output}` } };
+    }
     const applied = applyPlan(p, pageInputs, plan.claimInventory);
     if (applied.undisposed.length) {
       return { escalate: { ...record, status: "escalate", reason: `the plan left fact ids undisposed: ${applied.undisposed.join(", ")}` } };

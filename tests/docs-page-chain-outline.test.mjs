@@ -1339,6 +1339,141 @@ check("dry run: a well-shaped baseline that does not resolve takes the whole-pag
 });
 
 // -------------------------------------------------------------------------------------------
+// Dry runs of the YAML plan format: the path, the validator line, and the checkPlan escalation.
+// -------------------------------------------------------------------------------------------
+
+const YAML_PLAN_PATH = "docs/internal/briefs/extend/architecture.plan.yaml";
+const CLEAN_CHECK = { exit: 0, output: "" };
+
+/** A stubbed YAML plan step: writes the plan file and places every id it was asked to dispose. */
+function yamlPlan(wt, checkPlan, extra = {}) {
+  return async (prompt) => {
+    const plan = prompt.match(/docs\/internal\/briefs\/\S+?\.plan\.yaml/)[0];
+    write(wt, plan, "plan: yaml\n");
+    return {
+      plan,
+      claimInventory: planIds(prompt).map((factId) => ({ claim: "a planned fact", disposition: "carried", factId, section: "Section A" })),
+      ...(checkPlan === undefined ? {} : { checkPlan }),
+      ...extra
+    };
+  };
+}
+
+/** One page through the runner in YAML mode, with an outline unless `outline` is false. */
+async function yamlDryRun(checkPlan, { outline = true, overrides = {}, extraArgs = {} } = {}) {
+  const home = makeHome();
+  const wt = makeWorktree();
+  const calls = [];
+  const page = outline
+    ? { id: "architecture", path: "docs/extend/architecture.md", track: "extend" }
+    : { id: "architecture", path: "docs/extend/architecture.md", track: "extend", job: "inline job" };
+  const args = baseArgs(wt, [page], { planFormat: "yaml", ...(outline ? { outline: "docs/internal/outlines/extend.json" } : {}), ...extraArgs });
+  const agent = makeAgent(wt, home, calls, { plan: yamlPlan(wt, checkPlan), replan: yamlPlan(wt, checkPlan), ...overrides });
+  const out = await runRunner(args, agent, parallel, noop, noop);
+  const prompt = (label) => calls.find((c) => c.label === label).prompt;
+  return { out, record: out.pages[0], labels: calls.map((c) => c.label), prompt, flat: (label) => prompt(label).replace(/\s+/g, " ") };
+}
+
+check("yaml: the plan path is .plan.yaml in the plan prompt, the record, and the later steps", async () => {
+  const { prompt, record } = await yamlDryRun(CLEAN_CHECK);
+  assert.ok(prompt("plan:architecture").includes(YAML_PLAN_PATH));
+  const outside = prompt("plan:architecture").split("\n").filter((l) => !l.includes(".plan.md"));
+  assert.ok(!outside.some((l) => l.includes("plan.md")), "only the prior-plan lines name .plan.md");
+  assert.equal(record.plan, YAML_PLAN_PATH);
+  assert.equal(record.status, "accepted");
+  for (const l of ["structure:architecture:plan", "framing:architecture", "draft:architecture"]) assert.ok(prompt(l).includes(YAML_PLAN_PATH), l);
+  assert.ok(!prompt("draft:architecture").includes("architecture.plan.md"));
+});
+
+check("yaml: planFormat defaults to yaml, markdown keeps the .plan.md path, and another value fails the run", async () => {
+  const home = makeHome();
+  const wt = makeWorktree();
+  const calls = [];
+  const page = { id: "architecture", path: "docs/extend/architecture.md", track: "extend" };
+  const { planFormat, ...unset } = baseArgs(wt, [page], { outline: "docs/internal/outlines/extend.json" });
+  await runRunner(unset, makeAgent(wt, home, calls, { plan: yamlPlan(wt, CLEAN_CHECK) }), parallel, noop, noop);
+  assert.ok(calls.find((c) => c.label === "plan:architecture").prompt.includes(YAML_PLAN_PATH), "the default is yaml");
+  const md = await seatDryRun("docs/extend/architecture.md");
+  assert.ok(md.prompt("plan:architecture").includes(PLAN_PATH));
+  assert.ok(!md.prompt("plan:architecture").includes("check-plan"));
+  await assert.rejects(runRunner(baseArgs(wt, [page], { planFormat: "toml" }), makeAgent(wt, home, [], {}), parallel, noop, noop), /planFormat/);
+});
+
+check("yaml: the validator line carries --outline when the run has an outline, and not otherwise", async () => {
+  const withOutline = await yamlDryRun(CLEAN_CHECK);
+  const lines = withOutline.prompt("plan:architecture").split("\n");
+  assert.ok(lines.includes(`\`drafter check-plan --facts docs/internal/facts --outline docs/internal/outlines/extend.json ${YAML_PLAN_PATH}\``), "with --outline");
+  const without = await yamlDryRun(CLEAN_CHECK, { outline: false });
+  assert.ok(without.prompt("plan:architecture").split("\n").includes(`\`drafter check-plan --facts docs/internal/facts ${YAML_PLAN_PATH}\``), "without --outline");
+  assert.ok(!without.prompt("plan:architecture").includes("--outline"));
+});
+
+check("yaml: the plan prompt carries the format reference, the | rule, the three-run cap, and the couldNotDo rule", async () => {
+  const { flat, prompt } = await yamlDryRun(CLEAN_CHECK);
+  const p = flat("plan:architecture");
+  assert.ok(p.includes("~/Projects/drafter/docs/plan-format.md"));
+  assert.match(p, /Write every prose field as a `\|` block scalar/);
+  assert.match(p, /Run it at most three times for each write of the plan/);
+  assert.match(p, /When the third run still exits nonzero, stop editing and add each remaining finding to couldNotDo/);
+  assert.match(p, /return its exit code and its full output as checkPlan: \{ exit, output \}/);
+  assert.match(p, /only the plan validator and the extractor named below/);
+  assert.match(p, /structured report only: the plan's path, claimInventory, checkPlan, couldNotDo, and frictionFiled\./);
+  assert.ok(prompt("plan:architecture").includes("node scripts/checks/check-provenance.mjs --extract"), "the extractor stays");
+});
+
+check("yaml: a prior .plan.md is read and deleted once the .plan.yaml is written, in the plan and the revision", async () => {
+  const { flat, labels } = await yamlDryRun(CLEAN_CHECK, { overrides: { structure: async (p, o) => (o.label.endsWith(":plan") ? STRUCT_FIX : ACCEPT) } });
+  assert.ok(labels.includes("replan:architecture"));
+  for (const label of ["plan:architecture", "replan:architecture"]) {
+    const p = flat(label);
+    assert.ok(p.includes(`If ${PLAN_PATH} exists, it is this page's earlier plan in the markdown format. Read it as the prior plan`), label);
+    assert.ok(p.includes(`Once ${YAML_PLAN_PATH} is written, delete ${PLAN_PATH}, so the page keeps one plan.`), label);
+  }
+});
+
+check("yaml: a missing checkPlan escalates the page before the plan read; a clean one does not", async () => {
+  const bad = await yamlDryRun(undefined);
+  assert.equal(bad.record.status, "escalate");
+  assert.match(bad.record.reason, /no drafter check-plan run/);
+  assert.ok(!bad.labels.some((l) => l.startsWith("structure:") || l.startsWith("draft:")));
+  assert.equal((await yamlDryRun(CLEAN_CHECK)).record.status, "accepted");
+});
+
+check("yaml: a nonzero checkPlan escalates, naming its output; a zero exit passes", async () => {
+  const bad = await yamlDryRun({ exit: 1, output: "CHECK-PLAN-OUTPUT step s2 requires deployed" });
+  assert.equal(bad.record.status, "escalate");
+  assert.match(bad.record.reason, /exited 1: CHECK-PLAN-OUTPUT step s2 requires deployed/);
+  assert.ok(!bad.labels.some((l) => l.startsWith("structure:") || l.startsWith("draft:")));
+  assert.equal((await yamlDryRun({ exit: 0, output: "ok" })).record.status, "accepted");
+});
+
+check("yaml: a revision's missing or nonzero checkPlan escalates too, with a passing twin", async () => {
+  const fixOnce = async (p, o) => (o.label.endsWith(":plan") ? STRUCT_FIX : ACCEPT);
+  const missing = await yamlDryRun(CLEAN_CHECK, { overrides: { structure: fixOnce, replan: yamlPlan(makeWorktree(), undefined) } });
+  assert.equal(missing.record.status, "escalate");
+  assert.match(missing.record.reason, /no drafter check-plan run/);
+  const nonzero = await yamlDryRun(CLEAN_CHECK, { overrides: { structure: fixOnce, replan: yamlPlan(makeWorktree(), { exit: 2, output: "REPLAN-OUTPUT" }) } });
+  assert.match(nonzero.record.reason, /exited 2: REPLAN-OUTPUT/);
+  assert.equal((await yamlDryRun(CLEAN_CHECK, { overrides: { structure: fixOnce } })).record.status, "accepted");
+});
+
+check("yaml: couldNotDo findings reported beside a clean checkPlan reach the record", async () => {
+  const { record } = await yamlDryRun(CLEAN_CHECK, { overrides: { plan: yamlPlan(makeWorktree(), CLEAN_CHECK, { couldNotDo: ["REMAINING-FINDING"] }) } });
+  assert.deepEqual(record.planStep.couldNotDo, ["REMAINING-FINDING"]);
+});
+
+check("yaml: the plan read grades step and failure items for completeness; markdown mode's read does not", async () => {
+  const { flat } = await yamlDryRun(CLEAN_CHECK);
+  const s = flat("structure:architecture:plan");
+  assert.match(s, /Grade its `step` and `failure` items too/);
+  assert.match(s, /proves the plan consistent, not complete/);
+  assert.match(s, /Return a blocking finding for each step the page's job needs that the plan lacks/);
+  const md = await seatDryRun("docs/extend/architecture.md");
+  assert.doesNotMatch(md.flat("structure:architecture:plan"), /`step` and `failure`/);
+  assert.doesNotMatch(flat("structure:architecture:r1"), /Grade its `step`/, "the page read is unchanged");
+});
+
+// -------------------------------------------------------------------------------------------
 
 for (const { name, fn } of pending) {
   try {
