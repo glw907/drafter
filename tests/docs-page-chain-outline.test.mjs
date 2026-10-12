@@ -174,7 +174,7 @@ const parallel = (fns) => Promise.all(fns.map((f) => f()));
 const noop = () => {};
 
 function baseArgs(wt, pages, extra = {}) {
-  return { worktree: wt, gate: "npm run check:docs-gate -- --page {page} --brief {brief}", pages, ...extra };
+  return { worktree: wt, gate: "npm run check:docs-gate -- --page {page} --brief {brief}", pages, planFormat: "markdown", ...extra };
 }
 
 // -------------------------------------------------------------------------------------------
@@ -1039,6 +1039,27 @@ async function placingPlan() {
     couldNotDo: ["PLAN-COULD-NOT-DO docs/reference/sveltekit.md does not state f:zzz"],
     frictionFiled: ["plan-friction"]
   };
+}
+
+// The markdown-mode plan prompts, rendered for fixed inputs and kept byte for byte, so a change
+// for the YAML plan format cannot alter what an in-flight markdown run sends. The temp paths
+// are replaced by placeholders. Run with UPDATE_GOLDENS=1 to rewrite them on purpose.
+const GOLDEN_DIR = join(HERE, "fixtures", "docs-page-chain");
+
+for (const [label, file] of [["plan:architecture", "plan-prompt.markdown.golden.md"], ["structure:architecture:plan", "structure-plan-prompt.markdown.golden.md"]]) {
+  check(`golden: the markdown-mode ${label} prompt matches ${file} byte for byte`, async () => {
+    const home = makeHome();
+    const wt = makeWorktree();
+    const calls = [];
+    await runRunner(baseArgs(wt, [{ id: "architecture", path: "docs/extend/architecture.md", track: "extend" }], { outline: "docs/internal/outlines/extend.json" }), makeAgent(wt, home, calls), parallel, noop, noop);
+    const rendered = calls.find((c) => c.label === label).prompt.split(wt).join("<WORKTREE>").split(home).join("<HOME>");
+    const path = join(GOLDEN_DIR, file);
+    if (process.env.UPDATE_GOLDENS) {
+      mkdirSync(GOLDEN_DIR, { recursive: true });
+      writeFileSync(path, rendered);
+    }
+    assert.equal(rendered, readFileSync(path, "utf8"));
+  });
 }
 
 check("dry run: the plan step runs between page inputs and the draft, on Opus 5.5 at high by default", async () => {
