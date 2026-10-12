@@ -57,8 +57,10 @@ second YAML document in the same file.
 ### page
 
 The `page` mapping has three required fields. The `path` field is the page's path relative to
-the repository root. The `title` field is the page's H1. The `type` field is the page type,
-such as `task-guide`, `concept`, or `reference`.
+the repository root. The `title` field is the page's H1. The `type` field is the page type, as
+free text. Write the page type exactly as the project's outline names it: a project might use
+`concept`, `task guide`, `symptom row`, or `tutorial milestone`. The command checks only that
+`type` is present and not empty.
 
 ### The opening
 
