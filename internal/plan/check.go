@@ -251,7 +251,7 @@ func (c *checker) facts() {
 			if it.Kind == "fact" {
 				c.add(it.Lines["fact"], SeverityWarning, checkFacts,
 					fmt.Sprintf("the fact item at line %d is not checked because no facts directory is set", it.Lines["fact"]),
-					"set facts.dir to check that the fact exists and is citable")
+					"pass --facts <dir> to check that the fact exists and is citable")
 			}
 		})
 		return
