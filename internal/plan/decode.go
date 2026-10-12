@@ -20,13 +20,15 @@ const checkDecode = "decode"
 // kinds lists, per item kind, the fields it requires and the fields it may carry besides id
 // and kind. An item carrying any other field is refused.
 var kinds = map[string]struct{ required, optional []string }{
-	"fact":     {required: []string{"fact"}},
-	"sentence": {required: []string{"mode", "text"}},
+	"fact":     {required: []string{"fact"}, optional: []string{"use"}},
+	"sentence": {required: []string{"mode", "text"}, optional: []string{"facts"}},
 	"link":     {required: []string{"target"}},
 	"handoff":  {required: []string{"text"}},
 	"reason":   {required: []string{"text"}},
 	"step":     {required: []string{"text"}, optional: []string{"requires", "produces", "canFail"}},
-	"failure":  {required: []string{"from", "symptom", "handledBy"}},
+	"failure":  {required: []string{"symptom", "handledBy"}, optional: []string{"from", "cause"}},
+	"code":     {required: []string{"source", "text"}},
+	"figure":   {required: []string{"text"}, optional: []string{"source"}},
 }
 
 var (
@@ -153,6 +155,7 @@ func (d *decoder) structure(n *yaml.Node, v reflect.Value, where string) {
 				names[k] = s.name
 			}
 			d.add(key.Line, at(where, fmt.Sprintf("unknown field %q", key.Value)), "remove it or fix the spelling; the fields here are "+strings.Join(names, ", "))
+			delete(lines, key.Value)
 			continue
 		}
 		d.value(val, v.Field(specs[j].index), specs[j], join(where, key.Value))
@@ -243,8 +246,14 @@ func (d *decoder) validate(p *Plan) {
 		d.add(line, fmt.Sprintf("unsupported version %d", p.Version), "set version: 1")
 	}
 	for i := range p.Sections {
-		for j := range p.Sections[i].Items {
-			d.item(&p.Sections[i].Items[j], fmt.Sprintf("sections[%d].items[%d]", i, j))
+		s := &p.Sections[i]
+		if line, ok := s.Lines["level"]; !ok {
+			s.Level = 2
+		} else if s.Level != 2 && s.Level != 3 && !d.faultAt(line) {
+			d.add(line, fmt.Sprintf("sections[%d]: level %d is not a heading level the plan supports", i, s.Level), "use level: 2 or level: 3, or omit it for 2")
+		}
+		for j := range s.Items {
+			d.item(&s.Items[j], fmt.Sprintf("sections[%d].items[%d]", i, j))
 		}
 	}
 	for i := range p.Dispositions {

@@ -26,6 +26,21 @@ func mutate(t *testing.T, old, repl string) string {
 	return strings.Replace(src, old, repl, 1)
 }
 
+// sentenceText is the text line of the valid plan's t-verify sentence, and handoff the first
+// line of its h-next item at line 70, where the rows insert items.
+const (
+	sentenceText = "        text: \"The health endpoint reports the new key's ID.\"\n"
+	handoff      = "      - id: h-next\n"
+)
+
+func codeItem(source string) string {
+	return "      - id: c-demo\n        kind: code\n        source: " + source + "\n        text: |\n          The key command.\n"
+}
+
+func figureItem(extra string) string {
+	return "      - id: fig-1\n        kind: figure\n        text: |\n          A diagram.\n" + extra
+}
+
 func TestDecodeValid(t *testing.T) {
 	p, fs := Decode("valid.plan.yaml", []byte(readValid(t)))
 	if len(fs) != 0 {
@@ -85,6 +100,15 @@ func TestDecodeRefusals(t *testing.T) {
 		{"alias", "  - signing-key-exists\n", "  - &k signing-key-exists\n  - *k\n", 20, "aliases are not supported"},
 		{"plain prose with a line comment", "        text: \"Deploy the service with the new key.\"\n", "        text: Deploy the service first # then the worker\n", 58, "carries a line comment"},
 		{"plain multi-line prose with a line comment", "        text: \"Deploy the service with the new key.\"\n", "        text: Deploy the service\n          with the new key # then the worker\n", 58, "carries a line comment"},
+		{"level out of range", "  - heading: Create the new key\n", "  - heading: Create the new key\n    level: 4\n", 32, "level 4 is not a heading level"},
+		{"level is not an integer", "  - heading: Create the new key\n", "  - heading: Create the new key\n    level: deep\n", 32, "level: must be an integer"},
+		{"use on a link", "        target: ../reference/keys.md#key-lifetime\n", "        target: ../reference/keys.md#key-lifetime\n        use: stray\n", 31, `field "use" does not belong to kind "link"`},
+		{"facts written as a string", sentenceText, sentenceText + "        facts: signing-key-ttl\n", 65, "facts: must be a list"},
+		{"facts on a handoff", "        kind: handoff\n", "        kind: handoff\n        facts: [signing-key-ttl]\n", 72, `field "facts" does not belong to kind "handoff"`},
+		{"cause on a step", "        canFail: true\n", "        canFail: true\n        cause: stray\n", 42, `field "cause" does not belong to kind "step"`},
+		{"code with no source", handoff, "      - id: c-demo\n        kind: code\n        text: |\n          The key command.\n" + handoff, 70, `kind "code" needs the field "source"`},
+		{"figure with an unknown field", handoff, figureItem("        caption: x\n") + handoff, 74, `unknown field "caption"`},
+		{"figure with no text", handoff, "      - id: fig-1\n        kind: figure\n" + handoff, 70, `kind "figure" needs the field "text"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -108,6 +132,14 @@ func TestDecodeCleanTwins(t *testing.T) {
 		{"block prose with a hash", "        text: \"Deploy the service with the new key.\"\n", "        text: |\n          Deploy the service first # then the worker\n"},
 		{"non-prose value with a comment", "        produces: [deployed]\n", "        produces: [deployed] # the final state\n"},
 		{"canFail omitted", "        canFail: true\n", ""},
+		{"level 3", "  - heading: Create the new key\n", "  - heading: Create the new key\n    level: 3\n"},
+		{"level 2 written out", "  - heading: Create the new key\n", "  - heading: Create the new key\n    level: 2\n"},
+		{"failure with no from", "        from: s-create\n", ""},
+		{"failure with a cause", "        from: s-create\n", "        from: s-create\n        cause: |\n          The account is full.\n"},
+		{"fact with a use", "        fact: signing-key-ttl\n", "        fact: signing-key-ttl\n        use: |\n          The key lives for 90 days.\n"},
+		{"sentence with facts", sentenceText, sentenceText + "        facts: [signing-key-ttl]\n"},
+		{"code with a symbol", handoff, codeItem("../reference/keys.md#Symbol") + handoff},
+		{"figure with a source", handoff, figureItem("        source: assets/key.svg\n") + handoff},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -121,6 +153,16 @@ func TestDecodeCleanTwins(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDecodeLevelDefault(t *testing.T) {
+	p, fs := Decode("p.plan.yaml", []byte(mutate(t, "  - heading: Create the new key\n", "  - heading: Create the new key\n    level: 3\n")))
+	if len(fs) != 0 {
+		t.Fatalf("findings = %+v", fs)
+	}
+	if got := []int{p.Sections[0].Level, p.Sections[1].Level, p.Sections[2].Level}; got[0] != 2 || got[1] != 3 || got[2] != 2 {
+		t.Errorf("levels = %v, want [2 3 2]", got)
 	}
 }
 

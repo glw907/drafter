@@ -128,6 +128,20 @@ func TestCheckPlanClean(t *testing.T) {
 	}
 }
 
+// The troubleshooting plan uses the optional fields a page of symptoms needs: a level-3
+// section, a failure with no step, code and figure items, and a sentence that cites facts.
+func TestCheckPlanSymptomPage(t *testing.T) {
+	const plan = "plans/key-troubleshooting.plan.yaml"
+	r := checkPlan(t, project(t), plan, projectFlags...)
+	if r.code != 0 || r.stdout != "" || r.stderr != "0 errors, 0 warnings\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q", r.code, r.stdout, r.stderr)
+	}
+	r = checkPlan(t, project(t), plan, "--root", ".")
+	if r.code != 0 || len(lines(r.stdout)) != 2 || !strings.Contains(r.stdout, ":58: warning: facts: the facts list") {
+		t.Errorf("without --facts: exit %d, stdout %q", r.code, r.stdout)
+	}
+}
+
 func TestCheckPlanRootFromGit(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "project")
 	if err := os.CopyFS(dir, os.DirFS(project(t))); err != nil {

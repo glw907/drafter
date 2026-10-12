@@ -86,6 +86,7 @@ func (c *checker) ids() {
 			return
 		}
 		switch from := c.items[it.From]; {
+		case it.From == "":
 		case from == nil:
 			c.add(it.Lines["from"], SeverityError, checkIDs,
 				fmt.Sprintf("from names %q, which is no item's id", it.From), "name the step this failure belongs to")
@@ -161,8 +162,11 @@ func (c *checker) recovery() {
 func (c *checker) links() {
 	own := c.pageAnchors()
 	c.each(func(it *Item) {
-		if it.Kind == "link" {
+		switch it.Kind {
+		case "link":
 			c.link(it.Lines["target"], it.Target, own)
+		case "code":
+			c.codeSource(it.Lines["source"], it.Source)
 		}
 	})
 	for i := range c.p.Dispositions {
@@ -183,6 +187,36 @@ func (c *checker) pageAnchors() map[string]bool {
 	return own
 }
 
+// repoPath resolves a link or source path from the page's directory, or from the repository root
+// when it starts with a slash. It reports a finding and returns false when the path leaves the
+// repository.
+func (c *checker) repoPath(line int, file string) (string, bool) {
+	rel := path.Join(path.Dir(c.p.Page.Path), file)
+	if rest, ok := strings.CutPrefix(file, "/"); ok {
+		rel = path.Clean(rest)
+	}
+	if rel == ".." || strings.HasPrefix(rel, "../") {
+		c.add(line, SeverityError, checkLinks,
+			fmt.Sprintf("target %s leaves the repository", file), "point the link at a file under the repository root")
+		return "", false
+	}
+	return rel, true
+}
+
+// codeSource checks that the path part of a code item's source exists. The #Symbol part is not
+// checked.
+func (c *checker) codeSource(line int, source string) {
+	file, _, _ := strings.Cut(source, "#")
+	rel, ok := c.repoPath(line, file)
+	if !ok {
+		return
+	}
+	if _, err := os.Stat(filepath.Join(c.opts.Root, filepath.FromSlash(rel))); err != nil {
+		c.add(line, SeverityError, checkLinks,
+			fmt.Sprintf("source %s does not exist", rel), "correct the path to the file the code block shows")
+	}
+}
+
 func (c *checker) link(line int, target string, own map[string]bool) {
 	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
 		return
@@ -196,13 +230,8 @@ func (c *checker) link(line int, target string, own map[string]bool) {
 		}
 		return
 	}
-	rel := path.Join(path.Dir(c.p.Page.Path), file)
-	if rest, ok := strings.CutPrefix(file, "/"); ok {
-		rel = path.Clean(rest)
-	}
-	if rel == ".." || strings.HasPrefix(rel, "../") {
-		c.add(line, SeverityError, checkLinks,
-			fmt.Sprintf("target %s leaves the repository", file), "point the link at a file under the repository root")
+	rel, ok := c.repoPath(line, file)
+	if !ok {
 		return
 	}
 	info, err := os.Stat(filepath.Join(c.opts.Root, filepath.FromSlash(rel)))
@@ -248,10 +277,15 @@ func (c *checker) link(line int, target string, own map[string]bool) {
 func (c *checker) facts() {
 	if c.opts.FactsDir == "" {
 		c.each(func(it *Item) {
-			if it.Kind == "fact" {
+			switch {
+			case it.Kind == "fact":
 				c.add(it.Lines["fact"], SeverityWarning, checkFacts,
 					fmt.Sprintf("the fact item at line %d is not checked because no facts directory is set", it.Lines["fact"]),
 					"pass --facts <dir> to check that the fact exists and is citable")
+			case it.Lines["facts"] != 0:
+				c.add(it.Lines["facts"], SeverityWarning, checkFacts,
+					fmt.Sprintf("the facts list at line %d is not checked because no facts directory is set", it.Lines["facts"]),
+					"pass --facts <dir> to check that each fact exists and is citable")
 			}
 		})
 		return
@@ -280,20 +314,25 @@ func (c *checker) facts() {
 			"keep one bullet per id")
 		return Fact{}, false
 	}
-	c.each(func(it *Item) {
-		if it.Kind != "fact" {
-			return
-		}
-		f, ok := resolve(it.Lines["fact"], it.Fact)
+	cite := func(line int, id string) {
+		f, ok := resolve(line, id)
 		switch {
 		case !ok || f.Citable():
 		case f.Problem != "":
-			c.add(it.Lines["fact"], SeverityError, checkFacts,
-				fmt.Sprintf("fact %q cannot be cited: %s", it.Fact, f.Problem), "correct the bullet's status tag")
+			c.add(line, SeverityError, checkFacts,
+				fmt.Sprintf("fact %q cannot be cited: %s", id, f.Problem), "correct the bullet's status tag")
 		default:
-			c.add(it.Lines["fact"], SeverityError, checkFacts,
-				fmt.Sprintf("fact %q is tagged [%s], which a page cannot cite", it.Fact, f.Tag),
+			c.add(line, SeverityError, checkFacts,
+				fmt.Sprintf("fact %q is tagged [%s], which a page cannot cite", id, f.Tag),
 				"place a verified, external, or vendor fact, or retag the bullet once it is checked")
+		}
+	}
+	c.each(func(it *Item) {
+		if it.Kind == "fact" {
+			cite(it.Lines["fact"], it.Fact)
+		}
+		for _, id := range it.Facts {
+			cite(it.Lines["facts"], id)
 		}
 	})
 	for i := range c.p.Dispositions {

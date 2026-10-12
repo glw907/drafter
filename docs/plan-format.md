@@ -33,8 +33,8 @@ text: |
 ```
 
 A `|` block keeps the text exactly, including any `#`. The prose fields are `argument`,
-`covers`, `priorKnowledge`, `notCovered`, `orderReason`, `opens`, `text`, `symptom`, `reason`,
-and each entry of `constraints` and `friction`.
+`covers`, `priorKnowledge`, `notCovered`, `orderReason`, `opens`, `text`, `symptom`, `cause`,
+`use`, `reason`, and each entry of `constraints` and `friction`.
 
 ## Top-level fields
 
@@ -45,7 +45,7 @@ and each entry of `constraints` and `friction`.
 | `argument` | string | yes | The page's argument, in prose. |
 | `introduction` | mapping | yes | The three parts of the page's opening. |
 | `orderReason` | string | yes | Why the sections run in this order. |
-| `preconditions` | list of strings | no | State tokens the reader holds before the first step. |
+| `preconditions` | list of strings | no | State tokens the reader brings to the page. |
 | `sections` | list | yes | The page's sections, in page order. At least one. |
 | `dispositions` | list | no | Facts the plan keeps out of the page body. |
 | `constraints` | list of strings | no | Drafting constraints. |
@@ -72,6 +72,19 @@ the page covers. The `priorKnowledge` field says what the reader should already 
 Each entry in `sections` has a `heading` (the section heading, verbatim), `opens` (the section's
 first sentence, as prose), and `items`. A section needs at least one item.
 
+A section can carry a `level`, `2` or `3`, which defaults to `2`. The list stays flat, in page
+order: write a level-3 section as the next entry after its parent, with `level: 3`. Any other
+value is an error. A same-page `#anchor` can name a level-3 heading, since the link check reads
+every section `heading`.
+
+Within a section, list the items in the order the drafted prose will present them.
+
+### preconditions
+
+The `preconditions` list holds the state tokens the reader brings to the page, and a "Before you
+begin" section describes the same state in prose. Anything the reader must do there is a `step`
+that produces its token, not a precondition.
+
 ### dispositions
 
 Each entry in `dispositions` records a fact that the page body doesn't carry. The `fact` field is
@@ -89,20 +102,32 @@ An item can't carry a field that its kind doesn't list.
 
 | Kind | Fields | Pins down |
 |---|---|---|
-| `fact` | `fact` | A fact id placed in the section. The item id is separate, so one fact can sit in two sections. |
-| `sentence` | `mode`, `text` | A load-bearing sentence. The `mode` is `verbatim` or `claim`. |
+| `fact` | `fact`, and optionally `use` | A fact id placed in the section. The item id is separate, so one fact can sit in two sections. The `use` field says which claim in the fact this placement backs. |
+| `sentence` | `mode`, `text`, and optionally `facts` | A load-bearing sentence. The `mode` is `verbatim` or `claim`. The `facts` field lists the fact ids the sentence rests on. |
 | `link` | `target` | A link the section must carry. |
 | `handoff` | `text` | The section's closing turn toward what comes next. |
 | `reason` | `text` | A "why" that must survive drafting. |
 | `step` | `text`, and optionally `requires`, `produces`, `canFail` | One action the reader takes. |
-| `failure` | `from`, `symptom`, `handledBy` | A failure that a step can cause. |
+| `failure` | `symptom`, `handledBy`, and optionally `from`, `cause` | A failure that a step can cause, or a free-standing symptom row. |
+| `code` | `source`, `text` | A code block the section shows. The `source` is `path` or `path#Symbol`, and `text` says what the block shows. |
+| `figure` | `text`, and optionally `source` | A figure the section needs. The `text` says what it must show, and the optional `source` says where it comes from. |
 
 The `target` of a link is one of `path`, `path#anchor`, `#anchor`, or an `http://` or `https://`
 URL. A path resolves from the directory of the page, as the page's own link would.
 
 A step's `requires` and `produces` are lists of state tokens, such as `new-key` or `deployed`.
 The `canFail` field is `true` or `false`, and it defaults to `false`. A failure's `from` is the
-`id` of a step. Its `handledBy` is the `id` of the item that tells the reader what to do.
+`id` of a step. Its `handledBy` is the `id` of the item that tells the reader what to do. A
+failure with no `from` is a free-standing symptom row, for a page that lists symptoms, causes, and
+fixes with no steps. The optional `cause` says why the symptom happens.
+
+The path part of a code item's `source` resolves from the directory of the page, as a link target
+does, and must exist. The `#Symbol` part isn't checked. A figure's `source` isn't checked.
+
+### What the plan leaves out
+
+The plan carries no exemplars and no cross-links from the outline. The chain supplies both from
+the page inputs, so don't copy them into `constraints`.
 
 ### Example
 
@@ -170,12 +195,13 @@ Each finding names one of these checks.
 The decode check reads the YAML and refuses anything outside the format: malformed YAML, an empty
 file, a second document, an unknown or repeated field, a missing required field, a value of the
 wrong type, an unknown `kind`, `mode`, or `disposition`, a field that doesn't belong to the
-item's kind, and a plain-style prose value with a line comment. Later checks run only on a plan
+item's kind, a `level` other than `2` or `3`, and a plain-style prose value with a line
+comment. Later checks run only on a plan
 that decodes without errors.
 
 ### ids
 
-Every `id` is unique. A failure's `from` names a step. A failure's `handledBy` names an item that
+Every `id` is unique. A failure's `from`, when present, names a step. A failure's `handledBy` names an item that
 exists. No fact is both a `fact` item and a disposition.
 
 ### reader-state
@@ -192,7 +218,8 @@ item whose handler doesn't exist is an `ids` error.
 
 ### links
 
-For every `link` item and every subordinated `reference`:
+For every `link` item, every subordinated `reference`, and the path part of every `code` item's
+`source`:
 
 - An `http://` or `https://` target isn't checked.
 - A path must exist under the repository root. A directory passes, but an anchor on a directory
@@ -215,11 +242,12 @@ In YAML, quote a same-page target such as `"#grace-period"`. Unquoted, the `#` s
 
 ### facts
 
-This check runs only when you pass `--facts`. Without it, each `fact` item gets a warning that
-names its line, and no fact is checked.
+This check runs only when you pass `--facts`. Without it, each `fact` item and each `sentence`
+item's `facts` list gets a warning that names its line, and no fact is checked.
 
-Every `fact` item's `fact` field and every disposition's `fact` field must name exactly one
-bullet in the facts directory. A `fact` item's bullet must also be citable.
+Every `fact` item's `fact` field, every id in a `sentence` item's `facts` list, and every
+disposition's `fact` field must name exactly one bullet in the facts directory. The bullet behind
+a `fact` item or a `facts` entry must also be citable.
 
 ## Facts files
 

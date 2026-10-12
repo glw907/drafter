@@ -71,6 +71,10 @@ func TestCheckIDs(t *testing.T) {
 			{80, SeverityError, "ids", `placed in the page by the item at line 25 and also disposed`},
 		}},
 		{"handledBy names a step", "handledBy: r-quota", "handledBy: s-deploy", nil},
+		{"a failure with no from is free-standing", "        canFail: true\n      - id: x-create\n        kind: failure\n        from: s-create\n", "      - id: x-create\n        kind: failure\n", nil},
+		{"a free-standing failure still needs its handler", "        canFail: true\n      - id: x-create\n        kind: failure\n        from: s-create\n        symptom: |\n          The command prints a quota error.\n        handledBy: r-quota\n", "      - id: x-create\n        kind: failure\n        symptom: |\n          The command prints a quota error.\n        handledBy: r-gone\n", []want{
+			{45, SeverityError, "ids", `handledBy names "r-gone"`},
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -165,6 +169,14 @@ func TestCheckLinks(t *testing.T) {
 		{"an unlisted target next to a listed one", target, "../reference/other.md", nil, []want{
 			{30, SeverityError, "links", "target docs/reference/other.md does not exist"},
 		}},
+		{"code source that exists", handoff, codeItem("../reference/keys.md") + handoff, nil, nil},
+		{"code source with a symbol", handoff, codeItem("../reference/keys.md#NoSuchSymbol") + handoff, nil, nil},
+		{"code source that is missing", handoff, codeItem("../reference/gone.go#Symbol") + handoff, nil, []want{
+			{72, SeverityError, "links", "source docs/reference/gone.go does not exist"},
+		}},
+		{"code source outside the repository", handoff, codeItem("../../../x.go") + handoff, nil, []want{
+			{72, SeverityError, "links", "target ../../../x.go leaves the repository"},
+		}},
 		{"https target is not checked", target, "https://example.com/a#nowhere", nil, nil},
 		{"http target is not checked", target, "http://example.com/a", nil, nil},
 		{"root-relative target", target, "/docs/reference/keys.md#grace-period", nil, nil},
@@ -181,6 +193,37 @@ func TestCheckLinks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assertFindings(t, runCheck(t, mutate(t, tt.old, tt.repl), tt.opts), tt.wants)
+		})
+	}
+}
+
+func TestCheckSentenceFacts(t *testing.T) {
+	const withFacts = sentenceText + "        facts: [%s]\n"
+	row := func(ids string) string { return strings.Replace(withFacts, "%s", ids, 1) }
+	noFacts := func(o *CheckOptions) { o.FactsDir = "" }
+	tests := []struct {
+		name, repl string
+		opts       func(*CheckOptions)
+		wants      []want
+	}{
+		{"citable facts", row("signing-key-ttl, vendor-fact"), nil, nil},
+		{"a rejected fact", row("signing-key-ttl, rejected-fact"), nil, []want{
+			{65, SeverityError, "facts", `fact "rejected-fact" is tagged [rejected], which a page cannot cite`},
+		}},
+		{"an id in no facts file", row("no-such-fact"), nil, []want{
+			{65, SeverityError, "facts", `fact "no-such-fact" is in no facts file`},
+		}},
+		{"an id on two bullets", row("dup-id"), nil, []want{
+			{65, SeverityError, "facts", `fact "dup-id" is on 2 bullets`},
+		}},
+		{"no facts directory", row("signing-key-ttl"), noFacts, []want{
+			{27, SeverityWarning, "facts", "the fact item at line 27 is not checked"},
+			{65, SeverityWarning, "facts", "the facts list at line 65 is not checked because no facts directory is set"},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertFindings(t, runCheck(t, mutate(t, sentenceText, tt.repl), tt.opts), tt.wants)
 		})
 	}
 }

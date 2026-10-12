@@ -45,6 +45,7 @@
         "required": ["heading", "opens", "items"],
         "properties": {
           "heading": { "type": "string", "minLength": 1, "description": "The section's heading, verbatim." },
+          "level": { "enum": [2, 3], "default": 2, "description": "The heading level. The section list stays flat, in page order." },
           "opens": { "type": "string", "minLength": 1, "description": "The section's first sentence." },
           "items": {
             "type": "array",
@@ -57,7 +58,9 @@
                 { "$ref": "#/$defs/item-handoff" },
                 { "$ref": "#/$defs/item-reason" },
                 { "$ref": "#/$defs/item-step" },
-                { "$ref": "#/$defs/item-failure" }
+                { "$ref": "#/$defs/item-failure" },
+                { "$ref": "#/$defs/item-code" },
+                { "$ref": "#/$defs/item-figure" }
               ]
             }
           }
@@ -100,7 +103,8 @@
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "kind": { "const": "fact" },
-        "fact": { "type": "string", "minLength": 1, "description": "A fact id." }
+        "fact": { "type": "string", "minLength": 1, "description": "A fact id." },
+        "use": { "type": "string", "minLength": 1, "description": "The claim in the fact that this placement backs." }
       }
     },
     "item-sentence": {
@@ -111,7 +115,12 @@
         "id": { "$ref": "#/$defs/id" },
         "kind": { "const": "sentence" },
         "mode": { "enum": ["verbatim", "claim"] },
-        "text": { "type": "string", "minLength": 1 }
+        "text": { "type": "string", "minLength": 1 },
+        "facts": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Fact ids the sentence rests on. Each must resolve to one citable bullet."
+        }
       }
     },
     "item-link": {
@@ -160,13 +169,36 @@
     "item-failure": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "kind", "from", "symptom", "handledBy"],
+      "required": ["id", "kind", "symptom", "handledBy"],
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "kind": { "const": "failure" },
-        "from": { "type": "string", "minLength": 1, "description": "The id of the step this failure follows." },
+        "from": { "type": "string", "minLength": 1, "description": "The id of the step this failure follows. Omit it for a free-standing symptom row." },
         "symptom": { "type": "string", "minLength": 1 },
+        "cause": { "type": "string", "minLength": 1, "description": "Why the symptom happens." },
         "handledBy": { "type": "string", "minLength": 1, "description": "The id of the item that handles the failure." }
+      }
+    },
+    "item-code": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "source", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "code" },
+        "source": { "type": "string", "minLength": 1, "description": "path or path#Symbol. The path resolves from the page's directory and must exist; the Symbol is not checked." },
+        "text": { "type": "string", "minLength": 1, "description": "What the code block shows." }
+      }
+    },
+    "item-figure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "figure" },
+        "text": { "type": "string", "minLength": 1, "description": "What the figure must show." },
+        "source": { "type": "string", "minLength": 1, "description": "Where the figure comes from. Not checked." }
       }
     },
     "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "description": "A lowercase token, unique across the plan." }

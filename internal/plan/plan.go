@@ -51,9 +51,11 @@ type Introduction struct {
 	Lines map[string]int `yaml:"-"`
 }
 
-// Section is one page section, in page order.
+// Section is one page section, in page order. Level is the heading level, 2 or 3; Decode sets
+// it to 2 when the plan omits it.
 type Section struct {
 	Heading string `yaml:"heading" plan:"required"`
+	Level   int    `yaml:"level"`
 	Opens   string `yaml:"opens" plan:"required,prose"`
 	Items   []Item `yaml:"items" plan:"required"`
 
@@ -68,14 +70,18 @@ type Item struct {
 	ID        string   `yaml:"id" plan:"required"`
 	Kind      string   `yaml:"kind" plan:"required"`
 	Fact      string   `yaml:"fact"`
+	Use       string   `yaml:"use" plan:"prose"`
 	Mode      string   `yaml:"mode"`
 	Text      string   `yaml:"text" plan:"prose"`
+	Facts     []string `yaml:"facts"`
+	Source    string   `yaml:"source"`
 	Target    string   `yaml:"target"`
 	Requires  []string `yaml:"requires"`
 	Produces  []string `yaml:"produces"`
 	CanFail   bool     `yaml:"canFail"`
 	From      string   `yaml:"from"`
 	Symptom   string   `yaml:"symptom" plan:"prose"`
+	Cause     string   `yaml:"cause" plan:"prose"`
 	HandledBy string   `yaml:"handledBy"`
 
 	Line  int            `yaml:"-"`
