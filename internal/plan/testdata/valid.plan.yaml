@@ -1,0 +1,87 @@
+version: 1
+page:
+  path: docs/guides/rotate-the-signing-key.md
+  title: Rotate the signing key
+  type: task-guide
+argument: |
+  Rotating the signing key takes three steps, and the order matters: the new key must be
+  live before the old one is revoked.
+introduction:
+  covers: |
+    How to rotate the signing key without downtime.
+  priorKnowledge: |
+    You can deploy the service and read its logs.
+  notCovered: |
+    Rotating the database credentials.
+orderReason: |
+  The new key goes live first, so a failed deploy leaves the old key working.
+preconditions:
+  - signing-key-exists
+sections:
+  - heading: Before you begin
+    opens: |
+      You need deploy access and a new key.
+    items:
+      - id: f-key-ttl
+        kind: fact
+        fact: signing-key-ttl
+      - id: l-keys
+        kind: link
+        target: ../reference/keys.md#key-lifetime
+  - heading: Create the new key
+    opens: |
+      Generate the new key first.
+    items:
+      - id: s-create
+        kind: step
+        text: |
+          Generate a new key.
+        requires: [signing-key-exists]
+        produces: [new-key]
+        canFail: true
+      - id: x-create
+        kind: failure
+        from: s-create
+        symptom: |
+          The command prints a quota error.
+        handledBy: r-quota
+      - id: r-quota
+        kind: reason
+        text: |
+          A quota error means the account already holds the maximum number of keys.
+  - heading: Deploy the new key
+    opens: |
+      Deploy the key, then check the health endpoint.
+    items:
+      - id: s-deploy
+        kind: step
+        text: "Deploy the service with the new key."
+        requires: [new-key]
+        produces: [deployed]
+      - id: t-verify
+        kind: sentence
+        mode: verbatim
+        text: "The health endpoint reports the new key's ID."
+      - id: t-claim
+        kind: sentence
+        mode: claim
+        text: |
+          The old key keeps working until you revoke it.
+      - id: h-next
+        kind: handoff
+        text: |
+          Revoke the old key, as described in the revocation guide.
+dispositions:
+  - fact: old-key-grace
+    disposition: subordinated
+    reference: ../reference/keys.md#grace-period
+    reason: |
+      The reference page owns the grace period.
+  - fact: legacy-format
+    disposition: cut
+    reason: "No reader of this guide still holds a legacy key."
+constraints:
+  - |
+    Keep each step to one action.
+friction:
+  - "The format gave no slot for a prerequisite link."
