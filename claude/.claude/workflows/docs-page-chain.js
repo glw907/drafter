@@ -1153,9 +1153,9 @@ ${HANDOFF_OWNER}
 Each sentence the plan quotes and marks "no-claim" (a hand-off or a lead-in) must carry no
 extractable fact. Run \`mkdir -p ~/.cache/docs-page-chain\`, then write those sentences, one per line,
 to /var/home/glw907/.cache/docs-page-chain/${slugOf(p)}.no-claim.txt (an absolute path, for Write).
-From the worktree, run \`node scripts/checks/check-provenance.mjs --extract
-/var/home/glw907/.cache/docs-page-chain/${slugOf(p)}.no-claim.txt\`. It prints one row per fact it finds,
-and nothing for a clean line. For each row, cite the fact's id, reword the sentence, or, for a path
+From the worktree, run this on one line:
+\`node scripts/checks/check-provenance.mjs --extract /var/home/glw907/.cache/docs-page-chain/${slugOf(p)}.no-claim.txt\`
+It prints one row per fact it finds, and nothing for a clean line. For each row, cite the fact's id, reword the sentence, or, for a path
 or name the page has the reader create, mark it for the brief's \`local\` array. The extractor is not
 a gate: it exits 0 whatever it finds.
 
