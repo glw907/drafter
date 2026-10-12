@@ -2,13 +2,14 @@ package plan
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"reflect"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -91,7 +92,7 @@ func Decode(file string, data []byte) (*Plan, []Finding) {
 	p := new(Plan)
 	d.structure(doc.Content[0], reflect.ValueOf(p).Elem(), "")
 	d.validate(p)
-	sort.SliceStable(d.findings, func(i, j int) bool { return d.findings[i].Line < d.findings[j].Line })
+	slices.SortStableFunc(d.findings, func(a, b Finding) int { return cmp.Compare(a.Line, b.Line) })
 	return p, d.findings
 }
 
@@ -282,11 +283,7 @@ func (d *decoder) item(it *Item, where string) {
 	}
 	spec, known := kinds[it.Kind]
 	if !known {
-		names := make([]string, 0, len(kinds))
-		for k := range kinds {
-			names = append(names, k)
-		}
-		sort.Strings(names)
+		names := slices.Sorted(maps.Keys(kinds))
 		d.add(kind, at(where, fmt.Sprintf("unknown kind %q", it.Kind)), "use one of "+strings.Join(names, ", "))
 		return
 	}

@@ -2,7 +2,6 @@ package plan
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -29,10 +28,10 @@ func LoadOutline(file string) (*Outline, error) {
 		} `json:"pages"`
 	}
 	if err := json.Unmarshal(data, &doc); err != nil {
-		return nil, fmt.Errorf("outline %s: %w", filepath.Base(file), err)
+		return nil, fmt.Errorf("outline %s: %w", file, err)
 	}
 	if doc.Pages == nil {
-		return nil, errors.New("outline has no pages array")
+		return nil, fmt.Errorf("outline %s has no pages array", file)
 	}
 	o := &Outline{paths: map[string]bool{}}
 	for _, p := range *doc.Pages {

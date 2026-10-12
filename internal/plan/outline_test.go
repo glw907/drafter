@@ -27,10 +27,10 @@ func TestLoadOutline(t *testing.T) {
 		{"other keys are ignored", write("b.json", `{"arm":"x","pages":[{"path":"docs/a.md","title":"A"},{"title":"no path"}]}`), []string{"docs/a.md"}, []string{""}, ""},
 		{"an empty pages array", write("c.json", `{"pages":[]}`), nil, []string{"docs/a.md"}, ""},
 		{"missing file", filepath.Join(dir, "absent.json"), nil, nil, "read outline"},
-		{"not json", write("d.json", `pages: [docs/a.md]`), nil, nil, "outline d.json"},
+		{"not json", write("d.json", `pages: [docs/a.md]`), nil, nil, "d.json"},
 		{"no pages array", write("e.json", `{"groups":[]}`), nil, nil, "no pages array"},
 		{"pages is null", write("f.json", `{"pages":null}`), nil, nil, "no pages array"},
-		{"pages is not an array", write("g.json", `{"pages":{"path":"docs/a.md"}}`), nil, nil, "outline g.json"},
+		{"pages is not an array", write("g.json", `{"pages":{"path":"docs/a.md"}}`), nil, nil, "g.json"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

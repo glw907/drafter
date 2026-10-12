@@ -264,8 +264,8 @@ func TestCheckPlanCannotRun(t *testing.T) {
 		{"facts directory missing", root, []string{"check-plan", "--root", ".", "--facts", "docs/nope", cleanPlan}, "docs/nope"},
 		{"facts directory with no facts file", root, []string{"check-plan", "--root", ".", "--facts", emptyFacts, cleanPlan}, "facts"},
 		{"outline missing", root, []string{"check-plan", "--root", ".", "--outline", "docs/nope.json", cleanPlan}, "read outline"},
-		{"outline not JSON", root, []string{"check-plan", "--root", ".", "--outline", notJSON, cleanPlan}, "outline"},
-		{"outline without pages", root, []string{"check-plan", "--root", ".", "--outline", noPages, cleanPlan}, "no pages array"},
+		{"outline not JSON", root, []string{"check-plan", "--root", ".", "--outline", notJSON, cleanPlan}, notJSON},
+		{"outline without pages", root, []string{"check-plan", "--root", ".", "--outline", noPages, cleanPlan}, noPages + " has no pages array"},
 		{"no root and outside a git tree", outside, []string{"check-plan", "p.plan.yaml"}, "not inside a git work tree"},
 	}
 	for _, tt := range tests {
