@@ -256,6 +256,55 @@ check("the drafter definition's brief shape takes a multi-id sentence and a cuts
   assert.match(DRAFTER_SRC, /\{ "id": "<fact id>", "reason": "<the plan's reason, verbatim>" \}/);
 });
 
+const S1 = "The 26-word cap counts each sentence on its own and applies only to a step, a list item, or a sentence in a task section; an introduction or explanation sentence is exempt.";
+const S2 = "Section hand-offs belong to the page plan: a hand-off the plan places is not a tell, and a read of the page grades its wording, never whether it is there or where it sits.";
+
+/** The source of one top-level function in the runner, up to the next top-level declaration. */
+function fnSource(name) {
+  const at = RUNNER_SRC.indexOf(`function ${name}(`);
+  assert.notEqual(at, -1, `${name} missing`);
+  const next = RUNNER_SRC.slice(at + 1).search(/\n(?:function |const |\/\*\*)/);
+  return RUNNER_SRC.slice(at, next === -1 ? undefined : at + 1 + next);
+}
+
+check("the cap-scope and hand-off-owner constants equal the register's two sentences", () => {
+  assert.ok(RUNNER_SRC.includes(`const CAP_SCOPE = ${JSON.stringify(S1)};`));
+  assert.ok(RUNNER_SRC.includes(`const HANDOFF_OWNER = ${JSON.stringify(S2)};`));
+});
+
+check("the plan, structural, and register-seat prompts interpolate both constants", () => {
+  for (const name of ["planPrompt", "structurePrompt", "editorPrompt"]) {
+    const src = fnSource(name);
+    assert.ok(src.includes("${CAP_SCOPE}"), `${name} lacks CAP_SCOPE`);
+    assert.ok(src.includes("${HANDOFF_OWNER}"), `${name} lacks HANDOFF_OWNER`);
+  }
+});
+
+check("the register seat's prompt says S1 governs over the definition's cap line", () => {
+  assert.ok(fnSource("editorPrompt").includes("S1 governs over your definition's cap line"));
+});
+
+check("the scoped-read note carries the cap's scope", () => {
+  assert.ok(fnSource("scopeNote").includes("${CAP_SCOPE}"));
+});
+
+check("the plan prompt runs the provenance extractor on the no-claim sentences", () => {
+  const src = fnSource("planPrompt");
+  assert.ok(src.includes("check-provenance.mjs --extract"));
+  assert.ok(src.includes(".no-claim.txt"));
+});
+
+check("the draft prompt carries the brief's local field, owned by the drafter", () => {
+  const src = fnSource("draftPrompt");
+  assert.ok(src.includes('"local": ['));
+  assert.ok(src.includes("one writer"));
+});
+
+check("the register editor definition carries S1 verbatim", () => {
+  const editor = readFileSync(join(HERE, "..", "claude", ".claude", "agents", "cairn-register-editor.md"), "utf8");
+  assert.ok(editor.replace(/\s+/g, " ").includes(S1));
+});
+
 check("a missing fact is a couldNotDo, not a friction-log entry", () => {
   assert.match(RUNNER_SRC, /couldNotDo naming the missing fact/);
 });

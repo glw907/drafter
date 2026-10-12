@@ -1077,6 +1077,11 @@ function applyPlan(p, pageInputs, planInventory) {
 // of the structural edit seat's introduction, review, and navigation items.
 const GOOGLE_LARGE_DOCS = "https://developers.google.com/tech-writing/two/large-docs";
 
+// The register's two scope rulings (cairn-cms docs-register.md, 2026-10-11), pasted verbatim so a
+// seat that loads a stale register definition still reads the current scope.
+const CAP_SCOPE = "The 26-word cap counts each sentence on its own and applies only to a step, a list item, or a sentence in a task section; an introduction or explanation sentence is exempt.";
+const HANDOFF_OWNER = "Section hand-offs belong to the page plan: a hand-off the plan places is not a tell, and a read of the page grades its wording, never whether it is there or where it sits.";
+
 /**
  * The plan step's prompt, for the first plan or its one revision on the plan read's findings. The
  * plan is Google's outline written down, per the 2026-10-01 page-plan diagnosis
@@ -1090,7 +1095,7 @@ const GOOGLE_LARGE_DOCS = "https://developers.google.com/tech-writing/two/large-
 function planPrompt(p, pageInputs, findings) {
   const head = findings
     ? `Revise the page plan ${planPathFor(p)} for ${p.path} once, on the structural edit's findings below. Fix every blocking finding, keep the plan's dispositions in step with the revision, and return the whole report again.`
-    : `Write the page plan for ${p.path} at ${planPathFor(p)}. You are the plan step of the docs page chain: you write no page prose and you do not run a gate.`;
+    : `Write the page plan for ${p.path} at ${planPathFor(p)}. You are the plan step of the docs page chain: you write no page prose and you run no gate, only the extractor named below.`;
   const rework = typeof p.rework === "string" && p.rework !== ""
     ? `\nThis page is committed and is being reworked. Its job-read findings and owner rulings, verbatim:\n\n${p.rework}\n`
     : "";
@@ -1141,6 +1146,18 @@ friction (below); the fact is still subordinated, never kept on the page for tha
 
 Name every file in the plan by its repo path in a code span, never as a Markdown link: the docs link
 gate walks docs/ and resolves a link relative to the plan file.
+
+${CAP_SCOPE}
+${HANDOFF_OWNER}
+
+Each sentence the plan quotes and marks "no-claim" (a hand-off or a lead-in) must carry no
+extractable fact. Run \`mkdir -p ~/.cache/docs-page-chain\`, then write those sentences, one per line,
+to /var/home/glw907/.cache/docs-page-chain/${slugOf(p)}.no-claim.txt (an absolute path, for Write).
+From the worktree, run this on one line:
+\`node scripts/checks/check-provenance.mjs --extract /var/home/glw907/.cache/docs-page-chain/${slugOf(p)}.no-claim.txt\`
+It prints one row per fact it finds, and nothing for a clean line. For each row, cite the fact's id, reword the sentence, or, for a path
+or name the page has the reader create, mark it for the brief's \`local\` array. The extractor is not
+a gate: it exits 0 whatever it finds.
 
 Return claimInventory with one entry per fact id you dispose, in the existing dispositions only:
 "carried" with its factId and the section heading it is placed under, or "cut" with its factId and
@@ -1425,7 +1442,10 @@ Write the page's sentence-to-fact brief alongside the page at ${briefPathFor(p)}
 fact ids above or "no-claim". A sentence's id is one fact id, an array of the fact ids it
 synthesizes when it states two or more together, or "no-claim". The brief also carries a top-level
 "cuts" array mirroring the plan's cut dispositions: one { "id", "reason" } entry per fact id the
-claim inventory above marks "cut", its reason verbatim. File no fact yourself, new or retagged. A claim the page needs whose
+claim inventory above marks "cut", its reason verbatim. The brief may also carry a top-level
+"local": ["<a path or name the page has the reader create>"] array: list there each site-invented
+path or name the page has the reader create, so a sentence naming it passes the provenance gate. You
+are \`local\`'s one writer, and an entry never names an engine export. File no fact yourself, new or retagged. A claim the page needs whose
 fact is not among the ids above is a couldNotDo naming the missing fact; do not draft that claim
 and do not file its fact yourself, since the invoking session re-runs page inputs for it.
 
@@ -1452,7 +1472,7 @@ function scopeNote(scope, where = "The page changed only at the spots the final 
   return `
 This read is scoped. ${where}. "Changed sentences get both reviews, scoped to those sentences"
 (docs/superpowers/specs/2026-09-26-draft-docs-approach-design.md, "Edits after the chain"). Grade
-the changed sentences.
+the changed sentences. ${CAP_SCOPE}
 
 ${scope}
 `;
@@ -1498,6 +1518,9 @@ ${common}
 ${registerLine(p, "editor")}
 ${framingReadLine(p)}
 ${scopeNote(scope, where)}${roundTwoNote(p, narrow, "register editor")}
+S1 governs over your definition's cap line: ${CAP_SCOPE}
+${HANDOFF_OWNER}
+
 Run plain \`vale ${p.path}\` from the worktree, never the docs gate, and read every alert it
 prints${narrow ? " (on a narrowed read, grade only the alerts on changed lines)" : ""}. Read the page, then grade the brief's structure checklist, the brief's tells, and Vale's
 alerts together, with the Names section, logic, and facts-adjacent phrasing. Return ranked
@@ -1677,6 +1700,9 @@ in your overview. Does your introduction provide an accurate overview of the top
 "Most readers appreciate at least a brief introduction under each heading to provide some context."
 "Structure your outline so that your document introduces information when it's most relevant to your
 reader."
+
+${CAP_SCOPE}
+${HANDOFF_OWNER}
 
 A checklist item the ${plan ? "plan" : "page"} fails is a blocking finding: its file:line as location, the item it fails
 and how, and in rewrite a suggestion for how to address it. Verdict "fix" if any blocking finding
