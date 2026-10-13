@@ -12,8 +12,9 @@ import (
 )
 
 type checkPlanFlags struct {
-	facts, outline, root string
-	json                 bool
+	facts, root string
+	outlines    []string
+	json        bool
 }
 
 func newCheckPlanCmd() *cobra.Command {
@@ -35,7 +36,7 @@ the command could not run.`,
 	}
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error { return usageError(cmd, err.Error()) })
 	cmd.Flags().StringVar(&f.facts, "facts", "", "directory of facts files; without it each fact item gets a warning")
-	cmd.Flags().StringVar(&f.outline, "outline", "", "outline JSON file whose pages array lists planned pages")
+	cmd.Flags().StringArrayVar(&f.outlines, "outline", nil, "outline JSON file whose pages array lists planned pages; repeat it to read several")
 	cmd.Flags().StringVar(&f.root, "root", "", "repository root that link targets resolve against (default: the git top level of the first plan)")
 	cmd.Flags().BoolVar(&f.json, "json", false, "print the findings as one JSON array")
 	return cmd
@@ -48,8 +49,8 @@ func runCheckPlan(cmd *cobra.Command, args []string, f *checkPlanFlags) error {
 			return exitError{code: exitCannotRun, msg: err.Error()}
 		}
 	}
-	if f.outline != "" {
-		o, err := plan.LoadOutline(f.outline)
+	if len(f.outlines) > 0 {
+		o, err := plan.LoadOutlines(f.outlines)
 		if err != nil {
 			return exitError{code: exitCannotRun, msg: err.Error()}
 		}

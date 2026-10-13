@@ -193,6 +193,29 @@ func TestCheckPlanWithoutFacts(t *testing.T) {
 	}
 }
 
+// A target counts as planned when any of the outlines lists it.
+func TestCheckPlanSeveralOutlines(t *testing.T) {
+	other := filepath.Join(t.TempDir(), "other.json")
+	if err := os.WriteFile(other, []byte(`{"pages":[{"path":"docs/guides/unrelated.md"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := []string{"--facts", "docs/facts", "--root", "."}
+	r := checkPlan(t, project(t), cleanPlan, append(base, "--outline", other, "--outline", "docs/outline.json")...)
+	got := lines(r.stdout)
+	if r.code != 0 || len(got) != 1 || !strings.HasPrefix(got[0], cleanPlan+":32: warning: links: ") {
+		t.Errorf("both outlines: exit %d, stdout %q", r.code, r.stdout)
+	}
+	r = checkPlan(t, project(t), cleanPlan, append(base, "--outline", other)...)
+	if r.code != 1 || !strings.Contains(r.stdout, cleanPlan+":32: error: links: ") {
+		t.Errorf("only the other outline: exit %d, stdout %q", r.code, r.stdout)
+	}
+	missing := filepath.Join(t.TempDir(), "absent.json")
+	r = checkPlan(t, project(t), cleanPlan, append(base, "--outline", "docs/outline.json", "--outline", missing)...)
+	if r.code != 2 || !strings.Contains(r.stderr, missing) {
+		t.Errorf("a missing second outline: exit %d, stderr %q", r.code, r.stderr)
+	}
+}
+
 func TestCheckPlanSeveralPlans(t *testing.T) {
 	r := run(t, project(t), append([]string{"check-plan"}, append(projectFlags, cleanPlan, gapsPlan)...)...)
 	if r.code != 1 || r.stderr != "2 errors, 2 warnings\n" {

@@ -23,12 +23,12 @@ const checkDecode = "decode"
 var kinds = map[string]struct{ required, optional []string }{
 	"fact":     {required: []string{"fact"}, optional: []string{"use"}},
 	"sentence": {required: []string{"mode", "text"}, optional: []string{"facts"}},
-	"link":     {required: []string{"target"}},
+	"link":     {required: []string{"target"}, optional: []string{"text"}},
 	"handoff":  {required: []string{"text"}},
-	"reason":   {required: []string{"text"}},
-	"step":     {required: []string{"text"}, optional: []string{"requires", "produces", "canFail"}},
+	"reason":   {required: []string{"text"}, optional: []string{"facts"}},
+	"step":     {required: []string{"text"}, optional: []string{"requires", "produces", "canFail", "optional"}},
 	"failure":  {required: []string{"symptom", "handledBy"}, optional: []string{"from", "cause"}},
-	"code":     {required: []string{"source", "text"}},
+	"code":     {required: []string{"text"}, optional: []string{"source", "facts"}},
 	"figure":   {required: []string{"text"}, optional: []string{"source"}},
 }
 
@@ -106,9 +106,9 @@ func errLine(err error) int {
 }
 
 type fieldSpec struct {
-	index           int
-	name            string
-	required, prose bool
+	index                  int
+	name                   string
+	required, prose, empty bool
 }
 
 func fieldsOf(t reflect.Type) []fieldSpec {
@@ -119,7 +119,7 @@ func fieldsOf(t reflect.Type) []fieldSpec {
 			continue
 		}
 		opts := strings.Split(t.Field(i).Tag.Get("plan"), ",")
-		out = append(out, fieldSpec{index: i, name: name, required: slices.Contains(opts, "required"), prose: slices.Contains(opts, "prose")})
+		out = append(out, fieldSpec{index: i, name: name, required: slices.Contains(opts, "required"), prose: slices.Contains(opts, "prose"), empty: slices.Contains(opts, "empty")})
 	}
 	return out
 }
@@ -226,7 +226,7 @@ func (d *decoder) list(n *yaml.Node, f reflect.Value, s fieldSpec, where string)
 		d.add(n.Line, at(where, "must be a list"), "write one - entry per line")
 		return
 	}
-	if s.required && len(n.Content) == 0 {
+	if s.required && !s.empty && len(n.Content) == 0 {
 		d.add(n.Line, at(where, "must hold at least one entry"), "add an entry")
 	}
 	for i, c := range n.Content {
@@ -252,6 +252,13 @@ func (d *decoder) validate(p *Plan) {
 			s.Level = 2
 		} else if s.Level != 2 && s.Level != 3 && !d.faultAt(line) {
 			d.add(line, fmt.Sprintf("sections[%d]: level %d is not a heading level the plan supports", i, s.Level), "use level: 2 or level: 3, or omit it for 2")
+		}
+	}
+	for i := range p.Sections {
+		s := &p.Sections[i]
+		parentOfSubsections := s.Level == 2 && i+1 < len(p.Sections) && p.Sections[i+1].Level == 3
+		if line, ok := s.Lines["items"]; ok && len(s.Items) == 0 && !parentOfSubsections && !d.faultAt(line) {
+			d.add(line, fmt.Sprintf("sections[%d].items: must hold at least one entry unless the next section is level 3", i), "add an entry, or leave items empty only above a level-3 section")
 		}
 		for j := range s.Items {
 			d.item(&s.Items[j], fmt.Sprintf("sections[%d].items[%d]", i, j))

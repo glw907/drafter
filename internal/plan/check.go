@@ -99,18 +99,41 @@ func (c *checker) ids() {
 				fmt.Sprintf("handledBy names %q, which is no item's id", it.HandledBy), "name the item that handles this failure")
 		}
 	})
+	disposed := map[string]int{}
 	for i := range c.p.Dispositions {
 		d := &c.p.Dispositions[i]
+		disposed[d.Fact] = d.Lines["fact"]
 		if it := placed[d.Fact]; it != nil {
 			c.add(d.Lines["fact"], SeverityError, checkIDs,
 				fmt.Sprintf("fact %q is placed in the page by the item at line %d and also disposed here", d.Fact, it.Line),
 				"keep the fact as an item or as a disposition, not both")
 		}
 	}
+	c.eachFactsList(func(line int, id string) {
+		if at, ok := disposed[id]; ok {
+			c.add(line, SeverityError, checkIDs,
+				fmt.Sprintf("fact %q is cited here but disposed at line %d", id, at),
+				"cite a placed fact, or place this one and drop its disposition")
+		}
+	})
+}
+
+// eachFactsList calls fn for every id in the introduction's facts list and in each item's, with
+// the line of the list.
+func (c *checker) eachFactsList(fn func(line int, id string)) {
+	for _, id := range c.p.Introduction.Facts {
+		fn(c.p.Introduction.Lines["facts"], id)
+	}
+	c.each(func(it *Item) {
+		for _, id := range it.Facts {
+			fn(it.Lines["facts"], id)
+		}
+	})
 }
 
 func (c *checker) readerState() {
 	produced := map[string]bool{}
+	optional := map[string]bool{}
 	for _, s := range c.p.Preconditions {
 		produced[s] = true
 	}
@@ -130,6 +153,14 @@ func (c *checker) readerState() {
 			if produced[r] {
 				continue
 			}
+			if optional[r] {
+				if !it.Optional {
+					c.add(it.Lines["requires"], SeverityWarning, checkReaderState,
+						fmt.Sprintf("step %q requires %q, which only optional steps produce before it, so a reader who skips them lacks it", it.ID, r),
+						"make the producing step required, or list the state under preconditions")
+				}
+				continue
+			}
 			msg := fmt.Sprintf("step %q requires %q, which no earlier step produces and no precondition lists", it.ID, r)
 			if line, ok := firstProducer[r]; ok {
 				msg += fmt.Sprintf(" (the step at line %d produces it, but not before this one)", line)
@@ -138,7 +169,11 @@ func (c *checker) readerState() {
 				"reorder the steps, or list the state under preconditions")
 		}
 		for _, s := range it.Produces {
-			produced[s] = true
+			if it.Optional {
+				optional[s] = true
+			} else {
+				produced[s] = true
+			}
 		}
 	})
 }
@@ -166,9 +201,12 @@ func (c *checker) links() {
 		case "link":
 			c.link(it.Lines["target"], it.Target, own)
 		case "code":
-			c.codeSource(it.Lines["source"], it.Source)
+			if it.Source != "" && !isURL(it.Source) {
+				c.codeSource(it.Lines["source"], it.Source)
+			}
 		}
 	})
+	c.anchorPins()
 	for i := range c.p.Dispositions {
 		if d := &c.p.Dispositions[i]; d.Disposition == "subordinated" {
 			c.link(d.Lines["reference"], d.Reference, own)
@@ -179,12 +217,39 @@ func (c *checker) links() {
 // pageAnchors returns the slugs of the page's title and section headings, in page order through
 // one slugger, so a repeated heading takes -1 as the rendered page will.
 func (c *checker) pageAnchors() map[string]bool {
-	sl := newSlugger()
-	own := map[string]bool{sl.slug(c.p.Page.Title): true}
-	for i := range c.p.Sections {
-		own[sl.slug(c.p.Sections[i].Heading)] = true
+	own := map[string]bool{}
+	for _, s := range c.slugs() {
+		own[s] = true
 	}
 	return own
+}
+
+// slugs returns the slug of the page title followed by one per section heading, in page order.
+func (c *checker) slugs() []string {
+	sl := newSlugger()
+	out := []string{sl.slug(c.p.Page.Title)}
+	for i := range c.p.Sections {
+		out = append(out, sl.slug(c.p.Sections[i].Heading))
+	}
+	return out
+}
+
+// anchorPins checks that each section's anchor, when the plan pins one, is the slug its heading
+// renders with.
+func (c *checker) anchorPins() {
+	slugs := c.slugs()[1:]
+	for i := range c.p.Sections {
+		s := &c.p.Sections[i]
+		if s.Anchor != "" && s.Anchor != slugs[i] {
+			c.add(s.Lines["anchor"], SeverityError, checkLinks,
+				fmt.Sprintf("anchor %q does not match %q, the slug of the heading %q", s.Anchor, slugs[i], s.Heading),
+				"write the heading's slug, or correct the heading")
+		}
+	}
+}
+
+func isURL(s string) bool {
+	return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://")
 }
 
 // repoPath resolves a link or source path from the page's directory, or from the repository root
@@ -218,7 +283,7 @@ func (c *checker) codeSource(line int, source string) {
 }
 
 func (c *checker) link(line int, target string, own map[string]bool) {
-	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+	if isURL(target) {
 		return
 	}
 	file, anchor, _ := strings.Cut(target, "#")
@@ -276,13 +341,18 @@ func (c *checker) link(line int, target string, own map[string]bool) {
 
 func (c *checker) facts() {
 	if c.opts.FactsDir == "" {
+		if line := c.p.Introduction.Lines["facts"]; len(c.p.Introduction.Facts) > 0 {
+			c.add(line, SeverityWarning, checkFacts,
+				fmt.Sprintf("the facts list at line %d is not checked because no facts directory is set", line),
+				"pass --facts <dir> to check that each fact exists and is citable")
+		}
 		c.each(func(it *Item) {
 			switch {
 			case it.Kind == "fact":
 				c.add(it.Lines["fact"], SeverityWarning, checkFacts,
 					fmt.Sprintf("the fact item at line %d is not checked because no facts directory is set", it.Lines["fact"]),
 					"pass --facts <dir> to check that the fact exists and is citable")
-			case it.Lines["facts"] != 0:
+			case len(it.Facts) > 0:
 				c.add(it.Lines["facts"], SeverityWarning, checkFacts,
 					fmt.Sprintf("the facts list at line %d is not checked because no facts directory is set", it.Lines["facts"]),
 					"pass --facts <dir> to check that each fact exists and is citable")
@@ -327,12 +397,10 @@ func (c *checker) facts() {
 				"place a verified, external, or vendor fact, or retag the bullet once it is checked")
 		}
 	}
+	c.eachFactsList(cite)
 	c.each(func(it *Item) {
 		if it.Kind == "fact" {
 			cite(it.Lines["fact"], it.Fact)
-		}
-		for _, id := range it.Facts {
-			cite(it.Lines["facts"], id)
 		}
 	})
 	for i := range c.p.Dispositions {

@@ -107,7 +107,15 @@ func TestDecodeRefusals(t *testing.T) {
 		{"facts written as a string", sentenceText, sentenceText + "        facts: signing-key-ttl\n", 65, "facts: must be a list"},
 		{"facts on a handoff", "        kind: handoff\n", "        kind: handoff\n        facts: [signing-key-ttl]\n", 72, `field "facts" does not belong to kind "handoff"`},
 		{"cause on a step", "        canFail: true\n", "        canFail: true\n        cause: stray\n", 42, `field "cause" does not belong to kind "step"`},
-		{"code with no source", handoff, "      - id: c-demo\n        kind: code\n        text: |\n          The key command.\n" + handoff, 70, `kind "code" needs the field "source"`},
+		{"code with no text", handoff, "      - id: c-demo\n        kind: code\n        source: ../reference/keys.md\n" + handoff, 70, `kind "code" needs the field "text"`},
+		{"introduction facts written as a string", "    Rotating the database credentials.\n", "    Rotating the database credentials.\n  facts: signing-key-ttl\n", 16, "introduction.facts: must be a list"},
+		{"code facts written as a string", handoff, codeItem("../reference/keys.md") + "        facts: signing-key-ttl\n" + handoff, 75, "facts: must be a list"},
+		{"step optional is not a boolean", "        canFail: true\n", "        canFail: true\n        optional: maybe\n", 42, "optional: must be true or false"},
+		{"link text is not a string", "        target: ../reference/keys.md#key-lifetime\n", "        target: ../reference/keys.md#key-lifetime\n        text: [a, b]\n", 31, "text: must be a string"},
+		{"section anchor is not a string", "  - heading: Create the new key\n", "  - heading: Create the new key\n    anchor: [a]\n", 32, "anchor: must be a string"},
+		{"reason facts written as a string", "          A quota error means the account already holds the maximum number of keys.\n", "          A quota error means the account already holds the maximum number of keys.\n        facts: signing-key-ttl\n", 52, "facts: must be a list"},
+		{"empty items above another level-2 section", "    items:\n      - id: s-create\n", "    items: []\n  - heading: Placeholder\n    opens: x\n    items:\n      - id: s-create\n", 34, "must hold at least one entry"},
+		{"optional on a sentence", sentenceText, sentenceText + "        optional: true\n", 65, `field "optional" does not belong to kind "sentence"`},
 		{"figure with an unknown field", handoff, figureItem("        caption: x\n") + handoff, 74, `unknown field "caption"`},
 		{"figure with no text", handoff, "      - id: fig-1\n        kind: figure\n" + handoff, 70, `kind "figure" needs the field "text"`},
 	}
@@ -142,6 +150,13 @@ func TestDecodeCleanTwins(t *testing.T) {
 		{"sentence with facts", sentenceText, sentenceText + "        facts: [signing-key-ttl]\n"},
 		{"code with a symbol", handoff, codeItem("../reference/keys.md#Symbol") + handoff},
 		{"figure with a source", handoff, figureItem("        source: assets/key.svg\n") + handoff},
+		{"introduction with facts", "    Rotating the database credentials.\n", "    Rotating the database credentials.\n  facts: [signing-key-ttl]\n"},
+		{"code with facts and no source", handoff, "      - id: c-demo\n        kind: code\n        text: |\n          The key command.\n        facts: [signing-key-ttl]\n" + handoff},
+		{"code with a URL source", handoff, codeItem("https://example.com/keys.go") + handoff},
+		{"step marked optional", "        canFail: true\n", "        canFail: true\n        optional: true\n"},
+		{"link with text", "        target: ../reference/keys.md#key-lifetime\n", "        target: ../reference/keys.md#key-lifetime\n        text: the key lifetime\n"},
+		{"section with an anchor", "  - heading: Create the new key\n", "  - heading: Create the new key\n    anchor: create-the-new-key\n"},
+		{"reason with facts", "          A quota error means the account already holds the maximum number of keys.\n", "          A quota error means the account already holds the maximum number of keys.\n        facts: [signing-key-ttl]\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -155,6 +170,61 @@ func TestDecodeCleanTwins(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// An empty items list is a finding except in a level-2 section directly above a level-3 one.
+func TestDecodeEmptyItems(t *testing.T) {
+	src := readValid(t)
+	empty := func(old, repl string) string {
+		if !strings.Contains(src, old) {
+			t.Fatalf("valid plan lacks %q", old)
+		}
+		return strings.Replace(src, old, repl, 1)
+	}
+	parent := empty("    items:\n      - id: s-create\n", "    items: []\n  - heading: Placeholder\n    level: 3\n    opens: x\n    items:\n      - id: s-create\n")
+	last := src[:strings.Index(src, "    items:\n      - id: s-deploy")] + "    items: []\n" + src[strings.Index(src, "dispositions:"):]
+	tests := []struct {
+		name, src string
+		clean     bool
+	}{
+		{"level-2 above a level-3 section", parent, true},
+		{"last section", last, false},
+		{"level-3 above a level-3 section", strings.Replace(parent, "  - heading: Create the new key\n", "  - heading: Create the new key\n    level: 3\n", 1), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, fs := Decode("p.plan.yaml", []byte(tt.src))
+			if tt.clean && len(fs) != 0 {
+				t.Fatalf("findings = %+v", fs)
+			}
+			if !tt.clean && (len(fs) != 1 || !strings.Contains(fs[0].Message, "must hold at least one entry")) {
+				t.Fatalf("findings = %+v, want one empty-items finding", fs)
+			}
+		})
+	}
+}
+
+func TestDecodeNewFields(t *testing.T) {
+	src := mutate(t, "    Rotating the database credentials.\n", "    Rotating the database credentials.\n  facts: [signing-key-ttl]\n")
+	src = strings.Replace(src, "        canFail: true\n", "        canFail: true\n        optional: true\n", 1)
+	src = strings.Replace(src, "        target: ../reference/keys.md#key-lifetime\n", "        target: ../reference/keys.md#key-lifetime\n        text: the key lifetime\n", 1)
+	src = strings.Replace(src, "  - heading: Create the new key\n", "  - heading: Create the new key\n    anchor: create-the-new-key\n", 1)
+	p, fs := Decode("p.plan.yaml", []byte(src))
+	if len(fs) != 0 {
+		t.Fatalf("findings = %+v", fs)
+	}
+	if got := p.Introduction.Facts; len(got) != 1 || got[0] != "signing-key-ttl" {
+		t.Errorf("introduction facts = %v", got)
+	}
+	if !p.Sections[1].Items[0].Optional || p.Sections[2].Items[0].Optional {
+		t.Errorf("optional decoded wrong: %v, %v", p.Sections[1].Items[0].Optional, p.Sections[2].Items[0].Optional)
+	}
+	if got := p.Sections[0].Items[1].Text; got != "the key lifetime" {
+		t.Errorf("link text = %q", got)
+	}
+	if got := p.Sections[1].Anchor; got != "create-the-new-key" {
+		t.Errorf("anchor = %q", got)
 	}
 }
 

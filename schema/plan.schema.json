@@ -26,7 +26,12 @@
       "properties": {
         "covers": { "type": "string", "minLength": 1, "description": "What the page covers." },
         "priorKnowledge": { "type": "string", "minLength": 1, "description": "What the reader should already know." },
-        "notCovered": { "type": "string", "minLength": 1, "description": "What the page leaves out." }
+        "notCovered": { "type": "string", "minLength": 1, "description": "What the page leaves out." },
+        "facts": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Fact ids the introduction rests on. Each must resolve to one citable bullet."
+        }
       }
     },
     "orderReason": { "type": "string", "minLength": 1, "description": "Why the sections run in this order." },
@@ -46,10 +51,11 @@
         "properties": {
           "heading": { "type": "string", "minLength": 1, "description": "The section's heading, verbatim." },
           "level": { "enum": [2, 3], "default": 2, "description": "The heading level. The section list stays flat, in page order." },
+          "anchor": { "type": "string", "minLength": 1, "description": "The heading's slug, when the plan pins it. The check compares it with the slug of the heading." },
           "opens": { "type": "string", "minLength": 1, "description": "The section's first sentence." },
           "items": {
             "type": "array",
-            "minItems": 1,
+            "description": "The section's items. Empty only for a level-2 section that the next section, at level 3, fills; the decoder enforces that rule.",
             "items": {
               "oneOf": [
                 { "$ref": "#/$defs/item-fact" },
@@ -130,7 +136,8 @@
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "kind": { "const": "link" },
-        "target": { "type": "string", "minLength": 1, "description": "path, path#anchor, #anchor, or an http(s) URL. A path resolves from the page's directory." }
+        "target": { "type": "string", "minLength": 1, "description": "path, path#anchor, #anchor, or an http(s) URL. A path resolves from the page's directory." },
+        "text": { "type": "string", "minLength": 1, "description": "The link text the page should carry." }
       }
     },
     "item-handoff": {
@@ -150,7 +157,12 @@
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "kind": { "const": "reason" },
-        "text": { "type": "string", "minLength": 1 }
+        "text": { "type": "string", "minLength": 1 },
+        "facts": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Fact ids the reason rests on. Each must resolve to one citable bullet."
+        }
       }
     },
     "item-step": {
@@ -163,7 +175,8 @@
         "text": { "type": "string", "minLength": 1 },
         "requires": { "type": "array", "items": { "type": "string", "minLength": 1 } },
         "produces": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "canFail": { "type": "boolean", "default": false }
+        "canFail": { "type": "boolean", "default": false },
+        "optional": { "type": "boolean", "default": false, "description": "True for a step the reader may skip. Its products do not satisfy a later required step." }
       }
     },
     "item-failure": {
@@ -182,12 +195,17 @@
     "item-code": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "kind", "source", "text"],
+      "required": ["id", "kind", "text"],
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "kind": { "const": "code" },
-        "source": { "type": "string", "minLength": 1, "description": "path or path#Symbol. The path resolves from the page's directory and must exist; the Symbol is not checked." },
-        "text": { "type": "string", "minLength": 1, "description": "What the code block shows." }
+        "source": { "type": "string", "minLength": 1, "description": "path, path#Symbol, or an http(s) URL. A path resolves from the page's directory and must exist; the Symbol and a URL are not checked. Omit it for an illustrative snippet with no model file." },
+        "text": { "type": "string", "minLength": 1, "description": "What the code block shows." },
+        "facts": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Fact ids the code block rests on. Each must resolve to one citable bullet."
+        }
       }
     },
     "item-figure": {

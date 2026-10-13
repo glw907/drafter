@@ -11,7 +11,8 @@ const Version = 1
 
 // Plan is a decoded plan file.
 //
-// Fields tagged plan:"required" must appear, and a required list must hold an entry. Fields
+// Fields tagged plan:"required" must appear, and a required list must hold an entry unless it
+// is also tagged plan:"empty", which leaves the emptiness to a later rule. Fields
 // tagged plan:"prose" are written as a sentence or more, so a plain-style value that carries a
 // line comment is refused: YAML would silently cut the value at the comment.
 type Plan struct {
@@ -43,21 +44,25 @@ type Page struct {
 // Introduction holds the three parts Google's developer documentation style gives a page's
 // opening: what it covers, what the reader should already know, and what it leaves out.
 type Introduction struct {
-	Covers         string `yaml:"covers" plan:"required,prose"`
-	PriorKnowledge string `yaml:"priorKnowledge" plan:"required,prose"`
-	NotCovered     string `yaml:"notCovered" plan:"required,prose"`
+	Covers         string   `yaml:"covers" plan:"required,prose"`
+	PriorKnowledge string   `yaml:"priorKnowledge" plan:"required,prose"`
+	NotCovered     string   `yaml:"notCovered" plan:"required,prose"`
+	Facts          []string `yaml:"facts"`
 
 	Line  int            `yaml:"-"`
 	Lines map[string]int `yaml:"-"`
 }
 
 // Section is one page section, in page order. Level is the heading level, 2 or 3; Decode sets
-// it to 2 when the plan omits it.
+// it to 2 when the plan omits it. Anchor, when set, is the heading's slug as the plan expects the
+// rendered page to carry it. Items must be present, and is empty only for a level-2 section
+// that the next section's level-3 headings fill.
 type Section struct {
 	Heading string `yaml:"heading" plan:"required"`
 	Level   int    `yaml:"level"`
+	Anchor  string `yaml:"anchor"`
 	Opens   string `yaml:"opens" plan:"required,prose"`
-	Items   []Item `yaml:"items" plan:"required"`
+	Items   []Item `yaml:"items" plan:"required,empty"`
 
 	Line  int            `yaml:"-"`
 	Lines map[string]int `yaml:"-"`
@@ -79,6 +84,7 @@ type Item struct {
 	Requires  []string `yaml:"requires"`
 	Produces  []string `yaml:"produces"`
 	CanFail   bool     `yaml:"canFail"`
+	Optional  bool     `yaml:"optional"`
 	From      string   `yaml:"from"`
 	Symptom   string   `yaml:"symptom" plan:"prose"`
 	Cause     string   `yaml:"cause" plan:"prose"`
