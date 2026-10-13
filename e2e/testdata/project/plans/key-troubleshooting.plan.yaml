@@ -1,0 +1,58 @@
+version: 1
+page:
+  path: docs/guides/key-troubleshooting.md
+  title: Troubleshoot key problems
+  type: troubleshooting
+argument: |
+  Most key problems come from a key that has expired or a key that was never published.
+introduction:
+  covers: |
+    The symptoms that a Lumen key problem produces and what causes each.
+  priorKnowledge: |
+    You can read a Lumen publish log.
+  notCovered: |
+    Rotating a key, which the rotation guide covers.
+orderReason: |
+  Symptoms come before the one command that lists keys, because readers arrive with a symptom.
+sections:
+  - heading: Symptoms
+    opens: |
+      Each symptom below names its cause and its fix.
+    items:
+      - id: f-ttl
+        kind: fact
+        fact: lumen-key-ttl
+        use: |
+          A key expires after the lifetime the fact gives.
+      - id: x-expired
+        kind: failure
+        symptom: |
+          Publishing fails with an authorization error.
+        cause: |
+          The key has passed its lifetime.
+        handledBy: s-list
+      - id: s-list
+        kind: step
+        text: |
+          List your keys and read the expiry column.
+  - heading: List your keys
+    level: 3
+    opens: |
+      The key command lists every key in the workspace.
+    items:
+      - id: c-list
+        kind: code
+        source: ../reference/keys.md#KeyCommand
+        text: |
+          The command that lists the workspace's keys.
+      - id: fig-expiry
+        kind: figure
+        source: assets/expiry-column.png
+        text: |
+          The expiry column of the key list, with one expired key highlighted.
+      - id: t-expiry
+        kind: sentence
+        mode: claim
+        text: |
+          An expired key shows a past date in the expiry column.
+        facts: [lumen-key-ttl]

@@ -1,0 +1,6 @@
+{
+  "pages": [
+    { "path": "docs/guides/rotate-the-signing-key.md" },
+    { "path": "docs/reference/planned.md" }
+  ]
+}
