@@ -106,8 +106,8 @@ func errLine(err error) int {
 }
 
 type fieldSpec struct {
-	index           int
-	name            string
+	index                  int
+	name                   string
 	required, prose, empty bool
 }
 

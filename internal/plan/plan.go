@@ -44,8 +44,8 @@ type Page struct {
 // Introduction holds the three parts Google's developer documentation style gives a page's
 // opening: what it covers, what the reader should already know, and what it leaves out.
 type Introduction struct {
-	Covers         string `yaml:"covers" plan:"required,prose"`
-	PriorKnowledge string `yaml:"priorKnowledge" plan:"required,prose"`
+	Covers         string   `yaml:"covers" plan:"required,prose"`
+	PriorKnowledge string   `yaml:"priorKnowledge" plan:"required,prose"`
 	NotCovered     string   `yaml:"notCovered" plan:"required,prose"`
 	Facts          []string `yaml:"facts"`
 
