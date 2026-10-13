@@ -295,3 +295,130 @@ func TestCheckFacts(t *testing.T) {
 		})
 	}
 }
+
+// Facts lists on the introduction, a code item, and a reason item resolve like a sentence's, and
+// every facts list is held against the dispositions.
+func TestCheckFactsLists(t *testing.T) {
+	const (
+		intro  = "    Rotating the database credentials.\n"
+		reason = "          A quota error means the account already holds the maximum number of keys.\n"
+	)
+	noFacts := func(o *CheckOptions) { o.FactsDir = "" }
+	introFacts := func(ids string) string { return intro + "  facts: [" + ids + "]\n" }
+	reasonFacts := func(ids string) string { return reason + "        facts: [" + ids + "]\n" }
+	codeFacts := func(ids string) string {
+		return "      - id: c-demo\n        kind: code\n        text: |\n          The key command.\n        facts: [" + ids + "]\n" + handoff
+	}
+	tests := []struct {
+		name, old, repl string
+		opts            func(*CheckOptions)
+		wants           []want
+	}{
+		{"introduction facts that are citable", intro, introFacts("signing-key-ttl"), nil, nil},
+		{"introduction fact that is rejected", intro, introFacts("rejected-fact"), nil, []want{
+			{16, SeverityError, "facts", `fact "rejected-fact" is tagged [rejected]`},
+		}},
+		{"introduction facts with no facts directory", intro, introFacts("signing-key-ttl"), noFacts, []want{
+			{16, SeverityWarning, "facts", "the facts list at line 16 is not checked"},
+			{28, SeverityWarning, "facts", "the fact item at line 28 is not checked"},
+		}},
+		{"code facts that are citable", handoff, codeFacts("signing-key-ttl"), nil, nil},
+		{"code fact that is in no facts file", handoff, codeFacts("no-such-fact"), nil, []want{
+			{74, SeverityError, "facts", `fact "no-such-fact" is in no facts file`},
+		}},
+		{"code facts with no facts directory", handoff, codeFacts("signing-key-ttl"), noFacts, []want{
+			{27, SeverityWarning, "facts", "the fact item at line 27 is not checked"},
+			{74, SeverityWarning, "facts", "the facts list at line 74 is not checked"},
+		}},
+		{"reason facts that are citable", reason, reasonFacts("signing-key-ttl"), nil, nil},
+		{"reason fact that is rejected", reason, reasonFacts("rejected-fact"), nil, []want{
+			{52, SeverityError, "facts", `fact "rejected-fact" is tagged [rejected]`},
+		}},
+		{"a sentence cites a disposed fact", sentenceText, sentenceText + "        facts: [old-key-grace]\n", nil, []want{
+			{65, SeverityError, "ids", `fact "old-key-grace" is cited here but disposed at line 76`},
+		}},
+		{"the same check with no facts directory", sentenceText, sentenceText + "        facts: [old-key-grace]\n", noFacts, []want{
+			{27, SeverityWarning, "facts", "the fact item at line 27 is not checked"},
+			{65, SeverityError, "ids", `fact "old-key-grace" is cited here but disposed at line 76`},
+			{65, SeverityWarning, "facts", "the facts list at line 65 is not checked"},
+		}},
+		{"the introduction cites a disposed fact", intro, introFacts("old-key-grace"), nil, []want{
+			{16, SeverityError, "ids", `fact "old-key-grace" is cited here but disposed at line 76`},
+		}},
+		{"a code item cites a disposed fact", handoff, codeFacts("old-key-grace"), nil, []want{
+			{74, SeverityError, "ids", `fact "old-key-grace" is cited here but disposed at line 80`},
+		}},
+		{"a reason cites a disposed fact", reason, reasonFacts("old-key-grace"), nil, []want{
+			{52, SeverityError, "ids", `fact "old-key-grace" is cited here but disposed at line 76`},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertFindings(t, runCheck(t, mutate(t, tt.old, tt.repl), tt.opts), tt.wants)
+		})
+	}
+}
+
+func TestCheckSectionAnchors(t *testing.T) {
+	const heading = "  - heading: Create the new key\n"
+	const deploy = "  - heading: Deploy the new key\n"
+	tests := []struct {
+		name, old, repl string
+		wants           []want
+	}{
+		{"an anchor equal to the slug", heading, heading + "    anchor: create-the-new-key\n", nil},
+		{"an anchor that differs from the slug", heading, heading + "    anchor: create-key\n", []want{
+			{32, SeverityError, "links", `anchor "create-key" does not match "create-the-new-key", the slug of the heading "Create the new key"`},
+		}},
+		{"a repeated heading takes the suffix", deploy, heading + "    anchor: create-the-new-key-1\n", nil},
+		{"a repeated heading without the suffix", deploy, heading + "    anchor: create-the-new-key\n", []want{
+			{53, SeverityError, "links", `does not match "create-the-new-key-1"`},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertFindings(t, runCheck(t, mutate(t, tt.old, tt.repl), nil), tt.wants)
+		})
+	}
+}
+
+// An optional step's products do not satisfy a later required step.
+func TestCheckOptionalSteps(t *testing.T) {
+	const (
+		canFail  = "        canFail: true\n"
+		deployed = "        produces: [deployed]\n"
+		deploy   = "      - id: s-deploy\n"
+	)
+	optionalCreate := func() string { return mutate(t, canFail, canFail+"        optional: true\n") }
+	tests := []struct {
+		name, src string
+		wants     []want
+	}{
+		{"a required step needs a token only an optional step produces", optionalCreate(), []want{
+			{60, SeverityWarning, "reader-state", `step "s-deploy" requires "new-key", which only optional steps produce before it`},
+		}},
+		{"a required step also produces the token", strings.Replace(optionalCreate(), deploy,
+			"      - id: s-alt\n        kind: step\n        text: Make the key another way.\n        produces: [new-key]\n"+deploy, 1), nil},
+		{"an optional step may need an optional token", strings.Replace(optionalCreate(), deployed, deployed+"        optional: true\n", 1), nil},
+		{"a precondition supplies the token", strings.Replace(optionalCreate(), "  - signing-key-exists\n", "  - signing-key-exists\n  - new-key\n", 1), nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertFindings(t, runCheck(t, tt.src, nil), tt.wants)
+		})
+	}
+}
+
+// A code source that is a URL, or absent, is not checked.
+func TestCheckCodeSourceUnchecked(t *testing.T) {
+	text := "        text: |\n          The key command.\n"
+	tests := []struct{ name, item string }{
+		{"a URL", "      - id: c-demo\n        kind: code\n        source: https://example.com/missing.go\n" + text},
+		{"no source", "      - id: c-demo\n        kind: code\n" + text},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertFindings(t, runCheck(t, mutate(t, handoff, tt.item+handoff), nil), nil)
+		})
+	}
+}
