@@ -3,6 +3,7 @@ package plan
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -40,6 +41,20 @@ func LoadOutline(file string) (*Outline, error) {
 		}
 	}
 	return o, nil
+}
+
+// LoadOutlines reads each outline file and returns one outline that lists every page any of them
+// lists. A load error names the file that failed.
+func LoadOutlines(files []string) (*Outline, error) {
+	merged := &Outline{paths: map[string]bool{}}
+	for _, file := range files {
+		o, err := LoadOutline(file)
+		if err != nil {
+			return nil, err
+		}
+		maps.Copy(merged.paths, o.paths)
+	}
+	return merged, nil
 }
 
 // lists reports whether the outline lists the repo-relative slash path p.

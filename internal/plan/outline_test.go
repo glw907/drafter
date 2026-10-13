@@ -57,3 +57,27 @@ func TestLoadOutline(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadOutlines(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	first := write("first.json", `{"pages":[{"path":"docs/a.md"}]}`)
+	second := write("second.json", `{"pages":[{"path":"docs/b.md"}]}`)
+	o, err := LoadOutlines([]string{first, second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !o.lists("docs/a.md") || !o.lists("docs/b.md") || o.lists("docs/c.md") {
+		t.Errorf("merged outline lists wrong: %v", o.paths)
+	}
+	bad := write("bad.json", `{"groups":[]}`)
+	if _, err := LoadOutlines([]string{first, bad}); err == nil || !strings.Contains(err.Error(), bad) {
+		t.Errorf("error = %v, want one naming %s", err, bad)
+	}
+}
