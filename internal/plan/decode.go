@@ -256,7 +256,8 @@ func (d *decoder) validate(p *Plan) {
 	}
 	for i := range p.Sections {
 		s := &p.Sections[i]
-		if line, ok := s.Lines["items"]; ok && len(s.Items) == 0 && !d.faultAt(line) && !(s.Level == 2 && i+1 < len(p.Sections) && p.Sections[i+1].Level == 3) {
+		parentOfSubsections := s.Level == 2 && i+1 < len(p.Sections) && p.Sections[i+1].Level == 3
+		if line, ok := s.Lines["items"]; ok && len(s.Items) == 0 && !parentOfSubsections && !d.faultAt(line) {
 			d.add(line, fmt.Sprintf("sections[%d].items: must hold at least one entry unless the next section is level 3", i), "add an entry, or leave items empty only above a level-3 section")
 		}
 		for j := range s.Items {
