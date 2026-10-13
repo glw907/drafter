@@ -334,6 +334,13 @@ func TestCheckFactsLists(t *testing.T) {
 		{"reason fact that is rejected", reason, reasonFacts("rejected-fact"), nil, []want{
 			{52, SeverityError, "facts", `fact "rejected-fact" is tagged [rejected]`},
 		}},
+		{"reason facts with no facts directory", reason, reasonFacts("signing-key-ttl"), noFacts, []want{
+			{27, SeverityWarning, "facts", "the fact item at line 27 is not checked"},
+			{52, SeverityWarning, "facts", "the facts list at line 52 is not checked"},
+		}},
+		{"an empty facts list is not warned about", reason, reasonFacts(""), noFacts, []want{
+			{27, SeverityWarning, "facts", "the fact item at line 27 is not checked"},
+		}},
 		{"a sentence cites a disposed fact", sentenceText, sentenceText + "        facts: [old-key-grace]\n", nil, []want{
 			{65, SeverityError, "ids", `fact "old-key-grace" is cited here but disposed at line 76`},
 		}},

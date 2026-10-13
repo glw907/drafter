@@ -162,7 +162,7 @@ use: |
 ```
 
 A `use` that takes only the correct half of a partly stale fact is intended. File the stale half
-as documentation drift as well. Quote a fact id in YAML when it holds a colon, as in `"f:7oxmh4"`.
+as documentation drift as well. Quote a fact id in YAML when it holds a colon, as in `"f:abc123"`.
 
 An inference that follows from a fact but isn't the fact is a `claim` sentence whose `facts` lists
 what it follows from. A fact whose home is another page is `subordinated` to that page, not
@@ -194,7 +194,7 @@ require that. A token names a state, never an action.
 **Opens and the opening.** A fact that backs a section's `opens` sentence is a `fact` item in that
 section, and its `use` names the opening. A fact that backs the introduction goes in the
 introduction's `facts`. A figure for the introduction sits in the first section. Omit a figure's
-`source` when there is no id, since an empty value is refused.
+`source` when the figure has no source token, since an empty value is refused.
 
 **Claims with no fact.** A claim the page needs but can't back yet goes in `friction`, the list a
 run surfaces to whoever owns the facts. A claim from outside the repository needs a fact. File a

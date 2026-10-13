@@ -341,7 +341,7 @@ func (c *checker) link(line int, target string, own map[string]bool) {
 
 func (c *checker) facts() {
 	if c.opts.FactsDir == "" {
-		if line := c.p.Introduction.Lines["facts"]; line != 0 {
+		if line := c.p.Introduction.Lines["facts"]; len(c.p.Introduction.Facts) > 0 {
 			c.add(line, SeverityWarning, checkFacts,
 				fmt.Sprintf("the facts list at line %d is not checked because no facts directory is set", line),
 				"pass --facts <dir> to check that each fact exists and is citable")
@@ -352,7 +352,7 @@ func (c *checker) facts() {
 				c.add(it.Lines["fact"], SeverityWarning, checkFacts,
 					fmt.Sprintf("the fact item at line %d is not checked because no facts directory is set", it.Lines["fact"]),
 					"pass --facts <dir> to check that the fact exists and is citable")
-			case it.Lines["facts"] != 0:
+			case len(it.Facts) > 0:
 				c.add(it.Lines["facts"], SeverityWarning, checkFacts,
 					fmt.Sprintf("the facts list at line %d is not checked because no facts directory is set", it.Lines["facts"]),
 					"pass --facts <dir> to check that each fact exists and is citable")
