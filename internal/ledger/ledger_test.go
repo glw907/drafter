@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"os"
 	"os/exec"
@@ -37,16 +38,16 @@ func newLedger(t *testing.T) (*Ledger, *clock, string) {
 
 func res(run, page, intent string, requests int, worst float64) Reservation {
 	return Reservation{
-		Entry:    Entry{RunID: run, Repo: "repo", Page: page, Seat: "draft", Model: "plain-s", Mode: "batch"},
+		RunID: run, Repo: "repo", Page: page, Seat: "draft", Model: "plain-s", Mode: "batch",
 		Intent:   intent,
 		Requests: requests,
 		Worst:    worst,
 	}
 }
 
-func settle(run, page, intent, key, kind string, cost float64) Settlement {
+func settle(page, intent, key, kind string, cost float64) Settlement {
 	return Settlement{
-		Entry:  Entry{RunID: run, Repo: "repo", Page: page, Seat: "draft", Model: "plain-s", Mode: "batch"},
+		RunID: "r1", Repo: "repo", Page: page, Seat: "draft", Model: "plain-s", Mode: "batch",
 		Intent: intent,
 		Key:    key,
 		Cost:   cost,
@@ -209,11 +210,11 @@ func TestReserveChild(t *testing.T) {
 	err := l.Reserve(res("r1", "p1", "i"+n, 1, 6), Caps{Page: 10, Cycle: 1000})
 	switch {
 	case err == nil:
-		os.Stdout.WriteString("RESULT ok\n")
+		fmt.Println("RESULT ok")
 	case errors.Is(err, ErrPageCap):
-		os.Stdout.WriteString("RESULT page-cap\n")
+		fmt.Println("RESULT page-cap")
 	default:
-		os.Stdout.WriteString("RESULT error " + err.Error() + "\n")
+		fmt.Println("RESULT error", err)
 	}
 }
 
@@ -265,7 +266,7 @@ func TestTwoProcessesOneLedger(t *testing.T) {
 func TestSettleTwiceAndEmptyKey(t *testing.T) {
 	l, _, dir := newLedger(t)
 	mustReserve(t, l, res("r1", "p1", "i1", 1, 5), wide)
-	s := settle("r1", "p1", "i1", "msg_1", "actual", 3)
+	s := settle("p1", "i1", "msg_1", "actual", 3)
 	mustSettle(t, l, s)
 	mustSettle(t, l, s)
 	if got := len(lines(t, dir)); got != 2 {
@@ -287,11 +288,11 @@ func TestSettlementKinds(t *testing.T) {
 		if got := pageSpend(t, l, "r1", "p1"); got != 8 {
 			t.Fatalf("open PageSpend = %v, want 8", got)
 		}
-		mustSettle(t, l, settle("r1", "p1", "i1", "batch_1/a", "actual", 0))
+		mustSettle(t, l, settle("p1", "i1", "batch_1/a", "actual", 0))
 		if got := pageSpend(t, l, "r1", "p1"); got != 8 {
 			t.Fatalf("after one of two PageSpend = %v, want 8", got)
 		}
-		mustSettle(t, l, settle("r1", "p1", "i1", "batch_1/b", "actual", 0))
+		mustSettle(t, l, settle("p1", "i1", "batch_1/b", "actual", 0))
 		if got := pageSpend(t, l, "r1", "p1"); got != 0 {
 			t.Errorf("closed PageSpend = %v, want 0", got)
 		}
@@ -306,12 +307,12 @@ func TestSettlementKinds(t *testing.T) {
 	t.Run("an intent counts at its worst case until the last request settles", func(t *testing.T) {
 		l, _, _ := newLedger(t)
 		mustReserve(t, l, res("r1", "p1", "i1", 3, 9), wide)
-		mustSettle(t, l, settle("r1", "p1", "i1", "b/a", "actual", 1))
-		mustSettle(t, l, settle("r1", "p1", "i1", "b/b", "actual", 1.5))
+		mustSettle(t, l, settle("p1", "i1", "b/a", "actual", 1))
+		mustSettle(t, l, settle("p1", "i1", "b/b", "actual", 1.5))
 		if got := pageSpend(t, l, "r1", "p1"); got != 9 {
 			t.Errorf("two of three settled: PageSpend = %v, want 9 (worst case)", got)
 		}
-		mustSettle(t, l, settle("r1", "p1", "i1", "b/c", "actual", 0.25))
+		mustSettle(t, l, settle("p1", "i1", "b/c", "actual", 0.25))
 		if got := pageSpend(t, l, "r1", "p1"); got != 2.75 {
 			t.Errorf("all settled: PageSpend = %v, want 2.75 (settled sum)", got)
 		}
@@ -319,7 +320,7 @@ func TestSettlementKinds(t *testing.T) {
 	t.Run("estimated sync settlement is idempotent on resume", func(t *testing.T) {
 		l, _, dir := newLedger(t)
 		mustReserve(t, l, res("r1", "p1", "s1", 1, 3), wide)
-		est := settle("r1", "p1", "s1", "s1/c1", "estimated", 3)
+		est := settle("p1", "s1", "s1/c1", "estimated", 3)
 		mustSettle(t, l, est)
 		mustSettle(t, l, est)
 		if got := len(lines(t, dir)); got != 2 {
@@ -332,7 +333,7 @@ func TestSettlementKinds(t *testing.T) {
 	t.Run("void closes the whole intent at zero", func(t *testing.T) {
 		l, _, _ := newLedger(t)
 		mustReserve(t, l, res("r1", "p1", "v1", 4, 5), wide)
-		mustSettle(t, l, settle("r1", "p1", "v1", "v1/void", "void", 0))
+		mustSettle(t, l, settle("p1", "v1", "v1/void", "void", 0))
 		if got := pageSpend(t, l, "r1", "p1"); got != 0 {
 			t.Errorf("PageSpend = %v, want 0", got)
 		}
@@ -362,7 +363,7 @@ func TestCycleStartAndOpenIntents(t *testing.T) {
 		l, ck, _ := newLedger(t)
 		ck.t = cycleStart.Add(-time.Hour)
 		mustReserve(t, l, res("r1", "a", "ia", 1, 8), wide)
-		mustSettle(t, l, settle("r1", "a", "ia", "m1", "actual", 8))
+		mustSettle(t, l, settle("a", "ia", "m1", "actual", 8))
 		ck.t = t0
 		if err := l.Reserve(res("r1", "b", "ib", 1, 5), caps); err != nil {
 			t.Errorf("old settled spend counted in the new cycle: %v", err)
@@ -372,7 +373,7 @@ func TestCycleStartAndOpenIntents(t *testing.T) {
 		l, ck, _ := newLedger(t)
 		ck.t = cycleStart
 		mustReserve(t, l, res("r1", "a", "ia", 1, 8), wide)
-		mustSettle(t, l, settle("r1", "a", "ia", "m1", "actual", 8))
+		mustSettle(t, l, settle("a", "ia", "m1", "actual", 8))
 		ck.t = t0
 		if err := l.Reserve(res("r1", "b", "ib", 1, 5), caps); !errors.Is(err, ErrCycleCap) {
 			t.Errorf("err = %v, want ErrCycleCap", err)
@@ -487,7 +488,7 @@ func TestUnknownModel(t *testing.T) {
 func TestPageSpendAfterResume(t *testing.T) {
 	l, _, dir := newLedger(t)
 	mustReserve(t, l, res("r1", "p1", "i1", 1, 5), wide)
-	mustSettle(t, l, settle("r1", "p1", "i1", "m1", "actual", 2))
+	mustSettle(t, l, settle("p1", "i1", "m1", "actual", 2))
 	mustReserve(t, l, res("r1", "p1", "i2", 1, 4), wide)
 
 	resumed := Open(dir)
@@ -507,7 +508,7 @@ func TestOpenIntentsByRun(t *testing.T) {
 	mustReserve(t, l, res("r1", "p1", "i1", 2, 5), wide)
 	mustReserve(t, l, res("r1", "p1", "i2", 1, 3), wide)
 	mustReserve(t, l, res("r2", "p1", "i3", 1, 3), wide)
-	mustSettle(t, l, settle("r1", "p1", "i2", "m2", "actual", 1))
+	mustSettle(t, l, settle("p1", "i2", "m2", "actual", 1))
 	got, err := l.OpenIntents("r1")
 	if err != nil {
 		t.Fatal(err)
@@ -568,7 +569,7 @@ func TestFileStates(t *testing.T) {
 		if _, err := f.WriteString(frag); err != nil {
 			t.Fatal(err)
 		}
-		f.Close()
+		_ = f.Close()
 
 		warn := &bytes.Buffer{}
 		l.Warn = warn
@@ -593,7 +594,7 @@ func TestFileStates(t *testing.T) {
 		if got := pageSpend(t, l, "r1", "p1"); got != 5 {
 			t.Errorf("PageSpend after repair = %v, want 5", got)
 		}
-		mustSettle(t, l, settle("r1", "p1", "i2", "m", "actual", 1))
+		mustSettle(t, l, settle("p1", "i2", "m", "actual", 1))
 	})
 	t.Run("a corrupt middle line fails every operation naming the line", func(t *testing.T) {
 		l, _, dir := newLedger(t)
@@ -607,7 +608,7 @@ func TestFileStates(t *testing.T) {
 		}
 		ops := map[string]func() error{
 			"Reserve": func() error { return l.Reserve(res("r1", "p1", "i3", 1, 1), wide) },
-			"Settle":  func() error { return l.Settle(settle("r1", "p1", "i2", "m", "actual", 1)) },
+			"Settle":  func() error { return l.Settle(settle("p1", "i2", "m", "actual", 1)) },
 			"Spend": func() error {
 				_, err := l.Spend(time.Time{}, time.Time{})
 				return err
@@ -642,7 +643,7 @@ func TestLineShape(t *testing.T) {
 	l, ck, dir := newLedger(t)
 	mustReserve(t, l, res("r1", "p1", "i1", 1, 2), wide)
 	ck.t = t0.Add(90 * time.Minute)
-	mustSettle(t, l, settle("r1", "p1", "i1", "m1", "actual", 1))
+	mustSettle(t, l, settle("p1", "i1", "m1", "actual", 1))
 	wantTypes := []string{"reserve", "settle"}
 	wantTimes := []time.Time{t0, t0.Add(90 * time.Minute)}
 	for i, ln := range lines(t, dir) {
@@ -676,13 +677,13 @@ func TestSpendReport(t *testing.T) {
 	}
 	ck.t = t0
 	mustReserve(t, l, other(res("r1", "p1", "i1", 2, 5), "a", "draft"), wide)
-	mustSettle(t, l, otherS(settle("r1", "p1", "i1", "b/x", "actual", 1.5), "a", "draft"))
-	mustSettle(t, l, otherS(settle("r1", "p1", "i1", "b/y", "actual", 0.25), "a", "draft"))
+	mustSettle(t, l, otherS(settle("p1", "i1", "b/x", "actual", 1.5), "a", "draft"))
+	mustSettle(t, l, otherS(settle("p1", "i1", "b/y", "actual", 0.25), "a", "draft"))
 	ck.t = t0.Add(time.Hour)
 	mustReserve(t, l, other(res("r1", "p2", "i2", 1, 3), "a", "edit"), wide)
-	mustSettle(t, l, otherS(settle("r1", "p2", "i2", "i2/c1", "estimated", 3), "a", "edit"))
+	mustSettle(t, l, otherS(settle("p2", "i2", "i2/c1", "estimated", 3), "a", "edit"))
 	mustReserve(t, l, other(res("r1", "p3", "i3", 1, 2), "b", "draft"), wide)
-	mustSettle(t, l, otherS(settle("r1", "p3", "i3", "m3", "actual", 2), "b", "draft"))
+	mustSettle(t, l, otherS(settle("p3", "i3", "m3", "actual", 2), "b", "draft"))
 	mustReserve(t, l, other(res("r1", "p4", "i4", 2, 7), "b", "draft"), wide) // open
 
 	rep, err := l.Spend(time.Time{}, time.Time{})

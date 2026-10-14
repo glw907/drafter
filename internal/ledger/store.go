@@ -1,0 +1,257 @@
+package ledger
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"syscall"
+	"time"
+
+	"github.com/glw907/drafter/internal/batch"
+)
+
+const (
+	version     = 1
+	typeReserve = "reserve"
+	typeSettle  = "settle"
+	typeTorn    = "torn"
+)
+
+// line is one ledger line. Readers ignore fields they do not know.
+type line struct {
+	V    int       `json:"v"`
+	Type string    `json:"type"`
+	Time time.Time `json:"time"`
+	Entry
+	Intent   string       `json:"intent,omitempty"`
+	Requests int          `json:"requests,omitempty"`
+	Worst    float64      `json:"worst,omitempty"`
+	Key      string       `json:"key,omitempty"`
+	Usage    *batch.Usage `json:"usage,omitempty"`
+	Cost     float64      `json:"cost,omitempty"`
+	Kind     string       `json:"kind,omitempty"`
+}
+
+type settleRec struct {
+	time time.Time
+	cost float64
+}
+
+// intent is what the ledger holds about one submission unit.
+type intent struct {
+	res      Reservation
+	reserved bool
+	entry    Entry
+	settles  []settleRec
+	count    int // settle lines other than void
+	void     bool
+}
+
+func (it *intent) open() bool {
+	return it.reserved && !it.void && it.count < it.res.Requests
+}
+
+// settled is the sum of the intent's settle lines at or after from.
+func (it *intent) settled(from time.Time) float64 {
+	var sum float64
+	for _, s := range it.settles {
+		if !s.time.Before(from) {
+			sum += s.cost
+		}
+	}
+	return sum
+}
+
+type state struct {
+	intents map[string]*intent
+	order   []string
+	keys    map[string]bool
+	settles []line
+	torn    bool // the file ends in a fragment with no newline
+}
+
+// pageTotal is the page's settled spend plus its open intents at their worst case.
+func (s *state) pageTotal(runID, page string) float64 {
+	var sum float64
+	for _, id := range s.order {
+		it := s.intents[id]
+		if it.entry.RunID != runID || it.entry.Page != page {
+			continue
+		}
+		if it.open() {
+			sum += it.res.Worst
+		} else {
+			sum += it.settled(time.Time{})
+		}
+	}
+	return sum
+}
+
+// cycleTotal is the settled spend dated at or after start plus every open intent, whenever it
+// was reserved.
+func (s *state) cycleTotal(start time.Time) float64 {
+	var sum float64
+	for _, id := range s.order {
+		it := s.intents[id]
+		if it.open() {
+			sum += it.res.Worst
+		} else {
+			sum += it.settled(start)
+		}
+	}
+	return sum
+}
+
+func (l *Ledger) path() string     { return filepath.Join(l.dir, "ledger.jsonl") }
+func (l *Ledger) lockPath() string { return filepath.Join(l.dir, "ledger.lock") }
+
+func (l *Ledger) warn(format string, a ...any) {
+	w := l.Warn
+	if w == nil {
+		w = os.Stderr
+	}
+	_, _ = fmt.Fprintf(w, format+"\n", a...)
+}
+
+// lock takes the blocking exclusive lock, creating the state directory and lock file on first
+// use, and returns the function that releases it.
+func (l *Ledger) lock() (func(), error) {
+	if err := os.MkdirAll(l.dir, 0o700); err != nil {
+		return nil, fmt.Errorf("create state directory: %w", err)
+	}
+	f, err := os.OpenFile(l.lockPath(), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("open ledger lock: %w", err)
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		_ = f.Close()
+		return nil, fmt.Errorf("lock %s: %w", l.lockPath(), err)
+	}
+	return func() { _ = f.Close() }, nil
+}
+
+// read parses the whole ledger. An absent file reads as empty. A final line with no newline is a
+// torn write: it is skipped with a warning. Any other line that does not parse is an error,
+// except a fragment that a later append already closed off, which a torn marker line follows.
+func (l *Ledger) read() (*state, error) {
+	st := &state{intents: map[string]*intent{}, keys: map[string]bool{}}
+	data, err := os.ReadFile(l.path())
+	if errors.Is(err, fs.ErrNotExist) {
+		return st, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read ledger: %w", err)
+	}
+	var tail []byte
+	if i := bytes.LastIndexByte(data, '\n'); i < 0 {
+		data, tail = nil, data
+	} else if i < len(data)-1 {
+		data, tail = data[:i+1], data[i+1:]
+	}
+	var raw [][]byte
+	if len(data) > 0 {
+		raw = bytes.Split(bytes.TrimSuffix(data, []byte("\n")), []byte("\n"))
+	}
+	parsed := make([]*line, len(raw))
+	bad := make([]error, len(raw))
+	for i, b := range raw {
+		parsed[i], bad[i] = parseLine(b)
+	}
+	for i, p := range parsed {
+		if bad[i] != nil {
+			if i+1 < len(parsed) && parsed[i+1] != nil && parsed[i+1].Type == typeTorn {
+				l.warn("ledger %s line %d: skipping torn line", l.path(), i+1)
+				continue
+			}
+			return nil, fmt.Errorf("ledger %s line %d: %w", l.path(), i+1, bad[i])
+		}
+		st.add(p)
+	}
+	if len(tail) > 0 {
+		st.torn = true
+		l.warn("ledger %s line %d: skipping torn final line", l.path(), len(raw)+1)
+	}
+	return st, nil
+}
+
+func parseLine(b []byte) (*line, error) {
+	var ln line
+	if err := json.Unmarshal(b, &ln); err != nil {
+		return nil, err
+	}
+	if ln.V != version {
+		return nil, fmt.Errorf("unsupported line version %d", ln.V)
+	}
+	if ln.Type == "" {
+		return nil, errors.New("line has no type")
+	}
+	return &ln, nil
+}
+
+func (st *state) get(id string, e Entry) *intent {
+	it, ok := st.intents[id]
+	if !ok {
+		it = &intent{entry: e}
+		st.intents[id] = it
+		st.order = append(st.order, id)
+	}
+	return it
+}
+
+func (st *state) add(ln *line) {
+	switch ln.Type {
+	case typeReserve:
+		it := st.get(ln.Intent, ln.Entry)
+		it.reserved = true
+		it.entry = ln.Entry
+		it.res = Reservation{Entry: ln.Entry, Intent: ln.Intent, Requests: ln.Requests, Worst: ln.Worst}
+	case typeSettle:
+		it := st.get(ln.Intent, ln.Entry)
+		it.settles = append(it.settles, settleRec{ln.Time, ln.Cost})
+		if ln.Kind == "void" {
+			it.void = true
+		} else {
+			it.count++
+		}
+		st.keys[ln.Key] = true
+		st.settles = append(st.settles, *ln)
+	}
+}
+
+// append writes the lines as one write on an O_APPEND descriptor and syncs. After a torn tail it
+// first closes the fragment with a newline and a torn marker, so the fragment is a line of its
+// own that readers can tell from corruption.
+func (l *Ledger) append(st *state, lns ...line) error {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	if st.torn {
+		buf.WriteByte('\n')
+		if err := enc.Encode(line{V: version, Type: typeTorn, Time: l.stamp()}); err != nil {
+			return err
+		}
+	}
+	for _, ln := range lns {
+		if err := enc.Encode(ln); err != nil {
+			return err
+		}
+	}
+	f, err := os.OpenFile(l.path(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return fmt.Errorf("open ledger: %w", err)
+	}
+	if _, err := f.Write(buf.Bytes()); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("append to ledger: %w", err)
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("sync ledger: %w", err)
+	}
+	return f.Close()
+}
+
+func (l *Ledger) stamp() time.Time { return l.Now().UTC() }
