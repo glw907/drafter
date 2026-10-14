@@ -1,0 +1,28 @@
+wrote /work/project/dist/admin/styles.css (1024 bytes)
+== check:docs ==
+docs-links: 1 broken link(s) across 555 files
+
+  docs/guides/other-page.md
+    :294  ./no-such-page-here.md  -- target not found: ./no-such-page-here.md
+== check:vale ==
+✔ 0 errors, 0 warnings and 0 suggestions in 1 file.
+== check:facts ==
+check-facts: OK
+  one.md: 10 facts (verified 9, rejected 1)
+  two.md: 20 facts (verified 20)
+== check:provenance ==
+check-provenance: OK
+  docs/briefs/guides/widget-setup.json: 20 sentences (cited 15, no-claim 5)
+== check:leaks ==
+docs/guides/other-page.md:12: warning [T1 C3] draft jargon: "drafted"
+docs/guides/notes.md:40: warning [T1 C3] draft jargon: "drafted"
+README.md: 12 warning(s) in released sections (run with --warnings to list)
+check:leaks: OK (40 file(s), 14 warning(s))
+== check:snippets ==
+check:snippets: 3 opted-out block(s):
+  docs/guides/other-page.md:135  continues src/job.ts from "Write the job"
+  docs/guides/widget-setup.md:92  imports a runtime module the site's own types declare
+  docs/guides/widget-setup.md:161  reads Env, which only the site's generated types declare
+== check:tellgrader ==
+check:tellgrader: OK (1 page(s))
+check:docs-gate: 1 check(s) failed: check:docs
