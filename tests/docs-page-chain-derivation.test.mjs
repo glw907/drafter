@@ -3,16 +3,27 @@
 // dependencies beyond the Node runtime: this repo has no package.json or test runner to plug
 // into. Run with: node tests/docs-page-chain-derivation.test.mjs
 // Exits 0 with "ALL PASS" on success; prints failures and exits 1 otherwise.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import assert from "node:assert/strict";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RUNNER_PATH = join(HERE, "..", "claude", ".claude", "workflows", "docs-page-chain.js");
-const DRAFTER_PATH = join(HERE, "..", "claude", ".claude", "agents", "cairn-docs-drafter.md");
+// The agent definitions live in the workstation repo; WORKSTATION_DIR names its checkout. A missing
+// file fails the run, so the guards below never pass by skipping.
+const WORKSTATION_DIR = process.env.WORKSTATION_DIR || join(homedir(), "Projects", "workstation");
+function agentSource(name) {
+  const path = join(WORKSTATION_DIR, "claude", ".claude", "agents", `${name}.md`);
+  if (!existsSync(path)) {
+    console.error(`${path} not found; set WORKSTATION_DIR to a workstation checkout`);
+    process.exit(1);
+  }
+  return readFileSync(path, "utf8");
+}
 const RUNNER_SRC = readFileSync(RUNNER_PATH, "utf8");
-const DRAFTER_SRC = readFileSync(DRAFTER_PATH, "utf8");
+const DRAFTER_SRC = agentSource("cairn-docs-drafter");
 
 const START = "// === CROSS-REGRESSION DERIVATION (docs-page-chain-derivation.test.mjs extracts this block) ===";
 const END = "// === END CROSS-REGRESSION DERIVATION ===";
@@ -301,7 +312,7 @@ check("the draft prompt carries the brief's local field, owned by the drafter", 
 });
 
 check("the register editor definition carries S1 verbatim", () => {
-  const editor = readFileSync(join(HERE, "..", "claude", ".claude", "agents", "cairn-register-editor.md"), "utf8");
+  const editor = agentSource("cairn-register-editor");
   assert.ok(editor.replace(/\s+/g, " ").includes(S1));
 });
 
