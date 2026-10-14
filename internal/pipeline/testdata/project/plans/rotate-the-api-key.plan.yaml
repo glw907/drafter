@@ -1,0 +1,82 @@
+version: 1
+page:
+  path: docs/guides/rotate-the-api-key.md
+  title: Rotate the API key
+  type: task-guide
+argument: |
+  Rotate a Lumen API key by publishing the new key before you retire the old one.
+introduction:
+  covers: |
+    How to rotate an API key without interrupting publishing.
+  priorKnowledge: |
+    You can publish a site with Lumen.
+  notCovered: |
+    Revoking a key after the grace period.
+orderReason: |
+  The new key must be live before the old key retires, so creation comes first.
+preconditions:
+  - key-exists
+sections:
+  - heading: Before you begin
+    opens: |
+      You need a workspace key and publish access.
+    items:
+      - id: f-ttl
+        kind: fact
+        fact: lumen-key-ttl
+      - id: l-lifetime
+        kind: link
+        target: ../reference/keys.md#key-lifetime
+      - id: l-revoke
+        kind: link
+        target: revoke-a-key.md
+  - heading: Rotate the key
+    opens: |
+      Create the new key, publish with it, then confirm which key signed the build.
+    items:
+      - id: s-create
+        kind: step
+        text: |
+          Create a new key.
+        requires: [key-exists]
+        produces: [new-key]
+      - id: s-publish
+        kind: step
+        text: |
+          Publish the site with the new key.
+        requires: [new-key]
+        produces: [published]
+        canFail: true
+      - id: s-verify
+        kind: step
+        text: |
+          Check which key signed the build.
+        requires: [published]
+        produces: [verified]
+        canFail: true
+      - id: x-publish
+        kind: failure
+        from: s-publish
+        symptom: |
+          The publish fails while the health check still passes.
+        handledBy: r-publish
+      - id: r-publish
+        kind: reason
+        text: |
+          A passing health check shows only that the service is up, so read the publish log.
+      - id: x-verify
+        kind: failure
+        from: s-verify
+        symptom: |
+          The build log shows a key ID, and you cannot tell the old key from the new one.
+        handledBy: r-verify
+      - id: r-verify
+        kind: reason
+        text: |
+          The new key's ID is the one the create step printed.
+dispositions:
+  - fact: lumen-grace
+    disposition: subordinated
+    reference: ../reference/keys.md#grace-period
+    reason: |
+      The reference page owns the grace period.

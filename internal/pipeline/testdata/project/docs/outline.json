@@ -1,0 +1,7 @@
+{
+  "pages": [
+    { "path": "docs/guides/rotate-the-api-key.md" },
+    { "path": "docs/guides/revoke-a-key.md" },
+    { "path": "docs/reference/keys.md" }
+  ]
+}

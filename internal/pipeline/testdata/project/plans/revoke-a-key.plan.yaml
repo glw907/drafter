@@ -1,0 +1,29 @@
+version: 1
+page:
+  path: docs/guides/revoke-a-key.md
+  title: Revoke a key
+  type: task-guide
+argument: |
+  Revoke a Lumen API key after its grace period ends.
+introduction:
+  covers: |
+    How to revoke a key once its replacement is live.
+  priorKnowledge: |
+    You have rotated the key.
+  notCovered: |
+    Creating a key.
+orderReason: |
+  Revoking is one action, so the page has one section.
+preconditions:
+  - rotated
+sections:
+  - heading: Revoke the key
+    opens: |
+      Revoke the old key after the grace period.
+    items:
+      - id: s-revoke
+        kind: step
+        text: |
+          Revoke the old key.
+        requires: [rotated]
+        produces: [revoked]
