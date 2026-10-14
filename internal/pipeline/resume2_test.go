@@ -3,6 +3,7 @@ package pipeline
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -211,17 +212,41 @@ func TestResumeRefusesAnIDThatIsNotARunID(t *testing.T) {
 }
 
 func TestResumeTakesTheLocksBeforeReadingState(t *testing.T) {
-	h := newHarness(t, withoutFacts, withPages("b"))
-	stopAfterDraft(h)
-	id := mustStop(t, h, StopCycleCap)
-	raiseCeiling(h)
-	l, err := run.TryLock(filepath.Join(h.runDir(id), "run.lock"))
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name string
+		lock func(t *testing.T, h *harness, id string) string
+	}{
+		{"the run lock", func(t *testing.T, h *harness, id string) string {
+			return filepath.Join(h.runDir(id), "run.lock")
+		}},
+		{"the worktree lock", func(t *testing.T, h *harness, id string) string {
+			out, err := exec.Command("git", "-C", h.root, "rev-parse", "--absolute-git-dir").Output()
+			if err != nil {
+				t.Fatal(err)
+			}
+			return filepath.Join(strings.TrimSpace(string(out)), "drafter.lock")
+		}},
 	}
-	defer func() { _ = l.Release() }()
-	_, err = h.resume(id)
-	if err == nil || !strings.Contains(err.Error(), "held by pid") {
-		t.Errorf("error = %v, want a refusal naming the holder of the run lock", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t, withoutFacts, withPages("b"))
+			stopAfterDraft(h)
+			id := mustStop(t, h, StopCycleCap)
+			raiseCeiling(h)
+			// A state file nobody can parse makes a resume that reads it first fail with a
+			// parse error, so only a resume that takes the lock first names the holder.
+			if err := os.WriteFile(filepath.Join(h.runDir(id), "state.json"), []byte("{"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			l, err := run.TryLock(tt.lock(t, h, id))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = l.Release() }()
+			_, err = h.resume(id)
+			if err == nil || !strings.Contains(err.Error(), "held by pid") {
+				t.Errorf("error = %v, want a refusal naming the holder of %s", err, tt.name)
+			}
+		})
 	}
 }
