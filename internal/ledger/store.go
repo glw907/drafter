@@ -210,6 +210,11 @@ func (st *state) add(ln *line) {
 		it.entry = ln.Entry
 		it.res = Reservation{Entry: ln.Entry, Intent: ln.Intent, Requests: ln.Requests, Worst: ln.Worst}
 	case typeSettle:
+		// A crash can leave a settle line complete but unterminated; the retry then appends the
+		// same key again. The first line wins.
+		if st.keys[ln.Key] {
+			return
+		}
 		it := st.get(ln.Intent, ln.Entry)
 		it.settles = append(it.settles, settleRec{ln.Time, ln.Cost})
 		if ln.Kind == "void" {
