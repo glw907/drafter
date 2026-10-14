@@ -1,0 +1,321 @@
+// Extracts and tests docs-page-chain.js's pure cross-regression derivation function, plus a few
+// static guards against the profile/grader/v2 machinery the docs reset pass 1 spec retired. No
+// dependencies beyond the Node runtime: this repo has no package.json or test runner to plug
+// into. Run with: node tests/docs-page-chain-derivation.test.mjs
+// Exits 0 with "ALL PASS" on success; prints failures and exits 1 otherwise.
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import assert from "node:assert/strict";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const RUNNER_PATH = join(HERE, "..", "claude", ".claude", "workflows", "docs-page-chain.js");
+const DRAFTER_PATH = join(HERE, "..", "claude", ".claude", "agents", "cairn-docs-drafter.md");
+const RUNNER_SRC = readFileSync(RUNNER_PATH, "utf8");
+const DRAFTER_SRC = readFileSync(DRAFTER_PATH, "utf8");
+
+const START = "// === CROSS-REGRESSION DERIVATION (docs-page-chain-derivation.test.mjs extracts this block) ===";
+const END = "// === END CROSS-REGRESSION DERIVATION ===";
+
+const failures = [];
+function check(name, fn) {
+  try {
+    fn();
+    console.log(`ok - ${name}`);
+  } catch (e) {
+    failures.push(name);
+    console.log(`FAIL - ${name}`);
+    console.log(`  ${(e && e.stack) || e}`);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Extract the pure derivation function from between its named markers. A missing or reordered
+// marker fails this check directly, rather than letting a later check fail on an undefined
+// function with a confusing message.
+// ---------------------------------------------------------------------------------------------
+
+const startAt = RUNNER_SRC.indexOf(START);
+const endAt = RUNNER_SRC.indexOf(END);
+
+check("the derivation markers are both present, in order", () => {
+  assert.notEqual(startAt, -1, "start marker missing");
+  assert.notEqual(endAt, -1, "end marker missing");
+  assert.ok(startAt < endAt, "markers out of order");
+});
+
+let deriveCrossRegression = () => {
+  throw new Error("derivation markers missing; function was not extracted");
+};
+if (startAt !== -1 && endAt !== -1) {
+  const block = RUNNER_SRC.slice(startAt, endAt);
+  // eslint-disable-next-line no-new-func -- extracting a pure function from a script the
+  // workflow runtime cannot import (it has a top-level `return`) is the documented pattern.
+  deriveCrossRegression = new Function(`${block}\nreturn deriveCrossRegression;`)();
+}
+
+/**
+ * Builds a two-reviewer `reads` array for a synthetic round record.
+ * @param {"accept"|"fix"} editorVerdict
+ * @param {"accept"|"fix"} factVerdict
+ * @returns {Array<{ read: string, verdict: string }>}
+ */
+function tworeads(editorVerdict, factVerdict) {
+  return [
+    { read: "register editor", verdict: editorVerdict },
+    { read: "fact read", verdict: factVerdict }
+  ];
+}
+
+// ---------------------------------------------------------------------------------------------
+// The four synthetic round records the acceptance criteria name, each with its expected output.
+// ---------------------------------------------------------------------------------------------
+
+check("both accept in round 1: no round 2, flag absent", () => {
+  const record = { rounds: [{ round: 1, reads: tworeads("accept", "accept") }] };
+  assert.equal(deriveCrossRegression(record, false), undefined);
+  assert.equal(deriveCrossRegression(record, true), undefined);
+});
+
+check("one fix, both re-read, the other flips to fix: flag set true, page qualifies", () => {
+  const record = {
+    rounds: [
+      { round: 1, reads: tworeads("fix", "accept") },
+      { round: 2, reads: tworeads("accept", "fix") }
+    ]
+  };
+  assert.equal(deriveCrossRegression(record, true), true);
+});
+
+check("the same shape in lean mode: not measured, never false", () => {
+  const record = {
+    rounds: [
+      { round: 1, reads: tworeads("fix", "accept") },
+      // Lean mode: only the reviewer that returned fix (register editor) re-reads.
+      { round: 2, reads: [{ read: "register editor", verdict: "accept" }] }
+    ]
+  };
+  assert.equal(deriveCrossRegression(record, false), "not-measured");
+});
+
+check("a second fix from a re-reader: escalation, still not measured in lean mode", () => {
+  const record = {
+    rounds: [
+      { round: 1, reads: tworeads("fix", "accept") },
+      { round: 2, reads: [{ read: "register editor", verdict: "fix" }] }
+    ]
+  };
+  assert.equal(deriveCrossRegression(record, false), "not-measured");
+});
+
+check("both reviewers re-read and neither regresses: flag set false", () => {
+  const record = {
+    rounds: [
+      { round: 1, reads: tworeads("fix", "accept") },
+      { round: 2, reads: tworeads("accept", "accept") }
+    ]
+  };
+  assert.equal(deriveCrossRegression(record, true), false);
+});
+
+// ---------------------------------------------------------------------------------------------
+// The register sections each track reads, named by exact heading. The block is extracted from the
+// runner the same way as the derivation above.
+// ---------------------------------------------------------------------------------------------
+
+const SECTIONS_START = "// === REGISTER SECTIONS (docs-page-chain-derivation.test.mjs extracts this block) ===";
+const SECTIONS_END = "// === END REGISTER SECTIONS ===";
+const sectionsStartAt = RUNNER_SRC.indexOf(SECTIONS_START);
+const sectionsEndAt = RUNNER_SRC.indexOf(SECTIONS_END);
+
+check("the register-sections markers are both present, in order", () => {
+  assert.notEqual(sectionsStartAt, -1, "start marker missing");
+  assert.notEqual(sectionsEndAt, -1, "end marker missing");
+  assert.ok(sectionsStartAt < sectionsEndAt, "markers out of order");
+});
+
+let registerSectionsFor = () => {
+  throw new Error("register-sections markers missing; function was not extracted");
+};
+if (sectionsStartAt !== -1 && sectionsEndAt !== -1) {
+  const block = RUNNER_SRC.slice(sectionsStartAt, sectionsEndAt);
+  // eslint-disable-next-line no-new-func -- same extraction pattern as the derivation above.
+  registerSectionsFor = new Function(`${block}\nreturn registerSectionsFor;`)();
+}
+
+const COMMON_HEADINGS = [
+  "## Names",
+  "## Visuals (every page that carries one)",
+  "## The page anatomies"
+];
+const DEV_BRIEF = "## Drafting brief: developer docs";
+const EDITOR_BRIEF = "## Drafting brief: editor docs";
+const TRACK_HEADING = {
+  editors: "### The editor track (`docs/editors/`)",
+  admin: "### The admin track (`docs/admin/`)",
+  extend: "### The extend track (`docs/extend/`)",
+  reference: "## The reference (`docs/reference/`), a shared instrument",
+  "front-door": "## The front door (`docs/README.md`, `docs/why-cairn.md`, and the root `README.md`)",
+  readme: "## The front door (`docs/README.md`, `docs/why-cairn.md`, and the root `README.md`)"
+};
+
+for (const [track, trackHeading] of Object.entries(TRACK_HEADING)) {
+  check(`track ${track}: the drafter reads its brief, Names, Visuals, anatomies, and its own section`, () => {
+    const brief = track === "editors" ? EDITOR_BRIEF : DEV_BRIEF;
+    assert.deepEqual(registerSectionsFor(track, "drafter"), [brief, ...COMMON_HEADINGS, trackHeading]);
+  });
+}
+
+check("the editor reads the same sections plus the deviations, on every track", () => {
+  for (const [track, trackHeading] of Object.entries(TRACK_HEADING)) {
+    const brief = track === "editors" ? EDITOR_BRIEF : DEV_BRIEF;
+    const expected = [brief, ...COMMON_HEADINGS, trackHeading, "## Deviations from the base guides"];
+    assert.deepEqual(registerSectionsFor(track, "editor"), expected, track);
+  }
+});
+
+check("the drafter never reads the deviations, including on a non-editors track", () => {
+  assert.ok(!registerSectionsFor("extend", "drafter").includes("## Deviations from the base guides"));
+});
+
+check("an unknown track throws", () => {
+  assert.throws(() => registerSectionsFor("nonsense", "drafter"), /unknown track/);
+  assert.throws(() => registerSectionsFor(undefined, "editor"), /unknown track/);
+});
+
+// ---------------------------------------------------------------------------------------------
+// The prompts carry no dispatch-side extraction, layering, or provenance machinery.
+// ---------------------------------------------------------------------------------------------
+
+check("no extraction script, q: id, guide source, or universal-contract reference remains", () => {
+  for (const src of [RUNNER_SRC, DRAFTER_SRC]) {
+    assert.doesNotMatch(src, /docs-chain-render/);
+    assert.doesNotMatch(src, /\bq:[a-z0-9]/);
+    assert.doesNotMatch(src, /source: guide/);
+    assert.doesNotMatch(src, /universal\s+contract/);
+  }
+});
+
+check("the drafter reads exemplar sources whole; page inputs no longer trims excerpts", () => {
+  assert.doesNotMatch(RUNNER_SRC, /exemplarExcerpts/);
+  assert.match(RUNNER_SRC, /read each in full/);
+});
+
+check("the editor runs plain vale and grades checklist, tells, and alerts together", () => {
+  assert.match(RUNNER_SRC, /vale \$\{p\.path\}/);
+  assert.match(RUNNER_SRC, /never the docs gate/);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Static guards for the removed profile/grader/v2 machinery: the acceptance's grep bullet, made
+// a durable regression instead of a one-time manual check.
+// ---------------------------------------------------------------------------------------------
+
+check("the runner takes no profile arg", () => {
+  assert.doesNotMatch(RUNNER_SRC, /a\.profile\b/);
+  assert.doesNotMatch(RUNNER_SRC, /args\.profile\b/);
+});
+
+check("the runner has no grader stage or Profile prompt section", () => {
+  assert.doesNotMatch(RUNNER_SRC, /graderPrompt/);
+  assert.doesNotMatch(RUNNER_SRC, /GRADER_SCHEMA/);
+  assert.doesNotMatch(RUNNER_SRC, /"Profile"/);
+});
+
+check("the runner names no v2 chain", () => {
+  assert.doesNotMatch(RUNNER_SRC, /docs-page-chain-v2/);
+});
+
+check("the drafter definition names no grader or v2 chain, and runs its own gate", () => {
+  assert.doesNotMatch(DRAFTER_SRC, /grader/i);
+  assert.doesNotMatch(DRAFTER_SRC, /v2/);
+  assert.doesNotMatch(DRAFTER_SRC, /Do not run the page gate/);
+  assert.doesNotMatch(DRAFTER_SRC, /\[candidate\]/);
+});
+
+check("the drafter definition keeps the anatomy's sentences from the removal rule and records them no-claim only without a fact", () => {
+  const flat = DRAFTER_SRC.replace(/\s+/g, " ");
+  assert.match(flat, /The introduction, the section hand-off lead-ins, and the ending the register's page anatomies require are not cut under this rule\./);
+  assert.match(flat, /`no-claim` only when it carries no extractable fact/);
+  assert.ok(flat.includes("a no-claim sentence cites nothing, so any extractable fact in it fails"));
+});
+
+check("the per-page record carries its brief and plan paths from the start, on every return path", () => {
+  assert.match(RUNNER_SRC, /const record = \{ id: p\.id, path: p\.path, brief: briefPathFor\(p\), plan: planPathFor\(p\), rounds: \[\] \};/);
+});
+
+check("the drafter definition keeps a sentence carrying a section's claim from the plan, and drafts from the plan", () => {
+  const flat = DRAFTER_SRC.replace(/\s+/g, " ");
+  assert.match(flat, /A sentence that carries a section's claim from the plan is not cut under this rule either\./);
+  assert.match(flat, /the source of the page's order, each section's claim, and each fact's placement/);
+});
+
+check("the drafter definition's brief shape takes a multi-id sentence and a cuts list", () => {
+  assert.match(DRAFTER_SRC, /"id": \["<fact id>", "<fact id>"\]/);
+  assert.match(DRAFTER_SRC, /"cuts": \[/);
+  assert.match(DRAFTER_SRC, /\{ "id": "<fact id>", "reason": "<the plan's reason, verbatim>" \}/);
+});
+
+const S1 = "The 26-word cap counts each sentence on its own and applies only to a step, a list item, or a sentence in a task section; an introduction or explanation sentence is exempt.";
+const S2 = "Section hand-offs belong to the page plan: a hand-off the plan places is not a tell, and a read of the page grades its wording, never whether it is there or where it sits.";
+
+/** The source of one top-level function in the runner, up to the next top-level declaration. */
+function fnSource(name) {
+  const at = RUNNER_SRC.indexOf(`function ${name}(`);
+  assert.notEqual(at, -1, `${name} missing`);
+  const next = RUNNER_SRC.slice(at + 1).search(/\n(?:function |const |\/\*\*)/);
+  return RUNNER_SRC.slice(at, next === -1 ? undefined : at + 1 + next);
+}
+
+check("the cap-scope and hand-off-owner constants equal the register's two sentences", () => {
+  assert.ok(RUNNER_SRC.includes(`const CAP_SCOPE = ${JSON.stringify(S1)};`));
+  assert.ok(RUNNER_SRC.includes(`const HANDOFF_OWNER = ${JSON.stringify(S2)};`));
+});
+
+check("the plan, structural, and register-seat prompts interpolate both constants", () => {
+  for (const name of ["planPrompt", "structurePrompt", "editorPrompt"]) {
+    const src = fnSource(name);
+    assert.ok(src.includes("${CAP_SCOPE}"), `${name} lacks CAP_SCOPE`);
+    assert.ok(src.includes("${HANDOFF_OWNER}"), `${name} lacks HANDOFF_OWNER`);
+  }
+});
+
+check("the register seat's prompt says S1 governs over the definition's cap line", () => {
+  assert.ok(fnSource("editorPrompt").includes("S1 governs over your definition's cap line"));
+});
+
+check("the scoped-read note carries the cap's scope", () => {
+  assert.ok(fnSource("scopeNote").includes("${CAP_SCOPE}"));
+});
+
+check("the plan prompt runs the provenance extractor on the no-claim sentences", () => {
+  const src = fnSource("planPrompt");
+  assert.ok(src.includes("check-provenance.mjs --extract"));
+  assert.ok(src.includes(".no-claim.txt"));
+});
+
+check("the draft prompt carries the brief's local field, owned by the drafter", () => {
+  const src = fnSource("draftPrompt");
+  assert.ok(src.includes('"local": ['));
+  assert.ok(src.includes("one writer"));
+});
+
+check("the register editor definition carries S1 verbatim", () => {
+  const editor = readFileSync(join(HERE, "..", "claude", ".claude", "agents", "cairn-register-editor.md"), "utf8");
+  assert.ok(editor.replace(/\s+/g, " ").includes(S1));
+});
+
+check("a missing fact is a couldNotDo, not a friction-log entry", () => {
+  assert.match(RUNNER_SRC, /couldNotDo naming the missing fact/);
+});
+
+check("the tool gate defaults to make -C <worktree>/tool check", () => {
+  assert.match(RUNNER_SRC, /a\.toolGate \|\| `make -C \$\{WT\}\/tool check`/);
+});
+
+console.log("");
+if (failures.length) {
+  console.log(`${failures.length} FAILING: ${failures.join(", ")}`);
+  process.exit(1);
+}
+console.log("ALL PASS");
