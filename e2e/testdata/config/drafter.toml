@@ -1,0 +1,10 @@
+prompts = "prompts/index.js"
+seats = ["draft"]
+
+[gate]
+command = "make check"
+
+[seat.draft]
+model = "model-a"
+effort = "high"
+max_tokens = 4000
