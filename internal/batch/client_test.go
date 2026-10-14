@@ -620,3 +620,24 @@ func TestErrorText(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildErrorsNameRequest(t *testing.T) {
+	tests := []struct {
+		name string
+		r    Request
+	}{
+		{"bad role", Request{CustomID: "p1-a", Messages: []Message{{Role: "system", Text: "x"}}}},
+		{"bad schema", Request{CustomID: "p1-a", Schema: []byte(`[1]`)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := buildWire(tt.r)
+			if err == nil {
+				t.Fatal("buildWire returned no error")
+			}
+			if !strings.Contains(err.Error(), `"p1-a"`) {
+				t.Errorf("error %q does not name the request", err)
+			}
+		})
+	}
+}

@@ -170,8 +170,8 @@ func newClient(t *testing.T, a *api, mut func(*Options)) (*Client, *fakeClock) {
 	}
 	clk := &fakeClock{now: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
 	c := New(o)
-	c.Sleep = clk.Sleep
-	c.Now = clk.Now
+	c.sleep = clk.Sleep
+	c.now = clk.Now
 	return c, clk
 }
 
