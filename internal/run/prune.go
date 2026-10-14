@@ -1,7 +1,9 @@
 package run
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -14,7 +16,7 @@ import (
 // or of another schema, is kept. Prune never touches the ledger files.
 func Prune(stateDir string, retentionDays int, now time.Time) ([]string, error) {
 	repos, err := os.ReadDir(filepath.Join(stateDir, "runs"))
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
@@ -55,7 +57,7 @@ func finished(s *State) bool {
 		return false
 	}
 	for _, p := range s.Pages {
-		if p.Status != "accepted" && p.Status != "escalated" {
+		if p == nil || (p.Status != "accepted" && p.Status != "escalated") {
 			return false
 		}
 	}

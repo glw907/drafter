@@ -159,6 +159,7 @@ func TestPrune(t *testing.T) {
 		{"no state", old, nil, "", false},
 		{"malformed state", old, nil, "{nope", false},
 		{"other schema", old, nil, `{"schema": 9}`, false},
+		{"null page", old, nil, `{"schema": 1, "pages": {"a": null}}`, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
