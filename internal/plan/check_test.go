@@ -157,6 +157,9 @@ func TestCheckLinks(t *testing.T) {
 		}},
 		{"same-page anchor on a section heading", target, `"#create-the-new-key"`, nil, nil},
 		{"same-page anchor on the title", target, `"#rotate-the-signing-key"`, nil, nil},
+		{"a bare # names nothing", target, `"#"`, nil, []want{
+			{30, SeverityError, "links", `target "#" names neither an anchor nor a path`},
+		}},
 		{"same-page anchor with no heading", target, `"#nope"`, nil, []want{
 			{30, SeverityError, "links", "anchor #nope matches no heading on this page"},
 		}},

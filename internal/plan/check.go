@@ -288,7 +288,12 @@ func (c *checker) link(line int, target string, own map[string]bool) {
 	}
 	file, anchor, _ := strings.Cut(target, "#")
 	if file == "" {
-		if anchor != "" && !own[anchor] {
+		if anchor == "" {
+			c.add(line, SeverityError, checkLinks,
+				fmt.Sprintf("target %q names neither an anchor nor a path", target), "name an anchor or a path")
+			return
+		}
+		if !own[anchor] {
 			c.add(line, SeverityError, checkLinks,
 				fmt.Sprintf("anchor #%s matches no heading on this page", anchor),
 				"use the slug of the page title or of a section heading")

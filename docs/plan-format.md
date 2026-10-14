@@ -324,6 +324,8 @@ For every `link` item, every subordinated `reference`, and the path part of ever
 - A target that the outline lists but that isn't on disk yet is a warning, and its anchor isn't
   checked. Any other missing target is an error.
 
+A target of just `#` names nothing and is an error.
+
 A path that begins with `/` resolves from the repository root. A path that leaves the repository
 is an error.
 
