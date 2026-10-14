@@ -39,6 +39,13 @@ type Fact struct {
 	Tag string
 	// Problem says why the bullet's tag is unusable, empty when Tag is set.
 	Problem string
+	// Text is the bullet's claim: what follows the id up to its Source: part or its status tag.
+	Text string
+	// Sources lists the bullet's source pointers as written: "path", "path:100-110,163", or
+	// "path#name". It holds the backticked spans of the Source: part that sit outside
+	// parentheses and brackets and name a path inside the facts store's repository. A span
+	// naming a command, a URL, or commentary, and an [external: ...] part, are left out.
+	Sources []string
 }
 
 // Citable reports whether a page may cite the fact: its tag is well formed and one of verified,
@@ -50,6 +57,15 @@ func (f Fact) Citable() bool {
 // Facts is the set of fact bullets in a facts directory, keyed by id.
 type Facts struct {
 	byID map[string][]Fact
+}
+
+// Get returns the fact with the given id. It reports false unless exactly one bullet holds the id.
+func (fs *Facts) Get(id string) (Fact, bool) {
+	got := fs.byID[id]
+	if len(got) != 1 {
+		return Fact{}, false
+	}
+	return got[0], true
 }
 
 // factsFiles lists the names of the facts files in dir: every Markdown file but README.md.
@@ -96,6 +112,7 @@ func LoadFacts(dir string) (*Facts, error) {
 		return nil, fmt.Errorf("read facts directory: %w", err)
 	}
 	fs := &Facts{byID: map[string][]Fact{}}
+	root := repoRoot(dir)
 	for _, name := range names {
 		data, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
@@ -111,6 +128,7 @@ func LoadFacts(dir string) (*Facts, error) {
 			}
 			f := Fact{ID: m[1], File: name, Line: b.line}
 			f.Tag, f.Problem = checkTag(b.text)
+			f.Text, f.Sources = parseBody(b.text[len(m[0]):], root)
 			fs.byID[f.ID] = append(fs.byID[f.ID], f)
 		}
 	}
@@ -187,4 +205,94 @@ func checkTag(text string) (tag, problem string) {
 		return "", "a second bracket appears before the trailing status tag"
 	}
 	return name, ""
+}
+
+// repoRoot returns the nearest ancestor of dir, dir included, that holds a .git entry, or dir
+// itself when none does. Source pointers in a facts file are relative to it.
+func repoRoot(dir string) string {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return dir
+	}
+	for d := abs; ; d = filepath.Dir(d) {
+		if _, err := os.Lstat(filepath.Join(d, ".git")); err == nil {
+			return d
+		}
+		if filepath.Dir(d) == d {
+			return abs
+		}
+	}
+}
+
+var (
+	sourceMarkerRe = regexp.MustCompile(`(^|\s)Source:`)
+	lineListRe     = regexp.MustCompile(`^\d+(-\d+)?(,\d+(-\d+)?)*$`)
+	pathCharsRe    = regexp.MustCompile(`^[\w@.+/()\[\]-]+$`)
+)
+
+// parseBody splits a bullet's text after its id into the claim and the source pointers. The claim
+// ends at the Source: marker, or at the status tag when the bullet has no marker.
+func parseBody(rest, root string) (text string, sources []string) {
+	masked := maskSpanRe.ReplaceAllStringFunc(rest, func(m string) string { return strings.Repeat("x", len(m)) })
+	if loc := tagRe.FindAllStringIndex(masked, -1); len(loc) > 0 {
+		cut := loc[len(loc)-1][0]
+		rest, masked = rest[:cut], masked[:cut]
+	}
+	loc := sourceMarkerRe.FindStringIndex(masked)
+	if loc == nil {
+		return strings.TrimSpace(rest), nil
+	}
+	text = strings.TrimSpace(rest[:loc[0]])
+	part := rest[loc[1]:]
+	depth := 0
+	for i := 0; i < len(part); i++ {
+		switch part[i] {
+		case '(', '[':
+			depth++
+		case ')', ']':
+			depth = max(depth-1, 0)
+		case '`':
+			end := strings.IndexByte(part[i+1:], '`')
+			if end < 0 {
+				return text, sources
+			}
+			span := part[i+1 : i+1+end]
+			i += end + 1
+			if depth == 0 && isSource(span, root) {
+				sources = append(sources, span)
+			}
+		}
+	}
+	return text, sources
+}
+
+// isSource reports whether a backticked span points at a file or directory of the repository. A
+// span with a slash counts as a path whether or not the file exists, so a stale pointer reaches
+// the reader as a missing source; a bare name counts only when it exists.
+func isSource(span, root string) bool {
+	if strings.Contains(span, "://") {
+		return false
+	}
+	file, suffix := span, ""
+	if i := strings.IndexAny(span, ":#"); i >= 0 {
+		file, suffix = span[:i], span[i:]
+	}
+	if file == "" || !pathCharsRe.MatchString(file) || filepath.IsAbs(file) {
+		return false
+	}
+	if clean := filepath.Clean(file); clean == ".." || strings.HasPrefix(clean, "../") {
+		return false
+	}
+	switch {
+	case suffix == "":
+	case suffix[0] == ':' && lineListRe.MatchString(suffix[1:]):
+	case suffix[0] == '#' && len(suffix) > 1:
+	default:
+		return false
+	}
+	if strings.Contains(file, "/") {
+		return true
+	}
+	_, err := os.Stat(filepath.Join(root, file))
+	return err == nil
 }
