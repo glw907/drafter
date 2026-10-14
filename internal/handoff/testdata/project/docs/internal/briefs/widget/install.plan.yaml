@@ -1,0 +1,6 @@
+page: docs/widget/install.md
+items:
+  - id: s1
+    kind: sentence
+    mode: instruction
+    text: Install Widget with the package manager.
