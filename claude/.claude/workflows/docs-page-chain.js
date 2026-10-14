@@ -89,7 +89,7 @@
 //
 // The workflow runtime has no filesystem or exec access, so the outline is read by the
 // `cairn-docs-outline` helper (`~/.local/bin`, tested by
-// `~/.dotfiles/tests/docs-page-chain-outline.test.mjs`): one probe agent runs its `resolve`
+// `~/Projects/drafter/tests/docs-page-chain-outline.test.mjs`): one probe agent runs its `resolve`
 // command before any page agent and returns the resolved entries, each with a checksum the runner
 // recomputes, plus a report checksum over `ok`, `index`, `missing`, and `error`, so a probe that
 // mistranscribes an entry or its report fails the run rather than drafting from it.

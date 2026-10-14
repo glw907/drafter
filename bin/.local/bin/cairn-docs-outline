@@ -29,7 +29,7 @@
 //     Exits 0 when ok (HEAD resolved), else 1.
 //
 // `--exemplars <dir>` overrides the capture root (default ~/.local/share/cairn/exemplars).
-// Tested by ~/.dotfiles/tests/docs-page-chain-outline.test.mjs, which also requires this file
+// Tested by ~/Projects/drafter/tests/docs-page-chain-outline.test.mjs, which also requires this file
 // as a module; keep canonicalEntry, fnv, checksumOf, and probeChecksum identical to the runner's
 // copies, and reworkChecksum identical to the runner's.
 "use strict";
