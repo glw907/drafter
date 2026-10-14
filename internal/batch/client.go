@@ -120,12 +120,20 @@ func (c *Client) requireCheck() error {
 func (c *Client) do(ctx context.Context, idempotent bool, call func(context.Context) error) (*failure, error) {
 	start := c.Now()
 	for attempt := 0; ; attempt++ {
+		if cerr := ctx.Err(); cerr != nil {
+			return nil, cerr // nothing was sent
+		}
 		err := call(ctx)
 		if err == nil {
 			return nil, nil
 		}
 		if cerr := ctx.Err(); cerr != nil {
-			return nil, cerr
+			if idempotent {
+				return nil, cerr
+			}
+			// The context ended while the request may have been written; the caller must adopt or
+			// settle, not treat the call as unsent.
+			return nil, &CallError{Kind: ErrMaybeSent, Message: "caller context ended during the call", Cause: cerr.Error()}
 		}
 		f := inspect(err)
 		if f.spend {
