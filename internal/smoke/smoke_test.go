@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -67,6 +68,7 @@ type fake struct {
 	hold       bool // batches never end
 	failCreate bool // Create answers 500 after reading the body
 	overCount  bool // results report more input than count_tokens did
+	syncCalls  int  // streamed calls served; each gets its own message ID
 }
 
 func newFake(t *testing.T) *fake {
@@ -186,6 +188,7 @@ func (f *fake) results(w http.ResponseWriter, id string) {
 }
 
 func (f *fake) stream(w http.ResponseWriter, body []byte) {
+	f.syncCalls++
 	var in wireRequest
 	_ = json.Unmarshal(body, &in.Params)
 	text, _ := json.Marshal(instance(in.Params.OutputConfig.Format.Schema))
@@ -194,8 +197,8 @@ func (f *fake) stream(w http.ResponseWriter, body []byte) {
 	ev := func(name, data string) {
 		_, _ = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", name, data)
 	}
-	ev("message_start", fmt.Sprintf(`{"type":"message_start","message":{"id":"msg_sync1","type":"message","role":"assistant","model":%q,"content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":%d,"cache_creation_input_tokens":0,"cache_read_input_tokens":%d,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":1}}}`,
-		testModel, syncUsage.InputTokens, syncUsage.CacheRead))
+	ev("message_start", fmt.Sprintf(`{"type":"message_start","message":{"id":"msg_sync%d","type":"message","role":"assistant","model":%q,"content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":%d,"cache_creation_input_tokens":0,"cache_read_input_tokens":%d,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":1}}}`,
+		f.syncCalls, testModel, syncUsage.InputTokens, syncUsage.CacheRead))
 	ev("content_block_start", `{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`)
 	delta, _ := json.Marshal(map[string]any{"type": "content_block_delta", "index": 0, "delta": map[string]any{"type": "text_delta", "text": string(text)}})
 	ev("content_block_delta", string(delta))
@@ -273,7 +276,7 @@ type ledgerLine struct {
 	Usage  batch.Usage `json:"usage"`
 }
 
-func ledgerLines(t *testing.T, stateDir, typ string) []ledgerLine {
+func settleLines(t *testing.T, stateDir string) []ledgerLine {
 	t.Helper()
 	fh, err := os.Open(filepath.Join(stateDir, "ledger.jsonl"))
 	if errors.Is(err, os.ErrNotExist) {
@@ -290,7 +293,7 @@ func ledgerLines(t *testing.T, stateDir, typ string) []ledgerLine {
 		if err := json.Unmarshal(sc.Bytes(), &l); err != nil {
 			t.Fatalf("ledger line %q: %v", sc.Text(), err)
 		}
-		if l.Type == typ {
+		if l.Type == "settle" {
 			out = append(out, l)
 		}
 	}
@@ -362,11 +365,12 @@ func TestCheck(t *testing.T) {
 	if err := json.Unmarshal(s.Schema, &schema); err != nil {
 		t.Fatal(err)
 	}
-	good := instance(schema).(map[string]any)
-	extra := map[string]any{"surprise": 1}
-	for k, v := range good {
-		extra[k] = v
+	good, ok := instance(schema).(map[string]any)
+	if !ok {
+		t.Fatal("instance of an object schema is not an object")
 	}
+	extra := map[string]any{"surprise": 1}
+	maps.Copy(extra, good)
 	tests := []struct {
 		name string
 		text string
@@ -401,7 +405,7 @@ func TestRun(t *testing.T) {
 	}
 
 	t.Run("ledger gains one settle per request plus the sync request", func(t *testing.T) {
-		lines := ledgerLines(t, dir, "settle")
+		lines := settleLines(t, dir)
 		if len(lines) != len(shapes)+1 {
 			t.Fatalf("settle lines = %d, want %d", len(lines), len(shapes)+1)
 		}
@@ -583,7 +587,7 @@ func TestResume(t *testing.T) {
 		if _, err := Run(ctx, p, Shapes()); !errors.Is(err, context.Canceled) {
 			t.Fatalf("first Run err = %v, want context.Canceled", err)
 		}
-		if n := len(ledgerLines(t, dir, "settle")); n != 0 {
+		if n := len(settleLines(t, dir)); n != 0 {
 			t.Fatalf("settle lines after the interrupted run = %d, want 0", n)
 		}
 
@@ -596,7 +600,7 @@ func TestResume(t *testing.T) {
 			t.Errorf("resumed = %v, want [msgbatch_1]", rep.Resumed)
 		}
 		count := func() (old, all int) {
-			for _, l := range ledgerLines(t, dir, "settle") {
+			for _, l := range settleLines(t, dir) {
 				all++
 				if strings.HasPrefix(l.Key, "msgbatch_1/") {
 					old++
@@ -648,7 +652,7 @@ func TestResume(t *testing.T) {
 			t.Errorf("open intents after resume = %v, want none", open)
 		}
 		var voids int
-		for _, l := range ledgerLines(t, dir, "settle") {
+		for _, l := range settleLines(t, dir) {
 			if l.Kind == "void" {
 				voids++
 				if l.Cost != 0 || !strings.HasSuffix(l.Key, "/void") {
