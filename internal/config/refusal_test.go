@@ -21,7 +21,7 @@ func newSandbox(t *testing.T) sandbox {
 	for _, kv := range os.Environ() {
 		if name, _, _ := strings.Cut(kv, "="); strings.HasPrefix(name, "DRAFTER_") {
 			t.Setenv(name, "")
-			os.Unsetenv(name)
+			_ = os.Unsetenv(name)
 		}
 	}
 	xdg := t.TempDir()

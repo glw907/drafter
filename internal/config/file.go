@@ -100,14 +100,12 @@ func decode(path string, data []byte) (*file, error) {
 	if err == nil {
 		return &f, nil
 	}
-	var missing *toml.StrictMissingError
-	if errors.As(err, &missing) && len(missing.Errors) > 0 {
+	if missing, ok := errors.AsType[*toml.StrictMissingError](err); ok && len(missing.Errors) > 0 {
 		first := missing.Errors[0]
 		row, _ := first.Position()
 		return nil, fmt.Errorf("%s:%d: unknown key %s", path, row, strings.Join(first.Key(), "."))
 	}
-	var de *toml.DecodeError
-	if errors.As(err, &de) {
+	if de, ok := errors.AsType[*toml.DecodeError](err); ok {
 		row, _ := de.Position()
 		return nil, fmt.Errorf("%s:%d: %s", path, row, de.Error())
 	}

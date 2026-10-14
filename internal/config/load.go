@@ -113,8 +113,7 @@ func checkIgnored(root, path string) error {
 	if err == nil {
 		return nil
 	}
-	var exit *exec.ExitError
-	if errors.As(err, &exit) {
+	if _, ok := errors.AsType[*exec.ExitError](err); ok {
 		return fmt.Errorf("%s: not ignored by git; add drafter.local.toml to .gitignore, "+
 			"because it can hold a key source and caps", path)
 	}

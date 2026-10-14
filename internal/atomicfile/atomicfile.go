@@ -19,8 +19,8 @@ func WriteFile(path string, data []byte, perm fs.FileMode) (err error) {
 	}
 	defer func() {
 		if err != nil {
-			tmp.Close()
-			os.Remove(tmp.Name())
+			_ = tmp.Close()
+			_ = os.Remove(tmp.Name())
 		}
 	}()
 	if _, err = tmp.Write(data); err != nil {
