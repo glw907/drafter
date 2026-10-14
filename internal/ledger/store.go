@@ -134,6 +134,38 @@ func (l *Ledger) lock() (func(), error) {
 	return func() { _ = f.Close() }, nil
 }
 
+// rlock takes the shared lock for a read, so a read waits out a writer's check and append. It
+// never creates the state directory: with no directory there is no ledger, and ok is false. A
+// directory without ledger.lock gets one, so a writer that starts next locks the same file.
+// Call it only from the public read methods; Reserve and Settle already hold the exclusive lock,
+// and flock treats a second descriptor on the file as a separate holder that would deadlock.
+func (l *Ledger) rlock() (unlock func(), ok bool, err error) {
+	f, err := os.OpenFile(l.lockPath(), os.O_CREATE|os.O_RDONLY, 0o600)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("open ledger lock %s: %w", l.lockPath(), err)
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_SH); err != nil {
+		_ = f.Close()
+		return nil, false, fmt.Errorf("lock %s: %w", l.lockPath(), err)
+	}
+	return func() { _ = f.Close() }, true, nil
+}
+
+// readShared reads the ledger under the shared lock; an absent state directory reads as empty.
+func (l *Ledger) readShared() (*state, error) {
+	unlock, ok, err := l.rlock()
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		defer unlock()
+	}
+	return l.read()
+}
+
 // read parses the whole ledger. An absent file reads as empty. A final line with no newline is a
 // torn write: it is skipped with a warning. Any other line that does not parse is an error,
 // except a fragment that a later append already closed off, which a torn marker line follows.
