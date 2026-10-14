@@ -26,7 +26,7 @@ func buildWire(r Request) (wire, error) {
 		case "assistant":
 			w.messages = append(w.messages, anthropic.NewAssistantMessage(block))
 		default:
-			return wire{}, fmt.Errorf("batch: message role %q is not user or assistant", m.Role)
+			return wire{}, fmt.Errorf("batch: request %q message role %q is not user or assistant", r.CustomID, m.Role)
 		}
 	}
 	if r.System != "" {

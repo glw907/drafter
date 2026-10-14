@@ -1,14 +1,17 @@
 // Package batch is drafter's client for the Claude API: the Message Batches endpoints for
 // stage work and one streamed Messages call for sync work. It starts no goroutines.
 //
-// A failed call returns one of four kinds of error, and none holds an SDK error value (whose
-// Request field holds the key header). An API failure is a *CallError with the status, the API's
-// error type, and its message. A transport failure is a *CallError whose Cause is the underlying
-// error's text without the request URL. A client-side refusal, from CheckWorkspace or a billable
-// call made before it passed, is a *CallError with a message and no status. A caller context that
-// ends before the request is written comes back as the context's own error. A request the client
-// cannot build (a message role that is not "user" or "assistant", or a schema that is not a JSON
-// object) is a plain error naming the request, returned before anything is sent.
+// No error a call returns holds an SDK error value (whose Request field holds the key header).
+// An API failure is a *CallError with the status, the API's error type, and its message. A
+// transport failure is a *CallError whose Cause is the underlying error's text without the
+// request URL. When retries run out (ErrTransport) or the API refuses at a spend limit
+// (ErrSpendLimit), the *CallError carries whatever the last failure had. A client-side refusal,
+// from CheckWorkspace or a billable call made before it passed, is a *CallError with a message
+// and no status. A caller context that ends comes back as the context's own error, except during
+// a Create or Send call, where it is a *CallError of kind ErrMaybeSent whose Cause is the context
+// error's text. A request the client cannot build (a message role that is not "user" or
+// "assistant", or a schema that is not a JSON object) is a plain error naming the request,
+// returned before anything is sent.
 package batch
 
 import (
