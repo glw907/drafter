@@ -1,0 +1,3227 @@
+{
+  "host": {
+    "args": {
+      "worktree": "/abs/worktree",
+      "gate": "npm run check:docs-gate -- --page {page} --brief {brief}",
+      "outline": "docs/internal/outlines/guide.json",
+      "backHalf": "drafter",
+      "pages": [
+        {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend"
+        },
+        {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend"
+        },
+        {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference"
+        }
+      ]
+    },
+    "resolved": {
+      "pages": [
+        {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        }
+      ],
+      "index": "docs/guide/README.md"
+    }
+  },
+  "cases": [
+    {
+      "name": "install-widget/draft-round-1",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/draft-round-2",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "## structural edit: fix\nstructural edit found a problem on install-widget.\n- [BLOCKING] docs/guide/install-widget.md:4: STRUCTURAL EDIT-FINDING-install-widget the section order buries the answer.\n  rewrite: Move the answer to the first sentence (install-widget).\n\n## register editor: fix\nregister editor found a problem on install-widget.\n- [BLOCKING] docs/guide/install-widget.md:9: REGISTER EDITOR-FINDING-install-widget the section order buries the answer.\n  rewrite: Move the answer to the first sentence (install-widget).\n\n## fact read: fix\nfact read found a problem on install-widget.\n- [BLOCKING] docs/guide/install-widget.md:14: FACT READ-FINDING-install-widget the section order buries the answer.\n  rewrite: Move the answer to the first sentence (install-widget).",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/draft-after-final-read",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "## final reader read: fix\nreader fix on install-widget.\n- [BLOCKING] docs/guide/install-widget.md:21: READER-FINDING-install-widget I had to infer the second step.",
+        "afterFinalRead": true,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/structure-round-1",
+      "seat": "structure",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/structure-round-2-narrowed",
+      "seat": "structure",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": {
+          "baseline": "0123456789abcdef0123456789abcdef01234567",
+          "own": {
+            "verdict": "fix",
+            "summary": "structure found a problem on install-widget.",
+            "findings": [
+              {
+                "location": "docs/guide/install-widget.md:4",
+                "finding": "STRUCTURE-FINDING-install-widget the section order buries the answer.",
+                "rewrite": "Move the answer to the first sentence (install-widget).",
+                "blocking": true
+              }
+            ]
+          }
+        },
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/structure-round-2-whole",
+      "seat": "structure",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/editor-round-1",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/editor-round-2-narrowed",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": {
+          "baseline": "0123456789abcdef0123456789abcdef01234567",
+          "own": {
+            "verdict": "fix",
+            "summary": "editor found a problem on install-widget.",
+            "findings": [
+              {
+                "location": "docs/guide/install-widget.md:9",
+                "finding": "EDITOR-FINDING-install-widget the section order buries the answer.",
+                "rewrite": "Move the answer to the first sentence (install-widget).",
+                "blocking": true
+              }
+            ]
+          }
+        },
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/editor-round-2-whole",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/editor-scoped-after-final-read",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "## final reader read: fix\nreader fix on install-widget.\n- [BLOCKING] docs/guide/install-widget.md:21: READER-FINDING-install-widget I had to infer the second step.",
+        "afterFinalRead": false,
+        "scope": "## final reader read: fix\nreader fix on install-widget.\n- [BLOCKING] docs/guide/install-widget.md:21: READER-FINDING-install-widget I had to infer the second step.",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/fact-round-1",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/fact-round-2-narrowed",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": {
+          "baseline": "0123456789abcdef0123456789abcdef01234567",
+          "own": {
+            "verdict": "accept",
+            "summary": "ok",
+            "findings": []
+          }
+        },
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/fact-round-2-whole",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/fact-scoped-after-final-read",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "## final reader read: fix\nreader fix on install-widget.\n- [BLOCKING] docs/guide/install-widget.md:21: READER-FINDING-install-widget I had to infer the second step.",
+        "afterFinalRead": false,
+        "scope": "## final reader read: fix\nreader fix on install-widget.\n- [BLOCKING] docs/guide/install-widget.md:21: READER-FINDING-install-widget I had to infer the second step.",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/reader-turn-1",
+      "seat": "reader",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 1,
+        "facts": true
+      }
+    },
+    {
+      "name": "install-widget/reader-turn-2",
+      "seat": "reader",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-quickstart/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the step cadence."
+          ],
+          "factIds": [
+            "f:ins111"
+          ],
+          "covers": [
+            "The install command.",
+            "The first run."
+          ],
+          "outOfScope": [
+            "Plugin authoring (plugins)."
+          ],
+          "absorbs": [],
+          "pinned": [
+            "#install"
+          ],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide",
+          "factIds": [
+            "f:ins111",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Install the widget is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:ins111",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 2,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/draft-round-1",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/draft-round-2",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "## structural edit: fix\nstructural edit found a problem on how-widgets-work.\n- [BLOCKING] docs/guide/how-widgets-work.md:4: STRUCTURAL EDIT-FINDING-how-widgets-work the section order buries the answer.\n  rewrite: Move the answer to the first sentence (how-widgets-work).\n\n## register editor: fix\nregister editor found a problem on how-widgets-work.\n- [BLOCKING] docs/guide/how-widgets-work.md:9: REGISTER EDITOR-FINDING-how-widgets-work the section order buries the answer.\n  rewrite: Move the answer to the first sentence (how-widgets-work).\n\n## fact read: fix\nfact read found a problem on how-widgets-work.\n- [BLOCKING] docs/guide/how-widgets-work.md:14: FACT READ-FINDING-how-widgets-work the section order buries the answer.\n  rewrite: Move the answer to the first sentence (how-widgets-work).",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/draft-after-final-read",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "## final reader read: fix\nreader fix on how-widgets-work.\n- [BLOCKING] docs/guide/how-widgets-work.md:21: READER-FINDING-how-widgets-work I had to infer the second step.",
+        "afterFinalRead": true,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/structure-round-1",
+      "seat": "structure",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/structure-round-2-narrowed",
+      "seat": "structure",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": {
+          "baseline": "0123456789abcdef0123456789abcdef01234567",
+          "own": {
+            "verdict": "fix",
+            "summary": "structure found a problem on how-widgets-work.",
+            "findings": [
+              {
+                "location": "docs/guide/how-widgets-work.md:4",
+                "finding": "STRUCTURE-FINDING-how-widgets-work the section order buries the answer.",
+                "rewrite": "Move the answer to the first sentence (how-widgets-work).",
+                "blocking": true
+              }
+            ]
+          }
+        },
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/structure-round-2-whole",
+      "seat": "structure",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/editor-round-1",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/editor-round-2-narrowed",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": {
+          "baseline": "0123456789abcdef0123456789abcdef01234567",
+          "own": {
+            "verdict": "fix",
+            "summary": "editor found a problem on how-widgets-work.",
+            "findings": [
+              {
+                "location": "docs/guide/how-widgets-work.md:9",
+                "finding": "EDITOR-FINDING-how-widgets-work the section order buries the answer.",
+                "rewrite": "Move the answer to the first sentence (how-widgets-work).",
+                "blocking": true
+              }
+            ]
+          }
+        },
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/editor-round-2-whole",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/editor-scoped-after-final-read",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "## final reader read: fix\nreader fix on how-widgets-work.\n- [BLOCKING] docs/guide/how-widgets-work.md:21: READER-FINDING-how-widgets-work I had to infer the second step.",
+        "afterFinalRead": false,
+        "scope": "## final reader read: fix\nreader fix on how-widgets-work.\n- [BLOCKING] docs/guide/how-widgets-work.md:21: READER-FINDING-how-widgets-work I had to infer the second step.",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/fact-round-1",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/fact-round-2-narrowed",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": {
+          "baseline": "0123456789abcdef0123456789abcdef01234567",
+          "own": {
+            "verdict": "accept",
+            "summary": "ok",
+            "findings": []
+          }
+        },
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/fact-round-2-whole",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/fact-scoped-after-final-read",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "## final reader read: fix\nreader fix on how-widgets-work.\n- [BLOCKING] docs/guide/how-widgets-work.md:21: READER-FINDING-how-widgets-work I had to infer the second step.",
+        "afterFinalRead": false,
+        "scope": "## final reader read: fix\nreader fix on how-widgets-work.\n- [BLOCKING] docs/guide/how-widgets-work.md:21: READER-FINDING-how-widgets-work I had to infer the second step.",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/reader-turn-1",
+      "seat": "reader",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 1,
+        "facts": true
+      }
+    },
+    {
+      "name": "how-widgets-work/reader-turn-2",
+      "seat": "reader",
+      "context": {
+        "page": {
+          "id": "how-widgets-work",
+          "path": "docs/guide/how-widgets-work.md",
+          "track": "extend",
+          "title": "How widgets work",
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "exemplarSources": [
+            "/abs/exemplars/tool/widget-model/page.md"
+          ],
+          "exemplarTakes": [
+            "Take the order of the diagram."
+          ],
+          "factIds": [
+            "f:mod222"
+          ],
+          "covers": [
+            "The three parts."
+          ],
+          "outOfScope": [],
+          "absorbs": [
+            "docs/guide/old-model"
+          ],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Learn the widget's model: its three parts and how they connect.",
+          "pageType": "concept",
+          "factIds": [
+            "f:mod222",
+            "f:extra16"
+          ],
+          "claimInventory": [
+            {
+              "claim": "How widgets work is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:mod222",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra16",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 2,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/draft-round-1",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/draft-round-2",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "## structural edit: fix\nstructural edit found a problem on widget-options.\n- [BLOCKING] docs/guide/widget-options.md:4: STRUCTURAL EDIT-FINDING-widget-options the section order buries the answer.\n  rewrite: Move the answer to the first sentence (widget-options).\n\n## register editor: fix\nregister editor found a problem on widget-options.\n- [BLOCKING] docs/guide/widget-options.md:9: REGISTER EDITOR-FINDING-widget-options the section order buries the answer.\n  rewrite: Move the answer to the first sentence (widget-options).\n\n## fact read: fix\nfact read found a problem on widget-options.\n- [BLOCKING] docs/guide/widget-options.md:14: FACT READ-FINDING-widget-options the section order buries the answer.\n  rewrite: Move the answer to the first sentence (widget-options).",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/draft-after-final-read",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "## final reader read: fix\nreader fix on widget-options.\n- [BLOCKING] docs/guide/widget-options.md:21: READER-FINDING-widget-options I had to infer the second step.",
+        "afterFinalRead": true,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/structure-round-1",
+      "seat": "structure",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/structure-round-2-narrowed",
+      "seat": "structure",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": {
+          "baseline": "0123456789abcdef0123456789abcdef01234567",
+          "own": {
+            "verdict": "fix",
+            "summary": "structure found a problem on widget-options.",
+            "findings": [
+              {
+                "location": "docs/guide/widget-options.md:4",
+                "finding": "STRUCTURE-FINDING-widget-options the section order buries the answer.",
+                "rewrite": "Move the answer to the first sentence (widget-options).",
+                "blocking": true
+              }
+            ]
+          }
+        },
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/structure-round-2-whole",
+      "seat": "structure",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/editor-round-1",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/editor-round-2-narrowed",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": {
+          "baseline": "0123456789abcdef0123456789abcdef01234567",
+          "own": {
+            "verdict": "fix",
+            "summary": "editor found a problem on widget-options.",
+            "findings": [
+              {
+                "location": "docs/guide/widget-options.md:9",
+                "finding": "EDITOR-FINDING-widget-options the section order buries the answer.",
+                "rewrite": "Move the answer to the first sentence (widget-options).",
+                "blocking": true
+              }
+            ]
+          }
+        },
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/editor-round-2-whole",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/editor-scoped-after-final-read",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "## final reader read: fix\nreader fix on widget-options.\n- [BLOCKING] docs/guide/widget-options.md:21: READER-FINDING-widget-options I had to infer the second step.",
+        "afterFinalRead": false,
+        "scope": "## final reader read: fix\nreader fix on widget-options.\n- [BLOCKING] docs/guide/widget-options.md:21: READER-FINDING-widget-options I had to infer the second step.",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/fact-round-1",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/fact-round-2-narrowed",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": {
+          "baseline": "0123456789abcdef0123456789abcdef01234567",
+          "own": {
+            "verdict": "accept",
+            "summary": "ok",
+            "findings": []
+          }
+        },
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/fact-round-2-whole",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/fact-scoped-after-final-read",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "## final reader read: fix\nreader fix on widget-options.\n- [BLOCKING] docs/guide/widget-options.md:21: READER-FINDING-widget-options I had to infer the second step.",
+        "afterFinalRead": false,
+        "scope": "## final reader read: fix\nreader fix on widget-options.\n- [BLOCKING] docs/guide/widget-options.md:21: READER-FINDING-widget-options I had to infer the second step.",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/reader-turn-1",
+      "seat": "reader",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 1,
+        "facts": true
+      }
+    },
+    {
+      "name": "widget-options/reader-turn-2",
+      "seat": "reader",
+      "context": {
+        "page": {
+          "id": "widget-options",
+          "path": "docs/guide/widget-options.md",
+          "track": "reference",
+          "title": "Widget options",
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "exemplarSources": [],
+          "exemplarTakes": [],
+          "factIds": [
+            "f:opt333"
+          ],
+          "covers": [
+            "Every option."
+          ],
+          "outOfScope": [
+            "Install steps (install-widget)."
+          ],
+          "absorbs": [],
+          "pinned": [],
+          "figure": false,
+          "figureNote": ""
+        },
+        "inputs": {
+          "job": "Look up one widget option and its default.",
+          "pageType": "reference",
+          "factIds": [
+            "f:opt333",
+            "f:extra14"
+          ],
+          "claimInventory": [
+            {
+              "claim": "Widget options is stated by its fact.",
+              "disposition": "carried",
+              "factId": "f:opt333",
+              "section": "Overview"
+            },
+            {
+              "claim": "A detail another page owns.",
+              "disposition": "cut",
+              "factId": "f:extra14",
+              "reason": "subordinated: `docs/guide/reference.md`, section Options, states it"
+            }
+          ]
+        },
+        "round": "final",
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 2,
+        "facts": true
+      }
+    }
+  ]
+}
