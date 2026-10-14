@@ -2,8 +2,6 @@
 // resolves each setting with the source it came from, and refuses what the layers may not hold.
 package config
 
-import "errors"
-
 // Config holds every resolved setting. Every path is absolute after Load.
 type Config struct {
 	Prices          Prices
@@ -28,6 +26,9 @@ type Config struct {
 	Register        map[string][]string
 	InlineFiles     []string
 	Root            string // the project root, empty outside a project
+
+	src     map[string]origin
+	capSets map[string][]string
 }
 
 // Retries holds the retry budgets.
@@ -104,14 +105,4 @@ type Source struct {
 	Value string
 	From  string   // the layer, variable, or flag that set it, or "default" or "unset"
 	Sets  []string // for a cap, every source that set it as "source: value", lowest layer first
-}
-
-// Load reads the layers for the project at root and returns the resolved configuration.
-func Load(root string, flags Flags) (*Config, error) {
-	return nil, errors.New("config: not implemented")
-}
-
-// Sources returns one row per setting. It never carries a key.
-func (c *Config) Sources() []Source {
-	return nil
 }
