@@ -90,7 +90,7 @@ func (r *repo) excerpt(id, source string) []string {
 		return []string{window(label, lines, at+1-declBefore, at+1+declAfter)}
 	}
 	var out []string
-	for _, rng := range strings.Split(suffix[1:], ",") {
+	for rng := range strings.SplitSeq(suffix[1:], ",") {
 		a, b, isSpan := strings.Cut(rng, "-")
 		lo, _ := strconv.Atoi(a)
 		hi := lo

@@ -168,17 +168,15 @@ func systemPrompt(path string) (string, error) {
 	}
 	s := strings.ReplaceAll(string(data), "\r\n", "\n")
 	if rest, ok := strings.CutPrefix(s, "---\n"); ok {
+		body, found := strings.CutPrefix(rest, "---\n")
+		if !found {
+			_, body, found = strings.Cut(rest, "\n---\n")
+		}
 		switch {
-		case strings.HasPrefix(rest, "---\n"):
-			s = rest[4:]
-		default:
-			i := strings.Index(rest, "\n---\n")
-			switch {
-			case i >= 0:
-				s = rest[i+5:]
-			case strings.HasSuffix(rest, "\n---"):
-				s = ""
-			}
+		case found:
+			s = body
+		case strings.HasSuffix(rest, "\n---"):
+			s = ""
 		}
 	}
 	return strings.TrimSpace(s), nil

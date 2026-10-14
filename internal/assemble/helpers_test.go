@@ -36,6 +36,7 @@ func newFixture(t *testing.T) fixture {
 	f.link(t, filepath.Join(f.outside, "secret.txt"), filepath.Join(f.outside, "exemplars", "link.txt"))
 	f.link(t, filepath.Join(f.outside, "secret.txt"), filepath.Join(f.root, "docs", "escape.md"))
 	f.link(t, filepath.Join(f.outside, "exemplars", "ok.txt"), filepath.Join(f.root, "docs", "allowed-link.md"))
+	f.write(t, filepath.Join(f.root, "big.txt"), strings.Repeat("x", 300<<10))
 	f.git(t, "init", "-q")
 	f.git(t, "add", ".")
 	f.git(t, "rm", "-q", "--cached", "untracked.txt")

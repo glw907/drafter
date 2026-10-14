@@ -113,7 +113,7 @@ func headings(realRoot, rel string) ([]string, error) {
 	}
 	var out []string
 	fenced := false
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		switch {
 		case strings.HasPrefix(line, "```") || strings.HasPrefix(line, "~~~"):
 			fenced = !fenced

@@ -43,7 +43,7 @@ func openRepo(ctx context.Context, c *config.Config) (*repo, error) {
 		return nil, fmt.Errorf("assemble: list tracked files: %w", err)
 	}
 	r := &repo{root: root, real: real, tracked: map[string]bool{}}
-	for _, name := range strings.Split(string(out), "\x00") {
+	for name := range strings.SplitSeq(string(out), "\x00") {
 		if name != "" {
 			r.tracked[name] = true
 		}
