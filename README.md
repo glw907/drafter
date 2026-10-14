@@ -24,6 +24,12 @@ The command builds the binary and copies it to `~/.local/bin/drafter`. To instal
 else, set `PREFIX`, as in `make install PREFIX=/usr/local`. The binary then goes to
 `$PREFIX/bin`.
 
+The install also links the docs page chain's two pieces from the checkout. `docs-page-chain.js`
+goes to `~/.claude/workflows/`, and `cairn-docs-outline` goes to `$PREFIX/bin`. Set `CLAUDE_DIR`
+to link the workflow somewhere other than `~/.claude`. The install stops with a message when
+either destination directory is a symlink, since a link written through it would land in another
+tree. Replace the symlink with a real directory and run the install again.
+
 Before your first run of `drafter page`, follow [Set up drafter](docs/setup.md). The pipeline
 spends money, and it refuses to start until you set a per-page cap and a per-cycle ceiling.
 
@@ -121,4 +127,8 @@ flag that set each one. A cap lists every source that set it. The command never 
 
 ## Develop
 
-`make check` runs `go vet`, `golangci-lint`, and the tests. Run it before each commit.
+`make check` runs `go vet`, `golangci-lint`, and the tests. It also runs the docs page chain's
+Node tests, the prompt parity check between Node and the built binary, and the install test. The
+chain's tests read two agent definitions from a workstation checkout. They look in
+`~/Projects/workstation` and fail when it is missing, so set `WORKSTATION_DIR` where your checkout
+lives. Run `make check` before each commit.
