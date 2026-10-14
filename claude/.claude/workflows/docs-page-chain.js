@@ -323,8 +323,9 @@
 //   findings        the numbered findings a redraft answers, or ""
 //   afterFinalRead  true for the redraft after the final reader read
 //   scope, where    a scoped read's scope note and its location text, or ""
-//   narrow          null, or { baseline, own } for a narrowed round-2 read; `own` is null when
-//                   the seat accepted with nothing to verify
+//   narrow          null, or { baseline, own } for a narrowed round-2 read; `own` is the seat's
+//                   round-1 read, an accept record included (the chain passes it under
+//                   `bothReviewers`), and null only when the seat did not read in round 1
 //   turn            the final reader only: 1 for steps 1 and 2, 2 for step 3 with the job
 //   facts           whether the project has a facts store (the builders do not read it)
 //
@@ -1918,7 +1919,10 @@ function readerTurnOne(p, pageType) {
  * @returns {string}
  */
 function readerTurnTwo(p) {
-  return `Step 3 of the final reader read of ${p.path} in ${WT}. You have read the page and answered\nsteps 1 and 2.\n\n${readerStepThree(`read the page's job: ${p.job}`)}`;
+  return `Step 3 of the final reader read of ${p.path} in ${WT}. You have read the page and answered
+steps 1 and 2.
+
+${readerStepThree(`read the page's job: ${p.job}`)}`;
 }
 
 function combined(readList) {
