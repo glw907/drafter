@@ -19,7 +19,7 @@ func clearEnv(t *testing.T) {
 		name, _, _ := strings.Cut(kv, "=")
 		if name == "DRAFTER_API_KEY" || name == "CLAUDE_CODE_OAUTH_TOKEN" || strings.HasPrefix(name, "ANTHROPIC_") {
 			t.Setenv(name, "")
-			os.Unsetenv(name)
+			_ = os.Unsetenv(name)
 		}
 	}
 }
@@ -36,9 +36,9 @@ func captureStderr(t *testing.T) func() string {
 	os.Stderr = w
 	return func() string {
 		os.Stderr = orig
-		w.Close()
+		_ = w.Close()
 		b, _ := io.ReadAll(r)
-		r.Close()
+		_ = r.Close()
 		return string(b)
 	}
 }
