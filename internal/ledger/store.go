@@ -18,7 +18,6 @@ const (
 	version     = 1
 	typeReserve = "reserve"
 	typeSettle  = "settle"
-	typeTorn    = "torn"
 )
 
 // line is one ledger line. Readers ignore fields they do not know.
@@ -71,7 +70,8 @@ type state struct {
 	order   []string
 	keys    map[string]bool
 	settles []line
-	torn    bool // the file ends in a fragment with no newline
+	tornAt  int64 // offset of the fragment the file ends in, when tornLen > 0
+	tornLen int   // bytes in that fragment, which holds no newline
 }
 
 // pageTotal is the page's settled spend plus its open intents at their worst case.
@@ -167,8 +167,9 @@ func (l *Ledger) readShared() (*state, error) {
 }
 
 // read parses the whole ledger. An absent file reads as empty. A final line with no newline is a
-// torn write: it is skipped with a warning. Any other line that does not parse is an error,
-// except a fragment that a later append already closed off, which a torn marker line follows.
+// torn write: it is skipped with a warning, and the next writer truncates it away. Any other line
+// that does not parse is an error. A legacy torn marker line parses and is ignored like any
+// unknown type.
 func (l *Ledger) read() (*state, error) {
 	st := &state{intents: map[string]*intent{}, keys: map[string]bool{}}
 	data, err := os.ReadFile(l.path())
@@ -179,33 +180,24 @@ func (l *Ledger) read() (*state, error) {
 		return nil, fmt.Errorf("read ledger: %w", err)
 	}
 	var tail []byte
-	if i := bytes.LastIndexByte(data, '\n'); i < 0 {
-		data, tail = nil, data
-	} else if i < len(data)-1 {
-		data, tail = data[:i+1], data[i+1:]
+	end := bytes.LastIndexByte(data, '\n') + 1
+	if end < len(data) {
+		data, tail = data[:end], data[end:]
 	}
 	var raw [][]byte
 	if len(data) > 0 {
 		raw = bytes.Split(bytes.TrimSuffix(data, []byte("\n")), []byte("\n"))
 	}
-	parsed := make([]*line, len(raw))
-	bad := make([]error, len(raw))
 	for i, b := range raw {
-		parsed[i], bad[i] = parseLine(b)
-	}
-	for i, p := range parsed {
-		if bad[i] != nil {
-			if i+1 < len(parsed) && parsed[i+1] != nil && parsed[i+1].Type == typeTorn {
-				l.warn("ledger %s line %d: skipping torn line", l.path(), i+1)
-				continue
-			}
-			return nil, fmt.Errorf("ledger %s line %d: %w", l.path(), i+1, bad[i])
+		ln, err := parseLine(b)
+		if err != nil {
+			return nil, fmt.Errorf("ledger %s line %d: %w", l.path(), i+1, err)
 		}
-		st.add(p)
+		st.add(ln)
 	}
 	if len(tail) > 0 {
-		st.torn = true
-		l.warn("ledger %s line %d: skipping torn final line", l.path(), len(raw)+1)
+		st.tornAt, st.tornLen = int64(end), len(tail)
+		l.warn("ledger %s line %d: skipping torn final line of %d bytes", l.path(), len(raw)+1, len(tail))
 	}
 	return st, nil
 }
@@ -260,17 +252,14 @@ func (st *state) add(ln *line) {
 }
 
 // append writes the lines as one write on an O_APPEND descriptor and syncs. After a torn tail it
-// first closes the fragment with a newline and a torn marker, so the fragment is a line of its
-// own that readers can tell from corruption.
+// first truncates the file to the end of its last complete line and syncs, so a crash at any
+// point leaves the fragment, the truncated file, or the truncated file with a torn new line, each
+// of which the next call reads and repairs. The append must go on an O_APPEND descriptor: truncate
+// leaves the file offset where it was, and a plain write would land past the new end and leave
+// NUL bytes. The caller holds the exclusive lock, so st is current.
 func (l *Ledger) append(st *state, lns ...line) error {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
-	if st.torn {
-		buf.WriteByte('\n')
-		if err := enc.Encode(line{V: version, Type: typeTorn, Time: l.stamp()}); err != nil {
-			return err
-		}
-	}
 	for _, ln := range lns {
 		if err := enc.Encode(ln); err != nil {
 			return err
@@ -279,6 +268,16 @@ func (l *Ledger) append(st *state, lns ...line) error {
 	f, err := os.OpenFile(l.path(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return fmt.Errorf("open ledger: %w", err)
+	}
+	if st.tornLen > 0 {
+		if err := f.Truncate(st.tornAt); err != nil {
+			_ = f.Close()
+			return fmt.Errorf("truncate torn tail of ledger: %w", err)
+		}
+		if err := f.Sync(); err != nil {
+			_ = f.Close()
+			return fmt.Errorf("sync ledger: %w", err)
+		}
 	}
 	if _, err := f.Write(buf.Bytes()); err != nil {
 		_ = f.Close()
