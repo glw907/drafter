@@ -50,8 +50,8 @@ type Report struct {
 	Sync    batch.Result
 	Counted map[string]int64 // custom_id to the input tokens count_tokens reported
 	// Resumed lists the batches of earlier runs this run settled. Voided lists the intents of
-	// earlier runs that never reached the API. Estimated lists earlier sync intents whose
-	// outcome is unknown, settled at their worst case.
+	// earlier runs that were provably refused before billing. Estimated lists earlier intents
+	// whose outcome is unknown, settled at their worst case.
 	Resumed   []string
 	Voided    []string
 	Estimated []string
@@ -149,13 +149,13 @@ func (r *runner) save(rec record) error {
 }
 
 func (r *runner) execute(ctx context.Context, shapes []Shape) error {
+	if len(shapes) == 0 {
+		return errors.New("no shapes to run")
+	}
 	rec := record{RunID: r.report.RunID, Model: r.p.Model}
 	reqs := make([]batch.Request, 0, len(shapes))
 	for _, s := range shapes {
 		reqs = append(reqs, r.request(s.Seat, s))
-	}
-	if len(shapes) == 0 {
-		return errors.New("no shapes to run")
 	}
 	syncReq := r.request(syncID, shapes[0])
 
@@ -180,10 +180,12 @@ func (r *runner) execute(ctx context.Context, shapes []Shape) error {
 	}
 	rec.Batch.Intent, rec.Batch.Worst, rec.Batch.Requests = rec.RunID+"-batch", batchWorst, len(reqs)
 
-	if err := r.reserve(rec.RunID, rec.Batch, "batch"); err != nil {
+	// The record is saved before the reservation so a crash between them never leaves an open
+	// intent that no record names.
+	if err := r.save(rec); err != nil {
 		return err
 	}
-	if err := r.save(rec); err != nil {
+	if err := r.reserve(rec.RunID, rec.Batch, "batch"); err != nil {
 		return err
 	}
 	b, err := r.c.Create(ctx, reqs)
@@ -215,14 +217,20 @@ func (r *runner) execute(ctx context.Context, shapes []Shape) error {
 	}
 
 	rec.Sync = syncIntent
-	if err := r.reserve(rec.RunID, rec.Sync, "sync"); err != nil {
+	if err := r.save(rec); err != nil {
 		return err
 	}
-	if err := r.save(rec); err != nil {
+	if err := r.reserve(rec.RunID, rec.Sync, "sync"); err != nil {
 		return err
 	}
 	res, err := r.c.Send(ctx, syncReq)
 	if err != nil {
+		if !errors.Is(err, batch.ErrMaybeSent) {
+			// The request never went out or the API refused it, so nothing was billed.
+			if verr := r.void(rec.RunID, rec.Sync, "sync"); verr != nil {
+				return errors.Join(err, verr)
+			}
+		}
 		return fmt.Errorf("send smoke sync request: %w", err)
 	}
 	if err := r.settleSync(rec.RunID, rec.Sync, res); err != nil {
@@ -245,13 +253,16 @@ func (r *runner) request(customID string, s Shape) batch.Request {
 	}
 }
 
-func (r *runner) reserve(runID string, it intentRecord, mode string) error {
-	seat := pageName
+func seatOf(mode string) string {
 	if mode == "sync" {
-		seat = syncID
+		return syncID
 	}
+	return pageName
+}
+
+func (r *runner) reserve(runID string, it intentRecord, mode string) error {
 	err := r.led.Reserve(ledger.Reservation{
-		Entry:    r.entry(runID, seat, mode),
+		Entry:    r.entry(runID, seatOf(mode), mode),
 		Intent:   it.Intent,
 		Requests: it.Requests,
 		Worst:    it.Worst,
@@ -264,7 +275,7 @@ func (r *runner) reserve(runID string, it intentRecord, mode string) error {
 
 func (r *runner) void(runID string, it intentRecord, mode string) error {
 	return r.led.Settle(ledger.Settlement{
-		Entry:  r.entry(runID, pageName, mode),
+		Entry:  r.entry(runID, seatOf(mode), mode),
 		Intent: it.Intent,
 		Key:    it.Intent + "/void",
 		Kind:   "void",
@@ -339,10 +350,8 @@ func (r *runner) settleSync(runID string, it intentRecord, res batch.Result) err
 	return nil
 }
 
-// resume settles what earlier runs left in the smoke directory. A batch with an ID is settled
-// through Results; an intent that never got a batch ID never reached the API and is voided; a
-// sync intent that was reserved but not settled may have been billed, so it settles estimated at
-// its worst case.
+// resume settles what earlier runs left in the smoke directory. The ledger decides what is
+// still owed: see resumeRecord.
 func (r *runner) resume(ctx context.Context) error {
 	files, err := filepath.Glob(filepath.Join(r.p.StateDir, recordDirName, "*.json"))
 	if err != nil {
@@ -364,18 +373,28 @@ func (r *runner) resume(ctx context.Context) error {
 	return nil
 }
 
+// resumeRecord settles the open intents of one earlier run. An intent the ledger no longer
+// lists is already closed (voided inline, settled before a failed save, or never reserved), so
+// the record is only marked settled. An open intent with a batch ID settles through Results.
+// An open intent with no batch ID, or an open sync intent, has an unknown outcome: it may have
+// been billed, so it settles estimated at its worst case and is never voided.
 func (r *runner) resumeRecord(ctx context.Context, rec record) error {
 	model := r.p.Model
 	r.p.Model = rec.Model
 	defer func() { r.p.Model = model }()
 
+	open, err := r.led.OpenIntents(rec.RunID)
+	if err != nil {
+		return err
+	}
+	isOpen := func(intent string) bool {
+		return slices.ContainsFunc(open, func(res ledger.Reservation) bool { return res.Intent == intent })
+	}
+
 	if it := rec.Batch; it.Intent != "" && !it.Settled {
-		if it.BatchID == "" {
-			if err := r.void(rec.RunID, it, "batch"); err != nil {
-				return err
-			}
-			r.report.Voided = append(r.report.Voided, it.Intent)
-		} else {
+		switch {
+		case !isOpen(it.Intent):
+		case it.BatchID != "":
 			results, err := r.await(ctx, it.BatchID)
 			if err != nil {
 				return err
@@ -384,6 +403,20 @@ func (r *runner) resumeRecord(ctx context.Context, rec record) error {
 				return err
 			}
 			r.report.Resumed = append(r.report.Resumed, it.BatchID)
+		default:
+			for _, id := range it.CustomIDs {
+				err := r.led.Settle(ledger.Settlement{
+					Entry:  r.entry(rec.RunID, id, "batch"),
+					Intent: it.Intent,
+					Key:    it.Intent + "/" + id,
+					Cost:   it.Worst / float64(it.Requests),
+					Kind:   "estimated",
+				})
+				if err != nil {
+					return fmt.Errorf("settle %s/%s: %w", it.Intent, id, err)
+				}
+			}
+			r.report.Estimated = append(r.report.Estimated, it.Intent)
 		}
 		rec.Batch.Settled = true
 		if err := r.save(rec); err != nil {
@@ -391,17 +424,19 @@ func (r *runner) resumeRecord(ctx context.Context, rec record) error {
 		}
 	}
 	if it := rec.Sync; it.Intent != "" && !it.Settled {
-		err := r.led.Settle(ledger.Settlement{
-			Entry:  r.entry(rec.RunID, syncID, "sync"),
-			Intent: it.Intent,
-			Key:    it.Intent + "/" + syncID,
-			Cost:   it.Worst,
-			Kind:   "estimated",
-		})
-		if err != nil {
-			return fmt.Errorf("settle %s: %w", it.Intent, err)
+		if isOpen(it.Intent) {
+			err := r.led.Settle(ledger.Settlement{
+				Entry:  r.entry(rec.RunID, syncID, "sync"),
+				Intent: it.Intent,
+				Key:    it.Intent + "/" + syncID,
+				Cost:   it.Worst,
+				Kind:   "estimated",
+			})
+			if err != nil {
+				return fmt.Errorf("settle %s: %w", it.Intent, err)
+			}
+			r.report.Estimated = append(r.report.Estimated, it.Intent)
 		}
-		r.report.Estimated = append(r.report.Estimated, it.Intent)
 		rec.Sync.Settled = true
 		return r.save(rec)
 	}

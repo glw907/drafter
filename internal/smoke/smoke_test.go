@@ -211,7 +211,7 @@ func (f *fake) stream(w http.ResponseWriter, body []byte) {
 	ev("message_start", fmt.Sprintf(`{"type":"message_start","message":{"id":"msg_sync%d","type":"message","role":"assistant","model":%q,"content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":%d,"cache_creation_input_tokens":0,"cache_read_input_tokens":%d,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":1}}}`,
 		f.syncCalls, testModel, syncUsage.InputTokens, syncUsage.CacheRead))
 	if f.syncMode == "reset" {
-		w.(http.Flusher).Flush()
+		_ = http.NewResponseController(w).Flush()
 		panic(http.ErrAbortHandler)
 	}
 	ev("content_block_start", `{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`)
