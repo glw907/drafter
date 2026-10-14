@@ -118,7 +118,13 @@ func TestCheckRecovery(t *testing.T) {
 		{"failing step with no failure item", "        produces: [deployed]\n", "        produces: [deployed]\n        canFail: true\n", []want{
 			{61, SeverityError, "recovery", `step "s-deploy" can fail, but no failure item names it`},
 		}},
-		{"canFail false needs no failure item", "canFail: true", "canFail: false", nil},
+		{"a failure from a step that cannot fail", "canFail: true", "canFail: false", []want{
+			{44, SeverityWarning, "recovery", `failure "x-create" follows step "s-create", which is not marked canFail`},
+		}},
+		{"a failure from a step that can fail", "canFail: true", "canFail: true", nil},
+		{"a free-standing failure needs no canFail step", "        from: s-create\n", "", []want{
+			{41, SeverityError, "recovery", `step "s-create" can fail, but no failure item names it`},
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

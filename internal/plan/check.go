@@ -181,8 +181,14 @@ func (c *checker) readerState() {
 func (c *checker) recovery() {
 	handled := map[string]bool{}
 	c.each(func(it *Item) {
-		if it.Kind == "failure" {
-			handled[it.From] = true
+		if it.Kind != "failure" {
+			return
+		}
+		handled[it.From] = true
+		if from := c.items[it.From]; from != nil && from.Kind == "step" && !from.CanFail {
+			c.add(it.Lines["from"], SeverityWarning, checkRecovery,
+				fmt.Sprintf("failure %q follows step %q, which is not marked canFail", it.ID, it.From),
+				"add canFail: true to the step, or remove from to make the failure free-standing")
 		}
 	})
 	c.each(func(it *Item) {

@@ -309,7 +309,9 @@ list it in `preconditions`.
 ### recovery
 
 Every step with `canFail: true` must be the `from` of at least one `failure` item. A failure
-item whose handler doesn't exist is an `ids` error.
+item whose handler doesn't exist is an `ids` error. A failure whose `from` names a step that
+isn't `canFail` gets a warning, since the step is not expected to fail: mark the step `canFail`, or
+drop `from` to make the failure free-standing.
 
 ### links
 
