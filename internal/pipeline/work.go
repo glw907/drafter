@@ -104,6 +104,9 @@ type work struct {
 	// run of the command: its content, or absent.
 	IndexPre map[string]*string `json:"index_pre,omitempty"`
 	Rec      record             `json:"rec"`
+	// PendingGate names the exchange kind of a write whose gate has not finished, so a resume
+	// that finds the files written runs the gate and never asks the model again.
+	PendingGate string `json:"pending_gate,omitempty"`
 	// Sent holds the turns of the request most recently built for each seat, which an answer
 	// extends into a conversation.
 	Sent map[string][]batch.Message `json:"sent,omitempty"`

@@ -61,6 +61,10 @@ type fakeAPI struct {
 	pollsToEnd int
 	// onSubmit runs at the start of every Create and Send, so a test can check what came before.
 	onSubmit func(ids []string)
+	// crash is asked at each call that can end a run: "create", "send", "results". It returns
+	// "before" to panic before the call does anything, "after" to panic once a create or send
+	// has been recorded, or "" to go on. The panic stands for the process dying.
+	crash func(call string, ids []string) string
 
 	batches   map[string]*fakeBatch
 	order     []string
@@ -187,11 +191,25 @@ func ids(rs []batch.Request) []string {
 	return out
 }
 
+// crashed is the panic value that stands for the process dying.
+type crashed struct{}
+
+func (f *fakeAPI) maybeCrash(call string, ids []string, phase string) {
+	if f.crash != nil && f.crash(call, ids) == phase {
+		panic(crashed{})
+	}
+}
+
 func (f *fakeAPI) Create(ctx context.Context, rs []batch.Request) (batch.Batch, error) {
 	f.creates++
 	f.calls = append(f.calls, "create")
 	if f.onSubmit != nil {
 		f.onSubmit(ids(rs))
+	}
+	f.maybeCrash("create", ids(rs), "before")
+	if f.crash != nil && f.crash("create", ids(rs)) == "after" {
+		f.record(rs)
+		panic(crashed{})
 	}
 	if err := f.createErrs[f.creates]; err != nil {
 		return batch.Batch{}, err
@@ -223,6 +241,7 @@ func (f *fakeAPI) Get(ctx context.Context, id string) (batch.Batch, error) {
 
 func (f *fakeAPI) Results(ctx context.Context, id string) ([]batch.Result, error) {
 	f.calls = append(f.calls, "results")
+	f.maybeCrash("results", nil, "before")
 	if f.resultsErr != nil {
 		return nil, f.resultsErr
 	}
@@ -246,12 +265,22 @@ func (f *fakeAPI) List(ctx context.Context, since time.Time) ([]batch.Batch, err
 	return out, nil
 }
 
+// addDecoy adds an ended batch of another run, which List returns beside the run's own.
+func (f *fakeAPI) addDecoy(id string, created time.Time) {
+	f.batches[id] = &fakeBatch{
+		id: id, created: created, polls: 1 << 20,
+		results: []batch.Result{{CustomID: "other_" + id, Kind: batch.KindSucceeded, StopReason: "end_turn", Text: "{}"}},
+	}
+	f.order = append(f.order, id)
+}
+
 func (f *fakeAPI) Send(ctx context.Context, r batch.Request) (batch.Result, error) {
 	f.sends++
 	f.calls = append(f.calls, "send")
 	if f.onSubmit != nil {
 		f.onSubmit([]string{r.CustomID})
 	}
+	f.maybeCrash("send", []string{r.CustomID}, "before")
 	if err := f.sendErrs[f.sends]; err != nil {
 		return batch.Result{}, err
 	}

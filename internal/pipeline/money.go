@@ -297,15 +297,17 @@ func (r *runner) send(ctx context.Context, p *page, idx int, name string, req ba
 	res, err := r.api.Send(ctx, req)
 	switch {
 	case err == nil:
-		in := &p.ps.Intents[idx]
 		if err := p.saveResponse(res); err != nil {
 			return err
 		}
-		in.Saved = true
+		p.ps.Intents[idx].Saved = true
+		if err := r.save(); err != nil {
+			return err
+		}
 		if err := r.settleResults(p, idx, []batch.Result{res}); err != nil {
 			return err
 		}
-		return p.handle(ctx, &p.ps.Intents[idx], []batch.Result{res})
+		return r.process(ctx, p, idx, []batch.Result{res})
 	case errors.Is(err, batch.ErrMaybeSent):
 		// The response is lost and cannot be recovered, so the attempt settles at its worst
 		// case, and the request goes out again as a new attempt.
@@ -454,18 +456,10 @@ func (r *runner) await(ctx context.Context) error {
 			}
 			r.inflight = append(r.inflight[:i], r.inflight[i+1:]...)
 			i--
-			for _, res := range results {
-				if err := fl.page.saveResponse(res); err != nil {
-					return err
-				}
-			}
-			if err := r.settleResults(fl.page, fl.idx, results); err != nil {
+			if err := r.record(fl.page, fl.idx, results); err != nil {
 				return err
 			}
-			if err := fl.page.handle(ctx, fl.intent(), results); err != nil {
-				return err
-			}
-			if err := r.save(); err != nil {
+			if err := r.process(ctx, fl.page, fl.idx, results); err != nil {
 				return err
 			}
 			if r.stop != "" {
@@ -479,6 +473,30 @@ func (r *runner) await(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// record saves the results of a batch to the page's record directory, marks the intent saved,
+// and settles it. After this a resume reads the results from disk and never needs the API.
+func (r *runner) record(p *page, idx int, results []batch.Result) error {
+	for _, res := range results {
+		if err := p.saveResponse(res); err != nil {
+			return err
+		}
+	}
+	p.ps.Intents[idx].Saved = true
+	if err := r.save(); err != nil {
+		return err
+	}
+	return r.settleResults(p, idx, results)
+}
+
+// process hands settled results to the page and marks the intent handled.
+func (r *runner) process(ctx context.Context, p *page, idx int, results []batch.Result) error {
+	if err := p.handle(ctx, &p.ps.Intents[idx], results); err != nil {
+		return err
+	}
+	p.ps.Intents[idx].Handled = true
+	return r.save()
 }
 
 // pollFailed maps a failed poll or download to a stop; the batch keeps running on the server,

@@ -84,6 +84,14 @@ func (p *page) doPlan() error {
 // coverage check on a green gate, to a hold on a red one with nothing of the page's own, and to
 // a fix exchange on a red one that names the page.
 func (p *page) gateStep(ctx context.Context, kind string) error {
+	err := p.gateStepOnce(ctx, kind)
+	if err == nil && p.r.stop == "" {
+		p.w.PendingGate = ""
+	}
+	return err
+}
+
+func (p *page) gateStepOnce(ctx context.Context, kind string) error {
 	if err := p.indexLink(ctx); err != nil {
 		return err
 	}

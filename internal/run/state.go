@@ -72,8 +72,11 @@ type Intent struct {
 	Worst    float64         `json:"worst"`
 	Requests []IntentRequest `json:"requests"`
 	BatchID  string          `json:"batch_id,omitempty"`
-	// Saved is true once a sync response is on disk.
+	// Saved is true once every response of the intent is on disk, in the page's record
+	// directory, so a resume never needs the API for them again.
 	Saved bool `json:"saved,omitempty"`
+	// Handled is true once the page has acted on the responses.
+	Handled bool `json:"handled,omitempty"`
 	// Settlement is how the intent closed in the ledger: actual, estimated, or void. It is
 	// empty while the intent is open.
 	Settlement string `json:"settlement,omitempty"`

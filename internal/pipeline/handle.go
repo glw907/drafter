@@ -290,6 +290,7 @@ func (p *page) completeDraft(ctx context.Context) error {
 	p.w.Rec.addFriction("draft", a.Friction)
 	p.w.DraftHist = append(slices.Clone(p.w.Sent["draft"]), batch.Message{Role: "assistant", Text: p.w.Got["draft"]})
 	p.w.Got = nil
+	p.w.PendingGate = exDraft
 	if err := p.writeFiles(a.Page, a.Brief); err != nil {
 		return err
 	}
@@ -377,6 +378,7 @@ func (p *page) completeExchange(ctx context.Context) error {
 	ex.Resolutions = ap.Resolutions
 	p.w.Rec.resolutions(exchangeStage(ex.Kind), ex.Resolutions)
 	if ap.Page != pageText || ap.Brief != briefText {
+		p.w.PendingGate = ex.Kind
 		if err := p.writeFiles(ap.Page, ap.Brief); err != nil {
 			return err
 		}

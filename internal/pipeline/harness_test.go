@@ -218,16 +218,54 @@ func (h *harness) handoff(page, brief, plan, job string) handoff.Handoff {
 	}
 }
 
-// run runs the pipeline once and returns its summary and error.
-func (h *harness) run() (Summary, error) {
-	h.t.Helper()
-	h.opts = Options{
+var testNow = time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+
+func (h *harness) options() Options {
+	return Options{
 		Config: h.cfg, Handoffs: h.handoffs, API: h.api, Version: "test",
-		Now:   func() time.Time { return time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC) },
+		Now:   func() time.Time { return testNow },
 		Sleep: func(context.Context, time.Duration) error { return nil }, PollInterval: time.Millisecond,
 		Out: &h.out, Err: &h.err,
 	}
+}
+
+// run runs the pipeline once and returns its summary and error.
+func (h *harness) run() (Summary, error) {
+	h.t.Helper()
+	h.opts = h.options()
 	return Run(context.Background(), h.opts)
+}
+
+// resume continues the stopped run with the harness's current configuration and handoffs.
+func (h *harness) resume(id string) (Summary, error) {
+	h.t.Helper()
+	h.opts = h.options()
+	h.opts.Resume = id
+	return Run(context.Background(), h.opts)
+}
+
+// dies runs f and reports whether the fake API killed the process in it.
+func dies(f func()) (died bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(crashed); !ok {
+				panic(r)
+			}
+			died = true
+		}
+	}()
+	f()
+	return false
+}
+
+// runID returns the ID of the one run in the state directory.
+func (h *harness) runID() string {
+	h.t.Helper()
+	matches, err := filepath.Glob(filepath.Join(h.stateDir, "runs", "*", "*"))
+	if err != nil || len(matches) != 1 {
+		h.t.Fatalf("run directories = %v, %v", matches, err)
+	}
+	return filepath.Base(matches[0])
 }
 
 func (h *harness) mustRun() Summary {
