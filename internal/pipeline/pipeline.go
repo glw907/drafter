@@ -58,36 +58,36 @@ type Options struct {
 
 // PageResult is one page's end state.
 type PageResult struct {
-	Path   string
-	Status string
+	Path   string `json:"path"`
+	Status string `json:"status"`
 	// Rule is the stop rule an escalated page failed on.
-	Rule string
-	Cost float64
+	Rule string  `json:"rule,omitempty"`
+	Cost float64 `json:"cost"`
 }
 
 // Estimate is one request of a dry run.
 type Estimate struct {
-	Seat      string
-	CustomID  string
-	Tokens    int64
-	MaxTokens int64
-	Worst     float64
+	Seat      string  `json:"seat"`
+	CustomID  string  `json:"custom_id"`
+	Tokens    int64   `json:"tokens"`
+	MaxTokens int64   `json:"max_tokens"`
+	Worst     float64 `json:"worst"`
 }
 
 // Summary is what a run did.
 type Summary struct {
-	RunID string
-	Pages []PageResult
+	RunID string       `json:"run_id,omitempty"`
+	Pages []PageResult `json:"pages"`
 	// Stop is the reason the run stopped, resumable, or empty when it finished.
-	Stop string
+	Stop string `json:"stop,omitempty"`
 	// ResumeLine is the command that continues a stopped run.
-	ResumeLine string
+	ResumeLine string `json:"resume,omitempty"`
 	// Estimates is the dry run's first stage, one entry per request.
-	Estimates []Estimate
+	Estimates []Estimate `json:"estimates,omitempty"`
 	// EstimateStage names the stage the estimates are for.
-	EstimateStage string
+	EstimateStage string `json:"estimate_stage,omitempty"`
 	// EstimateTotal is the stage's worst case in US dollars.
-	EstimateTotal float64
+	EstimateTotal float64 `json:"estimate_total,omitempty"`
 }
 
 // runner holds one run.
