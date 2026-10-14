@@ -49,8 +49,20 @@ func run(t *testing.T, dir string, args ...string) result {
 // machine running the tests reaches the binary; an entry in extra overrides them.
 func runEnv(t *testing.T, dir string, extra []string, args ...string) result {
 	t.Helper()
+	return runIn(t, dir, "", extra, args...)
+}
+
+// runWithStdin is run with stdin as the command's standard input.
+func runWithStdin(t *testing.T, dir, stdin string, args ...string) result {
+	t.Helper()
+	return runIn(t, dir, stdin, nil, args...)
+}
+
+func runIn(t *testing.T, dir, stdin string, extra []string, args ...string) result {
+	t.Helper()
 	cmd := exec.Command(binary, args...)
 	cmd.Dir = dir
+	cmd.Stdin = strings.NewReader(stdin)
 	for _, kv := range os.Environ() {
 		if !strings.HasPrefix(kv, "DRAFTER_") {
 			cmd.Env = append(cmd.Env, kv)
