@@ -57,6 +57,9 @@ type PageState struct {
 	Pre map[string]string `json:"pre,omitempty"`
 	// Writes lists the file writes the page started, in order.
 	Writes []Write `json:"writes,omitempty"`
+	// Restored is true once an ended page's record is complete and, for an escalated page,
+	// its files are back to their pre-run state.
+	Restored bool `json:"restored,omitempty"`
 }
 
 // Intent is one submission unit, one batch or one sync request, recorded before it is sent.
