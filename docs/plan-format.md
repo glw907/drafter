@@ -122,7 +122,7 @@ An item can't carry a field that its kind doesn't list.
 | `handoff` | `text` | The section's closing turn toward what comes next. |
 | `reason` | `text`, and optionally `facts` | A "why" that must survive drafting. The `facts` field lists the fact ids it rests on. |
 | `step` | `text`, and optionally `requires`, `produces`, `canFail`, `optional` | One action the reader takes. An `optional` step is one the reader may skip. |
-| `failure` | `symptom`, `handledBy`, and optionally `from`, `cause` | A failure that a step can cause, or a free-standing symptom row. |
+| `failure` | `symptom`, `handledBy`, and optionally `from`, `cause`, `facts` | A failure that a step can cause, or a free-standing symptom row. The `facts` field lists the fact ids it rests on. |
 | `code` | `text`, and optionally `source`, `facts` | A code block the section shows. The `text` says what the block shows. The `source` is `path`, `path#Symbol`, or an `http://` or `https://` URL. Omit it for an illustrative snippet with no model file. |
 | `figure` | `text`, and optionally `source` | A figure the section needs. The `text` says what it must show, and the optional `source` says where it comes from. |
 
@@ -134,7 +134,7 @@ The `canFail` field is `true` or `false`, and it defaults to `false`. The `optio
 the same way. A failure's `from` is the `id` of a step. Its `handledBy` is the `id` of the item
 that tells the reader what to do. A failure with no `from` is a free-standing symptom row, for a
 page that lists symptoms, causes, and fixes with no steps. The optional `cause` says why the
-symptom happens.
+symptom happens. The optional `facts` list names the fact ids the symptom and its cause rest on.
 
 The path part of a code item's `source` resolves from the directory of the page, as a link target
 does, and must exist. The `#Symbol` part isn't checked, and neither is a URL. A figure's `source`
@@ -150,7 +150,7 @@ fact behind a `reason` is a `fact` item beside it, and the `reason` can also lis
 `facts`.
 
 **Facts.** A `fact` item places a fact. A `facts` list cites one, on a sentence, a code item, a
-reason, or the introduction. A citation and a placement are separate, so a citation needs no item
+reason, a failure, or the introduction. A citation and a placement are separate, so a citation needs no item
 of its own, and a fact can be placed anywhere on the page: a sentence can cite a fact placed in a
 later section. A plan can't cite a fact that its `dispositions` list leaves out of the page.
 
@@ -291,7 +291,7 @@ that decodes without errors.
 
 Every `id` is unique. A failure's `from`, when present, names a step. A failure's `handledBy` names an item that
 exists. No fact is both a `fact` item and a disposition, and no `facts` list, on a sentence, a code
-item, a reason, or the introduction, names a fact that a disposition leaves out. This check runs
+item, a reason, a failure, or the introduction, names a fact that a disposition leaves out. This check runs
 with or without `--facts`.
 
 ### reader-state
@@ -344,7 +344,7 @@ with the same repeated-heading suffixes. A mismatch is an error that names both 
 ### facts
 
 This check runs only when you pass `--facts`. Without it, each `fact` item and each `facts` list
-(on a sentence, a code item, a reason, or the introduction) gets a warning that names its line,
+(on a sentence, a code item, a reason, a failure, or the introduction) gets a warning that names its line,
 and no fact is checked.
 
 Every `fact` item's `fact` field, every id in any `facts` list, and every disposition's `fact`

@@ -189,7 +189,12 @@
         "from": { "type": "string", "minLength": 1, "description": "The id of the step this failure follows. Omit it for a free-standing symptom row." },
         "symptom": { "type": "string", "minLength": 1 },
         "cause": { "type": "string", "minLength": 1, "description": "Why the symptom happens." },
-        "handledBy": { "type": "string", "minLength": 1, "description": "The id of the item that handles the failure." }
+        "handledBy": { "type": "string", "minLength": 1, "description": "The id of the item that handles the failure." },
+        "facts": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Fact ids the failure rests on. Each must resolve to one citable bullet."
+        }
       }
     },
     "item-code": {

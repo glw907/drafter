@@ -28,7 +28,7 @@ var kinds = map[string]struct{ required, optional []string }{
 	"handoff":  {required: []string{"text"}},
 	"reason":   {required: []string{"text"}, optional: []string{"facts"}},
 	"step":     {required: []string{"text"}, optional: []string{"requires", "produces", "canFail", "optional"}},
-	"failure":  {required: []string{"symptom", "handledBy"}, optional: []string{"from", "cause"}},
+	"failure":  {required: []string{"symptom", "handledBy"}, optional: []string{"from", "cause", "facts"}},
 	"code":     {required: []string{"text"}, optional: []string{"source", "facts"}},
 	"figure":   {required: []string{"text"}, optional: []string{"source"}},
 }

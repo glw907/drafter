@@ -309,6 +309,8 @@ func TestCheckFactsLists(t *testing.T) {
 	noFacts := func(o *CheckOptions) { o.FactsDir = "" }
 	introFacts := func(ids string) string { return intro + "  facts: [" + ids + "]\n" }
 	reasonFacts := func(ids string) string { return reason + "        facts: [" + ids + "]\n" }
+	failure := "        handledBy: r-quota\n"
+	failureFacts := func(ids string) string { return failure + "        facts: [" + ids + "]\n" }
 	codeFacts := func(ids string) string {
 		return "      - id: c-demo\n        kind: code\n        text: |\n          The key command.\n        facts: [" + ids + "]\n" + handoff
 	}
@@ -332,6 +334,17 @@ func TestCheckFactsLists(t *testing.T) {
 		{"code facts with no facts directory", handoff, codeFacts("signing-key-ttl"), noFacts, []want{
 			{27, SeverityWarning, "facts", "the fact item at line 27 is not checked"},
 			{74, SeverityWarning, "facts", "the facts list at line 74 is not checked"},
+		}},
+		{"failure facts that are citable", failure, failureFacts("signing-key-ttl"), nil, nil},
+		{"failure fact that is rejected", failure, failureFacts("rejected-fact"), nil, []want{
+			{48, SeverityError, "facts", `fact "rejected-fact" is tagged [rejected]`},
+		}},
+		{"failure facts with no facts directory", failure, failureFacts("signing-key-ttl"), noFacts, []want{
+			{27, SeverityWarning, "facts", "the fact item at line 27 is not checked"},
+			{48, SeverityWarning, "facts", "the facts list at line 48 is not checked"},
+		}},
+		{"a failure cites a disposed fact", failure, failureFacts("old-key-grace"), nil, []want{
+			{48, SeverityError, "ids", `fact "old-key-grace" is cited here but disposed at line 76`},
 		}},
 		{"reason facts that are citable", reason, reasonFacts("signing-key-ttl"), nil, nil},
 		{"reason fact that is rejected", reason, reasonFacts("rejected-fact"), nil, []want{
