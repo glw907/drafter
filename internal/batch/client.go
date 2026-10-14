@@ -25,11 +25,11 @@ const (
 // Client talks to the Claude API. It holds no connection state beyond the SDK client and starts
 // no goroutines. Use it from one goroutine at a time.
 type Client struct {
-	// Sleep waits d, or until ctx ends, and reports why it stopped early. Tests replace it so
+	// sleep waits d, or until ctx ends, and reports why it stopped early. Tests replace it so
 	// retry rows run in milliseconds.
-	Sleep func(ctx context.Context, d time.Duration) error
-	// Now is the backoff clock. Tests replace it.
-	Now func() time.Time
+	sleep func(ctx context.Context, d time.Duration) error
+	// now is the backoff clock. Tests replace it.
+	now func() time.Time
 
 	sdk     anthropic.Client
 	o       Options
@@ -61,10 +61,10 @@ func New(o Options) *Client {
 	if o.BaseURL != "" {
 		opts = append(opts, option.WithBaseURL(o.BaseURL))
 	}
-	return &Client{Sleep: sleep, Now: time.Now, sdk: anthropic.NewClient(opts...), o: o}
+	return &Client{sleep: sleepCtx, now: time.Now, sdk: anthropic.NewClient(opts...), o: o}
 }
 
-func sleep(ctx context.Context, d time.Duration) error {
+func sleepCtx(ctx context.Context, d time.Duration) error {
 	t := time.NewTimer(d)
 	defer t.Stop()
 	select {
@@ -118,7 +118,7 @@ func (c *Client) requireCheck() error {
 // the caller to map. idempotent calls retry any transport error and any 429, 500, or 529; the
 // others retry only a failure that provably came before the request was written, and a 429.
 func (c *Client) do(ctx context.Context, idempotent bool, call func(context.Context) error) (*failure, error) {
-	start := c.Now()
+	start := c.now()
 	for attempt := 0; ; attempt++ {
 		if cerr := ctx.Err(); cerr != nil {
 			return nil, cerr // nothing was sent
@@ -143,10 +143,10 @@ func (c *Client) do(ctx context.Context, idempotent bool, call func(context.Cont
 		if !retry {
 			return &f, nil
 		}
-		if c.Now().Sub(start)+delay > c.o.WallTime {
+		if c.now().Sub(start)+delay > c.o.WallTime {
 			return nil, f.callError(ErrTransport)
 		}
-		if err := c.Sleep(ctx, delay); err != nil {
+		if err := c.sleep(ctx, delay); err != nil {
 			return nil, err
 		}
 	}
