@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -65,10 +66,12 @@ type fake struct {
 	creates    int // accepted Create calls
 	rejected   int // Create calls refused for repeated custom_ids
 	pollsToEnd int
-	hold       bool // batches never end
-	failCreate bool // Create answers 500 after reading the body
-	overCount  bool // results report more input than count_tokens did
-	syncCalls  int  // streamed calls served; each gets its own message ID
+	hold       bool   // batches never end
+	failCreate bool   // Create answers 500 after reading the body
+	refuseBody string // when set, Create answers 400 with this error message
+	syncMode   string // "" serves the sync call; "reset" drops it mid-stream; "spend" refuses it at a spend limit
+	overCount  bool   // results report more input than count_tokens did
+	syncCalls  int    // streamed calls served; each gets its own message ID
 }
 
 func newFake(t *testing.T) *fake {
@@ -158,6 +161,10 @@ func (f *fake) create(w http.ResponseWriter, body []byte) {
 		}
 		seen[r.CustomID] = true
 	}
+	if f.refuseBody != "" {
+		writeJSON(w, 400, errBody("invalid_request_error", f.refuseBody))
+		return
+	}
 	if f.failCreate {
 		writeJSON(w, 500, errBody("api_error", "internal"))
 		return
@@ -188,6 +195,10 @@ func (f *fake) results(w http.ResponseWriter, id string) {
 }
 
 func (f *fake) stream(w http.ResponseWriter, body []byte) {
+	if f.syncMode == "spend" {
+		writeJSON(w, 400, errBody("invalid_request_error", "You have reached your specified API usage limits. You will regain access on 2026-11-01 at 00:00 UTC."))
+		return
+	}
 	f.syncCalls++
 	var in wireRequest
 	_ = json.Unmarshal(body, &in.Params)
@@ -199,6 +210,10 @@ func (f *fake) stream(w http.ResponseWriter, body []byte) {
 	}
 	ev("message_start", fmt.Sprintf(`{"type":"message_start","message":{"id":"msg_sync%d","type":"message","role":"assistant","model":%q,"content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":%d,"cache_creation_input_tokens":0,"cache_read_input_tokens":%d,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":1}}}`,
 		f.syncCalls, testModel, syncUsage.InputTokens, syncUsage.CacheRead))
+	if f.syncMode == "reset" {
+		w.(http.Flusher).Flush()
+		panic(http.ErrAbortHandler)
+	}
 	ev("content_block_start", `{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`)
 	delta, _ := json.Marshal(map[string]any{"type": "content_block_delta", "index": 0, "delta": map[string]any{"type": "text_delta", "text": string(text)}})
 	ev("content_block_delta", string(delta))
@@ -623,7 +638,7 @@ func TestResume(t *testing.T) {
 		}
 	})
 
-	t.Run("an intent that never reached the API is voided", func(t *testing.T) {
+	t.Run("a batch Create that may have been sent is settled estimated, not voided", func(t *testing.T) {
 		f := newFake(t)
 		f.set(func() { f.failCreate = true })
 		dir := t.TempDir()
@@ -631,37 +646,220 @@ func TestResume(t *testing.T) {
 		if !errors.Is(err, batch.ErrMaybeSent) {
 			t.Fatalf("first Run err = %v, want ErrMaybeSent", err)
 		}
-		files, _ := filepath.Glob(filepath.Join(dir, "smoke", "*.json"))
-		if len(files) != 1 {
-			t.Fatalf("record files = %v", files)
-		}
-		runID := strings.TrimSuffix(filepath.Base(files[0]), ".json")
-		if open, _ := ledger.Open(dir).OpenIntents(runID); len(open) != 1 {
+		runID, intent := onlyRecord(t, dir)
+		open, _ := ledger.Open(dir).OpenIntents(runID)
+		if len(open) != 1 || open[0].Intent != intent {
 			t.Fatalf("open intents = %v, want the one reservation", open)
 		}
+		worst := open[0].Worst
 
 		f.set(func() { f.failCreate = false })
 		rep, err := Run(context.Background(), params(f, dir), Shapes())
 		if err != nil {
 			t.Fatalf("second Run: %v", err)
 		}
-		if len(rep.Voided) != 1 {
-			t.Errorf("voided = %v, want one intent", rep.Voided)
+		if len(rep.Voided) != 0 || !slices.Equal(rep.Estimated, []string{intent}) {
+			t.Errorf("voided %v, estimated %v, want none and [%s]", rep.Voided, rep.Estimated, intent)
 		}
 		if open, _ := ledger.Open(dir).OpenIntents(runID); len(open) != 0 {
 			t.Errorf("open intents after resume = %v, want none", open)
 		}
-		var voids int
+		var total float64
+		keys := map[string]bool{}
 		for _, l := range settleLines(t, dir) {
 			if l.Kind == "void" {
-				voids++
-				if l.Cost != 0 || !strings.HasSuffix(l.Key, "/void") {
-					t.Errorf("void line = %+v", l)
+				t.Errorf("void line %+v for an intent that may have been billed", l)
+			}
+			if l.Intent == intent {
+				if l.Kind != "estimated" {
+					t.Errorf("line %+v, want estimated", l)
 				}
+				total += l.Cost
+				keys[l.Key] = true
 			}
 		}
-		if voids != 1 {
-			t.Errorf("void lines = %d, want 1", voids)
+		for _, s := range Shapes() {
+			if !keys[intent+"/"+s.Seat] {
+				t.Errorf("no estimated line keyed %s/%s", intent, s.Seat)
+			}
+		}
+		if len(keys) != 7 || math.Abs(total-worst) > 1e-9 {
+			t.Errorf("estimated keys %d, total %v, want 7 and %v", len(keys), total, worst)
 		}
 	})
+
+	t.Run("a batch Create refused before billing is voided inline once", func(t *testing.T) {
+		f := newFake(t)
+		f.set(func() { f.refuseBody = "bad request" })
+		dir := t.TempDir()
+		_, err := Run(context.Background(), params(f, dir), Shapes())
+		if err == nil || errors.Is(err, batch.ErrMaybeSent) {
+			t.Fatalf("first Run err = %v, want a refusal that is not ErrMaybeSent", err)
+		}
+		runID, intent := onlyRecord(t, dir)
+		if open, _ := ledger.Open(dir).OpenIntents(runID); len(open) != 0 {
+			t.Fatalf("open intents after the first run = %v, want none", open)
+		}
+		wantOneVoid(t, dir, intent)
+
+		f.set(func() { f.refuseBody = "" })
+		rep, err := Run(context.Background(), params(f, dir), Shapes())
+		if err != nil {
+			t.Fatalf("second Run: %v", err)
+		}
+		if len(rep.Voided) != 0 || len(rep.Estimated) != 0 || len(rep.Resumed) != 0 {
+			t.Errorf("resume reported voided %v, estimated %v, resumed %v, want nothing", rep.Voided, rep.Estimated, rep.Resumed)
+		}
+		wantOneVoid(t, dir, intent)
+	})
+
+	t.Run("a sync send that may have been sent is settled estimated at its worst case", func(t *testing.T) {
+		f := newFake(t)
+		f.set(func() { f.syncMode = "reset" })
+		dir := t.TempDir()
+		_, err := Run(context.Background(), params(f, dir), Shapes())
+		if !errors.Is(err, batch.ErrMaybeSent) {
+			t.Fatalf("first Run err = %v, want ErrMaybeSent", err)
+		}
+		runID, _ := onlyRecord(t, dir)
+		open, _ := ledger.Open(dir).OpenIntents(runID)
+		if len(open) != 1 || open[0].Intent != runID+"-sync" {
+			t.Fatalf("open intents = %v, want the sync reservation", open)
+		}
+
+		f.set(func() { f.syncMode = "" })
+		rep, err := Run(context.Background(), params(f, dir), Shapes())
+		if err != nil {
+			t.Fatalf("second Run: %v", err)
+		}
+		if !slices.Equal(rep.Estimated, []string{runID + "-sync"}) || len(rep.Voided) != 0 {
+			t.Errorf("estimated %v, voided %v, want [%s-sync] and none", rep.Estimated, rep.Voided, runID)
+		}
+		var est []ledgerLine
+		for _, l := range settleLines(t, dir) {
+			if l.Kind == "estimated" {
+				est = append(est, l)
+			}
+		}
+		if len(est) != 1 || est[0].Key != runID+"-sync/sync" || math.Abs(est[0].Cost-open[0].Worst) > 1e-9 {
+			t.Errorf("estimated lines = %+v, want one keyed %s-sync/sync at %v", est, runID, open[0].Worst)
+		}
+	})
+
+	t.Run("a sync send refused at a spend limit is voided inline once", func(t *testing.T) {
+		f := newFake(t)
+		f.set(func() { f.syncMode = "spend" })
+		dir := t.TempDir()
+		_, err := Run(context.Background(), params(f, dir), Shapes())
+		if !errors.Is(err, batch.ErrSpendLimit) {
+			t.Fatalf("first Run err = %v, want ErrSpendLimit", err)
+		}
+		runID, _ := onlyRecord(t, dir)
+		if open, _ := ledger.Open(dir).OpenIntents(runID); len(open) != 0 {
+			t.Fatalf("open intents after the first run = %v, want none", open)
+		}
+		wantOneVoid(t, dir, runID+"-sync")
+
+		f.set(func() { f.syncMode = "" })
+		rep, err := Run(context.Background(), params(f, dir), Shapes())
+		if err != nil {
+			t.Fatalf("second Run: %v", err)
+		}
+		if len(rep.Voided) != 0 || len(rep.Estimated) != 0 {
+			t.Errorf("resume reported voided %v, estimated %v, want nothing", rep.Voided, rep.Estimated)
+		}
+		wantOneVoid(t, dir, runID+"-sync")
+		for _, l := range settleLines(t, dir) {
+			if l.Kind == "estimated" {
+				t.Errorf("estimated line %+v for a refused send", l)
+			}
+		}
+	})
+
+	t.Run("a sync intent already settled in the ledger adds no line", func(t *testing.T) {
+		f := newFake(t)
+		dir := t.TempDir()
+		rep, err := Run(context.Background(), params(f, dir), Shapes())
+		if err != nil {
+			t.Fatalf("first Run: %v", err)
+		}
+		before := len(settleLines(t, dir))
+		// The crash the finding names: the ledger settled the sync result, the save did not land.
+		rec := readRecord(t, dir, rep.RunID)
+		rec.Sync.Settled = false
+		if err := (&runner{p: params(f, dir)}).save(rec); err != nil {
+			t.Fatal(err)
+		}
+		rep2, err := Run(context.Background(), params(f, dir), Shapes())
+		if err != nil {
+			t.Fatalf("second Run: %v", err)
+		}
+		if len(rep2.Estimated) != 0 {
+			t.Errorf("estimated = %v, want none", rep2.Estimated)
+		}
+		if got := len(settleLines(t, dir)); got != before+len(Shapes())+1 {
+			t.Errorf("settle lines = %d, want %d (only the second run's own)", got, before+len(Shapes())+1)
+		}
+		for _, l := range settleLines(t, dir) {
+			if l.Key == rep.RunID+"-sync/sync" {
+				t.Errorf("duplicate sync line %+v", l)
+			}
+		}
+		if !readRecord(t, dir, rep.RunID).Sync.Settled {
+			t.Error("record still unsettled after the resume")
+		}
+	})
+
+	t.Run("a refused reservation leaves a record the next run closes quietly", func(t *testing.T) {
+		f := newFake(t)
+		dir := t.TempDir()
+		tight := params(f, dir)
+		tight.Caps.Page = 0.000001
+		if _, err := Run(context.Background(), tight, Shapes()); err == nil {
+			t.Fatal("Run succeeded under a page cap too small to reserve")
+		}
+		runID, _ := onlyRecord(t, dir)
+		rep, err := Run(context.Background(), params(f, dir), Shapes())
+		if err != nil {
+			t.Fatalf("second Run: %v", err)
+		}
+		if len(rep.Voided) != 0 || len(rep.Estimated) != 0 {
+			t.Errorf("voided %v, estimated %v, want nothing for an intent never reserved", rep.Voided, rep.Estimated)
+		}
+		if !readRecord(t, dir, runID).Batch.Settled {
+			t.Error("record of the refused run still unsettled")
+		}
+	})
+}
+
+func TestRunNoShapes(t *testing.T) {
+	f := newFake(t)
+	if _, err := Run(context.Background(), params(f, t.TempDir()), nil); err == nil {
+		t.Fatal("Run with no shapes returned nil")
+	}
+}
+
+// onlyRecord returns the run ID and batch intent of the single record file in dir.
+func onlyRecord(t *testing.T, dir string) (runID, batchIntent string) {
+	t.Helper()
+	files, _ := filepath.Glob(filepath.Join(dir, "smoke", "*.json"))
+	if len(files) != 1 {
+		t.Fatalf("record files = %v, want one", files)
+	}
+	runID = strings.TrimSuffix(filepath.Base(files[0]), ".json")
+	return runID, readRecord(t, dir, runID).Batch.Intent
+}
+
+// wantOneVoid fails unless the ledger holds exactly one void line, for intent, at zero cost.
+func wantOneVoid(t *testing.T, dir, intent string) {
+	t.Helper()
+	var voids []ledgerLine
+	for _, l := range settleLines(t, dir) {
+		if l.Kind == "void" {
+			voids = append(voids, l)
+		}
+	}
+	if len(voids) != 1 || voids[0].Intent != intent || voids[0].Cost != 0 || voids[0].Key != intent+"/void" {
+		t.Errorf("void lines = %+v, want exactly one for %s at zero", voids, intent)
+	}
 }
