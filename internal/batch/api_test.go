@@ -27,7 +27,7 @@ func TestBatchRoundTrip(t *testing.T) {
 			writeJSON(w, 200, batchJSON("msgbatch_1", "in_progress", created))
 		case strings.HasSuffix(r.URL.Path, "/results"):
 			w.Header().Set("content-type", "application/x-jsonl")
-			w.Write([]byte(resultsBody))
+			_, _ = w.Write([]byte(resultsBody))
 		default:
 			status := "in_progress"
 			if polls.Add(1) >= 3 {
@@ -271,8 +271,12 @@ func TestRequestWithoutOptionalFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	create := decodeBody(t, a.last(t, "POST", "/v1/messages/batches").body)
-	item := create["requests"].([]any)[0].(map[string]any)
-	params := item["params"].(map[string]any)
+	reqs, _ := create["requests"].([]any)
+	if len(reqs) != 1 {
+		t.Fatalf("batch holds %d requests, want 1", len(reqs))
+	}
+	item, _ := reqs[0].(map[string]any)
+	params, _ := item["params"].(map[string]any)
 	for _, k := range []string{"system", "output_config"} {
 		if _, ok := params[k]; ok {
 			t.Errorf("params holds %q for a request without it", k)

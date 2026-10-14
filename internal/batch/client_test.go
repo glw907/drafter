@@ -179,11 +179,12 @@ func TestSDKRetriesOff(t *testing.T) {
 	}
 }
 
-// flaky answers the first n requests (models probe excluded) with fail and the rest with ok.
-func flaky(n int, fail, ok http.HandlerFunc) http.HandlerFunc {
+// failOnce answers the first request that reaches it (the models probe excluded) with fail and
+// the rest with ok.
+func failOnce(fail, ok http.HandlerFunc) http.HandlerFunc {
 	var count atomic.Int32
 	return func(w http.ResponseWriter, r *http.Request) {
-		if int(count.Add(1)) <= n {
+		if count.Add(1) == 1 {
 			fail(w, r)
 			return
 		}
@@ -216,7 +217,7 @@ func okAny(w http.ResponseWriter, r *http.Request) {
 	case strings.HasSuffix(r.URL.Path, "/results"):
 		w.Header().Set("content-type", "application/x-jsonl")
 		w.WriteHeader(200)
-		w.Write([]byte(resultsJSONL))
+		_, _ = w.Write([]byte(resultsJSONL))
 	case r.Method == "GET" && r.URL.Path == "/v1/messages/batches":
 		writeJSON(w, 200, `{"data":[],"has_more":false,"first_id":null,"last_id":null}`)
 	case strings.HasSuffix(r.URL.Path, "count_tokens"):
@@ -247,7 +248,7 @@ func TestInPlaceRetries(t *testing.T) {
 	}
 
 	t.Run("a reset then success", func(t *testing.T) {
-		a := newAPI(t, flaky(1, reset, okBatch))
+		a := newAPI(t, failOnce(reset, okBatch))
 		c, _ := checkedClient(t, a, nil)
 		if _, err := c.Get(ctx, "msgbatch_1"); err != nil {
 			t.Fatalf("Get: %v", err)
@@ -292,7 +293,7 @@ func TestInPlaceRetries(t *testing.T) {
 	})
 
 	t.Run("a 429 with retry-after honors it", func(t *testing.T) {
-		a := newAPI(t, flaky(1, retryAfter(429, "2"), okBatch))
+		a := newAPI(t, failOnce(retryAfter(429, "2"), okBatch))
 		c, clk := checkedClient(t, a, nil)
 		if _, err := c.Get(ctx, "msgbatch_1"); err != nil {
 			t.Fatalf("Get: %v", err)
@@ -303,7 +304,7 @@ func TestInPlaceRetries(t *testing.T) {
 	})
 
 	t.Run("a bare 429 on Get", func(t *testing.T) {
-		a := newAPI(t, flaky(1, status(429, "rate_limit_error"), okBatch))
+		a := newAPI(t, failOnce(status(429, "rate_limit_error"), okBatch))
 		c, clk := checkedClient(t, a, nil)
 		if _, err := c.Get(ctx, "msgbatch_1"); err != nil {
 			t.Fatalf("Get: %v", err)
@@ -323,7 +324,7 @@ func TestInPlaceRetries(t *testing.T) {
 				if code == 529 {
 					typ = "overloaded_error"
 				}
-				a := newAPI(t, flaky(1, status(code, typ), okAny))
+				a := newAPI(t, failOnce(status(code, typ), okAny))
 				c, _ := checkedClient(t, a, nil)
 				if err := calls[name](c); err != nil {
 					t.Fatalf("%s: %v", name, err)
@@ -333,7 +334,7 @@ func TestInPlaceRetries(t *testing.T) {
 	}
 
 	t.Run("Create retries a 429 that is not a spend limit", func(t *testing.T) {
-		a := newAPI(t, flaky(1, retryAfter(429, "1"), okAny))
+		a := newAPI(t, failOnce(retryAfter(429, "1"), okAny))
 		c, clk := checkedClient(t, a, nil)
 		if err := calls["Create"](c); err != nil {
 			t.Fatalf("Create: %v", err)
@@ -352,7 +353,7 @@ func TestInPlaceRetries(t *testing.T) {
 			t.Fatal(err)
 		}
 		addr := ln.Addr().String()
-		ln.Close()
+		_ = ln.Close()
 		a := newAPI(t, nil)
 		c, clk := newClient(t, a, func(o *Options) {
 			o.BaseURL = "http://" + addr
@@ -391,10 +392,7 @@ func TestMaybeSent(t *testing.T) {
 		a := newAPI(t, func(w http.ResponseWriter, r *http.Request) {
 			sseStart(w)
 			sseEvent(w, "message_start", messageStart)
-			conn, _, err := w.(http.Hijacker).Hijack()
-			if err == nil {
-				conn.Close()
-			}
+			dropConn(w)
 		})
 		c, _ := checkedClient(t, a, nil)
 		_, err := c.Send(ctx, sampleRequest("a"))

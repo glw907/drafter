@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -55,7 +56,7 @@ func newAPI(t *testing.T, h http.HandlerFunc) *api {
 				w.Header().Set("anthropic-workspace-id", *a.workspaceHeader)
 			}
 			w.Header().Set("content-type", "application/json")
-			io.WriteString(w, `{"data":[],"has_more":false,"first_id":null,"last_id":null}`)
+			_, _ = io.WriteString(w, `{"data":[],"has_more":false,"first_id":null,"last_id":null}`)
 			return
 		}
 		if h == nil {
@@ -100,9 +101,9 @@ func (a *api) last(t *testing.T, method, path string) seen {
 	t.Helper()
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	for i := len(a.reqs) - 1; i >= 0; i-- {
-		if a.reqs[i].method == method && a.reqs[i].path == path {
-			return a.reqs[i]
+	for _, r := range slices.Backward(a.reqs) {
+		if r.method == method && r.path == path {
+			return r
 		}
 	}
 	t.Fatalf("no %s %s request seen", method, path)
@@ -143,7 +144,7 @@ func clearEnv(t *testing.T) {
 		k, _, _ := strings.Cut(kv, "=")
 		if strings.HasPrefix(k, "ANTHROPIC_") || strings.HasPrefix(k, "CLAUDE_CODE_") || k == "DRAFTER_API_KEY" {
 			t.Setenv(k, "")
-			os.Unsetenv(k)
+			_ = os.Unsetenv(k)
 		}
 	}
 }
@@ -199,7 +200,7 @@ func sampleRequest(id string) Request {
 func writeJSON(w http.ResponseWriter, status int, body string) {
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(status)
-	io.WriteString(w, body)
+	_, _ = io.WriteString(w, body)
 }
 
 func errBody(typ, msg string) string {
@@ -234,23 +235,36 @@ func batchJSON(id, status string, created time.Time) string {
 
 // reset reads the request body, then closes the connection without answering.
 func reset(w http.ResponseWriter, r *http.Request) {
-	io.Copy(io.Discard, r.Body)
-	conn, _, err := w.(http.Hijacker).Hijack()
-	if err != nil {
+	_, _ = io.Copy(io.Discard, r.Body)
+	dropConn(w)
+}
+
+// dropConn closes the connection under w without finishing the response.
+func dropConn(w http.ResponseWriter) {
+	h, ok := w.(http.Hijacker)
+	if !ok {
 		return
 	}
-	conn.Close()
+	if conn, _, err := h.Hijack(); err == nil {
+		_ = conn.Close()
+	}
+}
+
+func flush(w http.ResponseWriter) {
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 func sseEvent(w http.ResponseWriter, event, data string) {
-	fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data)
-	w.(http.Flusher).Flush()
+	_, _ = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data)
+	flush(w)
 }
 
 func sseStart(w http.ResponseWriter) {
 	w.Header().Set("content-type", "text/event-stream")
 	w.WriteHeader(http.StatusOK)
-	w.(http.Flusher).Flush()
+	flush(w)
 }
 
 const messageStart = `{"type":"message_start","message":{"id":"msg_test1","type":"message","role":"assistant","model":"test-model","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"cache_creation_input_tokens":5,"cache_read_input_tokens":3,"cache_creation":{"ephemeral_5m_input_tokens":2,"ephemeral_1h_input_tokens":3},"output_tokens":1}}}`
