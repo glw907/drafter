@@ -71,7 +71,10 @@ func (r *repo) excerpt(id, source string) []string {
 	}
 
 	if suffix == "" {
-		b, _ := fileBlock(target{rel, real})
+		b, ok := fileBlock(target{rel, real})
+		if !ok {
+			return none("not a regular file")
+		}
 		return []string{b}
 	}
 	data, err := os.ReadFile(real)
@@ -113,8 +116,12 @@ func window(label string, lines []string, lo, hi int) string {
 	return block("excerpt", fmt.Sprintf("%s lines %d-%d", label, lo, hi), strings.Join(lines[lo-1:hi], "\n"))
 }
 
+// goGroupOpen matches the line that opens a grouped Go const, var, or type block.
+var goGroupOpen = regexp.MustCompile(`^(const|var|type)\s*\(\s*$`)
+
 // declaration returns the 0-based index of the first line declaring name in a file of extension
-// ext, or -1. Only a declaration counts, never a mere mention.
+// ext, or -1. Only a declaration counts, never a mere mention; in Go that includes a name at the
+// top level of a grouped const, var, or type block.
 func declaration(lines []string, ext, name string) int {
 	var res []*regexp.Regexp
 	q := regexp.QuoteMeta(name)
@@ -129,11 +136,24 @@ func declaration(lines []string, ext, name string) int {
 		res = []*regexp.Regexp{regexp.MustCompile(
 			`^(export\s+(default\s+)?)?(declare\s+)?(abstract\s+)?(async\s+)?(function\s*\*?|class|interface|type|enum|const|let)\s+` + q + `\b`)}
 	}
+	var member *regexp.Regexp
+	if ext == ".go" {
+		member = regexp.MustCompile(`^\t` + q + `(\s|=|$)`)
+	}
+	inGroup := false
 	for i, line := range lines {
 		for _, re := range res {
 			if re.MatchString(line) {
 				return i
 			}
+		}
+		switch {
+		case goGroupOpen.MatchString(line):
+			inGroup = member != nil
+		case line == ")":
+			inGroup = false
+		case inGroup && member.MatchString(line):
+			return i
 		}
 	}
 	return -1

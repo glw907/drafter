@@ -2,8 +2,10 @@ package assemble
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/glw907/drafter/internal/plan"
@@ -55,6 +57,11 @@ func TestExcerpt(t *testing.T) {
 		{"interface", "src/widget.ts#Options", []string{"export interface Options"}, nil},
 		{"name with no declaration", "src/widget.ts#unrelatedMention", []string{"no excerpt: declaration not found"}, nil},
 		{"name only mentioned in a comment", "src/greet.go#Greeting", []string{"no excerpt: declaration not found"}, nil},
+		{"name in a grouped const", "src/group.go#Alpha", []string{"\tAlpha = 1"}, nil},
+		{"name in a grouped var", "src/group.go#Gamma", []string{"\tGamma string"}, nil},
+		{"name in a grouped type", "src/group.go#Zeta", []string{"\tZeta int"}, nil},
+		{"name only mentioned in a group and a function body", "src/group.go#Mention", []string{"no excerpt: declaration not found"}, nil},
+		{"field nested in a grouped type", "src/group.go#Inner", []string{"no excerpt: declaration not found"}, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -70,6 +77,25 @@ func TestExcerpt(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestExcerptBareSpecialFile(t *testing.T) {
+	f := newFixture(t)
+	fifo := filepath.Join(f.root, "src", "widget.ts")
+	if err := os.Remove(fifo); err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Mkfifo(fifo, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r, err := openRepo(context.Background(), f.config())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := r.excerpt("f:x", "src/widget.ts")
+	if len(got) != 1 || !strings.Contains(got[0], "no excerpt: not a regular file") {
+		t.Errorf("excerpt = %q, want one block reading no excerpt: not a regular file", got)
 	}
 }
 

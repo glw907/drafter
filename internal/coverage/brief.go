@@ -1,7 +1,6 @@
 package coverage
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -53,7 +52,7 @@ func keepFacts(in []string) IDs {
 
 func parseBrief(data []byte) (*Brief, error) {
 	var b Brief
-	if err := json.NewDecoder(bytes.NewReader(data)).Decode(&b); err != nil {
+	if err := json.Unmarshal(data, &b); err != nil {
 		return nil, fmt.Errorf("brief is not valid JSON: %w", err)
 	}
 	return &b, nil

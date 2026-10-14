@@ -105,9 +105,15 @@ func TestSchemaShapes(t *testing.T) {
 			if err := json.Unmarshal(schema, &top); err != nil {
 				t.Fatal(err)
 			}
+			var doc any
+			if err := json.Unmarshal(schema, &doc); err != nil {
+				t.Fatal(err)
+			}
+			required := map[string]bool{}
+			collectRequired(doc, required)
 			for _, want := range tt.required {
-				if !strings.Contains(string(schema), want) {
-					t.Errorf("schema lacks %s", want)
+				if !required[strings.Trim(want, `"`)] {
+					t.Errorf("%s is not in any required array", want)
 				}
 			}
 			for _, name := range tt.optional {

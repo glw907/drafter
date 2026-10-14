@@ -73,6 +73,10 @@ func runPlain(ctx context.Context, env []string, root, command, logPath string) 
 	defer func() { _ = f.Close() }()
 	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", command)
 	cmd.Dir = root
+	// A nil Env makes exec inherit the parent's environment, key included.
+	if env == nil {
+		env = []string{}
+	}
 	cmd.Env = env
 	cmd.Stdout = f
 	cmd.Stderr = f
@@ -138,7 +142,7 @@ func exitLine(out string) (string, bool) {
 // wrapperEnv sets CAIRN_GATE_LANE from lane and drops RUN_GATE_IF_BUSY, so the wrapper never
 // answers with the deferred exit 76.
 func wrapperEnv(env []string, lane string) []string {
-	var out []string
+	out := []string{}
 	for _, kv := range env {
 		name, _, _ := strings.Cut(kv, "=")
 		if name == "RUN_GATE_IF_BUSY" || name == "CAIRN_GATE_LANE" {

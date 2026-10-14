@@ -206,6 +206,9 @@ func TestCheckBriefErrors(t *testing.T) {
 	if _, err := Check(f.plan, []byte(f.page), []byte("not json"), true); err == nil {
 		t.Error("a brief that isn't JSON must return an error")
 	}
+	if _, err := Check(f.plan, []byte(f.page), []byte(`{"sentences":[]} junk`), true); err == nil {
+		t.Error("a brief with trailing text after the JSON value must return an error")
+	}
 	if _, err := Check(f.plan, []byte(f.page), []byte(`{"sentences": [{"text": "x", "id": 4}]}`), true); err == nil {
 		t.Error("a brief id that is neither a string nor a list must return an error")
 	}

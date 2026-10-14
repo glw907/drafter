@@ -84,6 +84,21 @@ func TestRunPlain(t *testing.T) {
 	}
 }
 
+func TestRunPlainNilEnvIsEmpty(t *testing.T) {
+	t.Setenv("DRAFTER_LEAK_PROBE", "secret")
+	logPath := filepath.Join(t.TempDir(), "gate.log")
+	res, err := Run(context.Background(), config.Gate{}, nil, t.TempDir(), `test -z "$DRAFTER_LEAK_PROBE"`, logPath)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !res.Green {
+		t.Error("the child saw the parent's environment under a nil env")
+	}
+	if got := wrapperEnv(nil, ""); got == nil {
+		t.Error("wrapperEnv(nil, \"\") = nil, want an empty non-nil slice")
+	}
+}
+
 func TestRunPlainDetails(t *testing.T) {
 	root := t.TempDir()
 	logPath := filepath.Join(t.TempDir(), "gate.log")
