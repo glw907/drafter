@@ -1,10 +1,19 @@
 package smoke
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/glw907/drafter/internal/assemble"
+	"github.com/glw907/drafter/internal/config"
+	"github.com/glw907/drafter/internal/gate"
 )
 
 // Shape is one seat's request: its answer schema, effort, system prompt, and token limit.
@@ -18,62 +27,100 @@ type Shape struct {
 	Schema    json.RawMessage
 }
 
-// listField names the array each seat's synthetic answer carries beside its verdict.
-var listField = []struct{ seat, field string }{
-	{"draft", "sections"},
-	{"structure", "findings"},
-	{"editor", "edits"},
-	{"fact", "claims"},
-	{"reader", "questions"},
-	{"coverage", "gaps"},
-	{"consistency", "conflicts"},
+// Model is Haiku 5.5's model ID, from the claude-api skill's model table. Every smoke request
+// runs on it, so a live run costs cents.
+const Model = "claude-haiku-5-5"
+
+// seatAnswers lists the seven seats in pass 1's order, each with the answer its production
+// request asks for. The reader's second turn shares the read schema, so one shape per seat
+// covers every schema production sends.
+var seatAnswers = []struct {
+	seat   string
+	answer assemble.Answer
+	effort string
+}{
+	{"draft", assemble.AnswerDraft, "high"},
+	{"structure", assemble.AnswerRead, "medium"},
+	{"editor", assemble.AnswerRead, "medium"},
+	{"fact", assemble.AnswerRead, "medium"},
+	{"reader", assemble.AnswerReader1, "medium"},
+	{"coverage", assemble.AnswerCoverage, "low"},
+	{"consistency", assemble.AnswerConsistency, "low"},
 }
 
-// Shapes returns one synthetic shape per seat, in the seat order of pass 1. Pass 5 replaces
-// these with the production builders.
-func Shapes() []Shape {
-	out := make([]Shape, 0, len(listField))
-	for _, s := range listField {
+const (
+	smokePage  = "docs/page.md"
+	smokeBrief = "docs/page.brief.json"
+)
+
+// Project writes a synthetic project under dir, which must be an empty directory: a git
+// repository holding a page, its brief, and one agent definition per seat. It returns the
+// configuration the shapes build from, with every seat on Model at its production effort and
+// max_tokens 4096.
+func Project(dir string) (*config.Config, error) {
+	files := map[string]string{
+		smokePage:  "# Smoke\n\nThis page exists only to give each seat's request a page to inline.\n",
+		smokeBrief: "{}\n",
+	}
+	c := &config.Config{Root: dir, KeyEnv: "DRAFTER_API_KEY", Seat: map[string]config.Seat{}}
+	for _, s := range seatAnswers {
+		agent := filepath.Join("agents", s.seat+".md")
+		files[agent] = fmt.Sprintf("---\nname: %s\n---\nYou are the %s seat of a documentation pipeline. Answer only with the JSON the schema describes.\n", s.seat, s.seat)
+		c.Seat[s.seat] = config.Seat{Agent: filepath.Join(dir, agent), Model: Model, Effort: s.effort, MaxTokens: 4096}
+	}
+	for name, text := range files {
+		path := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return nil, fmt.Errorf("create project: %w", err)
+		}
+		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+			return nil, fmt.Errorf("write project file: %w", err)
+		}
+	}
+	for _, args := range [][]string{{"init", "-q"}, {"add", "."}} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(gate.Env(c), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return nil, fmt.Errorf("git %s: %w: %s", args[0], err, bytes.TrimSpace(out))
+		}
+	}
+	return c, nil
+}
+
+// Shapes builds one request per seat through assemble.Build, so each shape carries the answer
+// schema, effort, system prompt, and contract text production sends. c is a configuration
+// Project returned.
+func Shapes(ctx context.Context, c *config.Config) ([]Shape, error) {
+	out := make([]Shape, 0, len(seatAnswers))
+	for _, s := range seatAnswers {
+		req, err := assemble.Build(ctx, assemble.Input{
+			Seat:   s.seat,
+			Answer: s.answer,
+			Config: c,
+			Prompt: fmt.Sprintf("Smoke test for the %s seat. Read %s and answer in the schema's shape, keeping each list empty.", s.seat, smokePage),
+			Page:   smokePage,
+			Brief:  smokeBrief,
+			Slug:   "smoke",
+		})
+		if err != nil {
+			return nil, fmt.Errorf("build %s request: %w", s.seat, err)
+		}
 		out = append(out, Shape{
 			Seat:      s.seat,
-			System:    fmt.Sprintf("You are the %s seat of a documentation pipeline. Answer only with the JSON the schema describes.", s.seat),
-			Prompt:    fmt.Sprintf("Smoke test for the %s seat. Return verdict \"ok\" and an empty %s list.", s.seat, s.field),
-			Effort:    "medium",
-			MaxTokens: 4096,
-			Schema:    schemaFor(s.field),
+			System:    req.System,
+			Prompt:    req.Messages[len(req.Messages)-1].Text,
+			Effort:    req.Effort,
+			MaxTokens: req.MaxTokens,
+			Schema:    req.Schema,
 		})
 	}
-	return out
-}
-
-func schemaFor(field string) json.RawMessage {
-	item := map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"where": map[string]any{"type": "string"},
-			"note":  map[string]any{"type": "string"},
-		},
-		"required":             []string{"where", "note"},
-		"additionalProperties": false,
-	}
-	schema := map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"verdict": map[string]any{"type": "string", "enum": []string{"ok", "revise"}},
-			field:     map[string]any{"type": "array", "items": item},
-		},
-		"required":             []string{"verdict", field},
-		"additionalProperties": false,
-	}
-	b, err := json.Marshal(schema)
-	if err != nil {
-		panic(err) // the schema is built from literals
-	}
-	return b
+	return out, nil
 }
 
 // Check reports whether text is JSON that satisfies s's schema. It understands the keywords the
-// shapes use: type, enum, required, properties, additionalProperties false, and items.
+// production schemas use: type, enum, required, properties, additionalProperties false, items, and
+// description, which it ignores.
 func Check(s Shape, text string) error {
 	var schema map[string]any
 	if err := json.Unmarshal(s.Schema, &schema); err != nil {

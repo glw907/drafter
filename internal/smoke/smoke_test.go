@@ -315,8 +315,22 @@ func settleLines(t *testing.T, stateDir string) []ledgerLine {
 	return out
 }
 
+// testShapes builds the production shapes over a synthetic project in a temporary directory.
+func testShapes(t *testing.T) []Shape {
+	t.Helper()
+	c, err := Project(t.TempDir())
+	if err != nil {
+		t.Fatalf("Project: %v", err)
+	}
+	shapes, err := Shapes(context.Background(), c)
+	if err != nil {
+		t.Fatalf("Shapes: %v", err)
+	}
+	return shapes
+}
+
 func TestShapes(t *testing.T) {
-	shapes := Shapes()
+	shapes := testShapes(t)
 	var seats []string
 	for _, s := range shapes {
 		seats = append(seats, s.Seat)
@@ -331,6 +345,12 @@ func TestShapes(t *testing.T) {
 			}
 			if s.Effort == "" || s.System == "" || s.Prompt == "" {
 				t.Errorf("effort %q, system %q, or prompt %q is empty", s.Effort, s.System, s.Prompt)
+			}
+			if strings.Contains(s.System, "name:") || !strings.Contains(s.System, s.Seat+" seat") {
+				t.Errorf("system %q is not the agent definition body", s.System)
+			}
+			if !strings.Contains(s.Prompt, "Smoke test for the "+s.Seat+" seat") {
+				t.Errorf("prompt lacks the seat text: %q", s.Prompt)
 			}
 			var schema map[string]any
 			if err := json.Unmarshal(s.Schema, &schema); err != nil {
@@ -375,7 +395,7 @@ func openObjects(node any, path string) []string {
 }
 
 func TestCheck(t *testing.T) {
-	s := Shapes()[0]
+	s := testShapes(t)[0]
 	var schema map[string]any
 	if err := json.Unmarshal(s.Schema, &schema); err != nil {
 		t.Fatal(err)
@@ -410,7 +430,7 @@ func TestCheck(t *testing.T) {
 func TestRun(t *testing.T) {
 	f := newFake(t)
 	dir := t.TempDir()
-	shapes := Shapes()
+	shapes := testShapes(t)
 	rep, err := Run(context.Background(), params(f, dir), shapes)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -547,7 +567,7 @@ func readRecord(t *testing.T, dir, runID string) record {
 func TestRunProblems(t *testing.T) {
 	f := newFake(t)
 	f.set(func() { f.overCount = true })
-	rep, err := Run(context.Background(), params(f, t.TempDir()), Shapes())
+	rep, err := Run(context.Background(), params(f, t.TempDir()), testShapes(t))
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -563,7 +583,7 @@ func TestFakeRejectsRepeatedCustomIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 	mk := func(id string) batch.Request {
-		s := Shapes()[0]
+		s := testShapes(t)[0]
 		return batch.Request{CustomID: id, Model: testModel, Messages: []batch.Message{{Role: "user", Text: s.Prompt}}, MaxTokens: 4096, Schema: s.Schema}
 	}
 	tests := []struct {
@@ -599,7 +619,7 @@ func TestResume(t *testing.T) {
 		p := params(f, dir)
 		ctx, cancel := context.WithCancel(context.Background())
 		p.Sleep = func(ctx context.Context, _ time.Duration) error { cancel(); return ctx.Err() }
-		if _, err := Run(ctx, p, Shapes()); !errors.Is(err, context.Canceled) {
+		if _, err := Run(ctx, p, testShapes(t)); !errors.Is(err, context.Canceled) {
 			t.Fatalf("first Run err = %v, want context.Canceled", err)
 		}
 		if n := len(settleLines(t, dir)); n != 0 {
@@ -607,7 +627,7 @@ func TestResume(t *testing.T) {
 		}
 
 		f.set(func() { f.hold = false })
-		rep, err := Run(context.Background(), params(f, dir), Shapes())
+		rep, err := Run(context.Background(), params(f, dir), testShapes(t))
 		if err != nil {
 			t.Fatalf("second Run: %v", err)
 		}
@@ -626,7 +646,7 @@ func TestResume(t *testing.T) {
 		if old, all := count(); old != 7 || all != 7+8 {
 			t.Errorf("after resume: old-batch lines %d, all %d, want 7 and 15", old, all)
 		}
-		rep, err = Run(context.Background(), params(f, dir), Shapes())
+		rep, err = Run(context.Background(), params(f, dir), testShapes(t))
 		if err != nil {
 			t.Fatalf("third Run: %v", err)
 		}
@@ -642,7 +662,7 @@ func TestResume(t *testing.T) {
 		f := newFake(t)
 		f.set(func() { f.failCreate = true })
 		dir := t.TempDir()
-		_, err := Run(context.Background(), params(f, dir), Shapes())
+		_, err := Run(context.Background(), params(f, dir), testShapes(t))
 		if !errors.Is(err, batch.ErrMaybeSent) {
 			t.Fatalf("first Run err = %v, want ErrMaybeSent", err)
 		}
@@ -654,7 +674,7 @@ func TestResume(t *testing.T) {
 		worst := open[0].Worst
 
 		f.set(func() { f.failCreate = false })
-		rep, err := Run(context.Background(), params(f, dir), Shapes())
+		rep, err := Run(context.Background(), params(f, dir), testShapes(t))
 		if err != nil {
 			t.Fatalf("second Run: %v", err)
 		}
@@ -678,7 +698,7 @@ func TestResume(t *testing.T) {
 				keys[l.Key] = true
 			}
 		}
-		for _, s := range Shapes() {
+		for _, s := range testShapes(t) {
 			if !keys[intent+"/"+s.Seat] {
 				t.Errorf("no estimated line keyed %s/%s", intent, s.Seat)
 			}
@@ -692,7 +712,7 @@ func TestResume(t *testing.T) {
 		f := newFake(t)
 		f.set(func() { f.refuseBody = "bad request" })
 		dir := t.TempDir()
-		_, err := Run(context.Background(), params(f, dir), Shapes())
+		_, err := Run(context.Background(), params(f, dir), testShapes(t))
 		if err == nil || errors.Is(err, batch.ErrMaybeSent) {
 			t.Fatalf("first Run err = %v, want a refusal that is not ErrMaybeSent", err)
 		}
@@ -703,7 +723,7 @@ func TestResume(t *testing.T) {
 		wantOneVoid(t, dir, intent)
 
 		f.set(func() { f.refuseBody = "" })
-		rep, err := Run(context.Background(), params(f, dir), Shapes())
+		rep, err := Run(context.Background(), params(f, dir), testShapes(t))
 		if err != nil {
 			t.Fatalf("second Run: %v", err)
 		}
@@ -717,7 +737,7 @@ func TestResume(t *testing.T) {
 		f := newFake(t)
 		f.set(func() { f.syncMode = "reset" })
 		dir := t.TempDir()
-		_, err := Run(context.Background(), params(f, dir), Shapes())
+		_, err := Run(context.Background(), params(f, dir), testShapes(t))
 		if !errors.Is(err, batch.ErrMaybeSent) {
 			t.Fatalf("first Run err = %v, want ErrMaybeSent", err)
 		}
@@ -728,7 +748,7 @@ func TestResume(t *testing.T) {
 		}
 
 		f.set(func() { f.syncMode = "" })
-		rep, err := Run(context.Background(), params(f, dir), Shapes())
+		rep, err := Run(context.Background(), params(f, dir), testShapes(t))
 		if err != nil {
 			t.Fatalf("second Run: %v", err)
 		}
@@ -750,7 +770,7 @@ func TestResume(t *testing.T) {
 		f := newFake(t)
 		f.set(func() { f.syncMode = "spend" })
 		dir := t.TempDir()
-		_, err := Run(context.Background(), params(f, dir), Shapes())
+		_, err := Run(context.Background(), params(f, dir), testShapes(t))
 		if !errors.Is(err, batch.ErrSpendLimit) {
 			t.Fatalf("first Run err = %v, want ErrSpendLimit", err)
 		}
@@ -761,7 +781,7 @@ func TestResume(t *testing.T) {
 		wantOneVoid(t, dir, runID+"-sync")
 
 		f.set(func() { f.syncMode = "" })
-		rep, err := Run(context.Background(), params(f, dir), Shapes())
+		rep, err := Run(context.Background(), params(f, dir), testShapes(t))
 		if err != nil {
 			t.Fatalf("second Run: %v", err)
 		}
@@ -779,7 +799,7 @@ func TestResume(t *testing.T) {
 	t.Run("a sync intent already settled in the ledger adds no line", func(t *testing.T) {
 		f := newFake(t)
 		dir := t.TempDir()
-		rep, err := Run(context.Background(), params(f, dir), Shapes())
+		rep, err := Run(context.Background(), params(f, dir), testShapes(t))
 		if err != nil {
 			t.Fatalf("first Run: %v", err)
 		}
@@ -790,15 +810,15 @@ func TestResume(t *testing.T) {
 		if err := (&runner{p: params(f, dir)}).save(rec); err != nil {
 			t.Fatal(err)
 		}
-		rep2, err := Run(context.Background(), params(f, dir), Shapes())
+		rep2, err := Run(context.Background(), params(f, dir), testShapes(t))
 		if err != nil {
 			t.Fatalf("second Run: %v", err)
 		}
 		if len(rep2.Estimated) != 0 {
 			t.Errorf("estimated = %v, want none", rep2.Estimated)
 		}
-		if got := len(settleLines(t, dir)); got != before+len(Shapes())+1 {
-			t.Errorf("settle lines = %d, want %d (only the second run's own)", got, before+len(Shapes())+1)
+		if got := len(settleLines(t, dir)); got != before+len(testShapes(t))+1 {
+			t.Errorf("settle lines = %d, want %d (only the second run's own)", got, before+len(testShapes(t))+1)
 		}
 		for _, l := range settleLines(t, dir) {
 			if l.Key == rep.RunID+"-sync/sync" {
@@ -815,11 +835,11 @@ func TestResume(t *testing.T) {
 		dir := t.TempDir()
 		tight := params(f, dir)
 		tight.Caps.Page = 0.000001
-		if _, err := Run(context.Background(), tight, Shapes()); err == nil {
+		if _, err := Run(context.Background(), tight, testShapes(t)); err == nil {
 			t.Fatal("Run succeeded under a page cap too small to reserve")
 		}
 		runID, _ := onlyRecord(t, dir)
-		rep, err := Run(context.Background(), params(f, dir), Shapes())
+		rep, err := Run(context.Background(), params(f, dir), testShapes(t))
 		if err != nil {
 			t.Fatalf("second Run: %v", err)
 		}
