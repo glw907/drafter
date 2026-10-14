@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -385,6 +386,54 @@ func TestMaybeSent(t *testing.T) {
 		}
 		if n := a.hits("POST", "/v1/messages/batches"); n != 1 {
 			t.Errorf("server saw %d Create requests, want 1", n)
+		}
+	})
+
+	t.Run("Create when the caller's context ends after the body", func(t *testing.T) {
+		cctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		a := newAPI(t, func(w http.ResponseWriter, r *http.Request) {
+			_, _ = io.Copy(io.Discard, r.Body)
+			cancel()
+			<-r.Context().Done()
+		})
+		c, _ := checkedClient(t, a, nil)
+		_, err := c.Create(cctx, []Request{sampleRequest("a")})
+		if !errors.Is(err, ErrMaybeSent) {
+			t.Fatalf("Create err = %v, want ErrMaybeSent", err)
+		}
+		if n := a.hits("POST", "/v1/messages/batches"); n != 1 {
+			t.Errorf("server saw %d Create requests, want 1", n)
+		}
+	})
+
+	t.Run("Send when the caller's context ends mid-stream", func(t *testing.T) {
+		cctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		a := newAPI(t, func(w http.ResponseWriter, r *http.Request) {
+			sseStart(w)
+			sseEvent(w, "message_start", messageStart)
+			cancel()
+			<-r.Context().Done()
+		})
+		c, _ := checkedClient(t, a, nil)
+		_, err := c.Send(cctx, sampleRequest("a"))
+		if !errors.Is(err, ErrMaybeSent) {
+			t.Fatalf("Send err = %v, want ErrMaybeSent", err)
+		}
+	})
+
+	t.Run("Create with a context already ended sends nothing", func(t *testing.T) {
+		cctx, cancel := context.WithCancel(ctx)
+		cancel()
+		a := newAPI(t, reset)
+		c, _ := checkedClient(t, a, nil)
+		_, err := c.Create(cctx, []Request{sampleRequest("a")})
+		if !errors.Is(err, context.Canceled) || errors.Is(err, ErrMaybeSent) {
+			t.Fatalf("Create err = %v, want context.Canceled", err)
+		}
+		if n := a.hits("POST", "/v1/messages/batches"); n != 0 {
+			t.Errorf("server saw %d Create requests, want 0", n)
 		}
 	})
 
