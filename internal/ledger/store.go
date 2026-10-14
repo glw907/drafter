@@ -276,7 +276,7 @@ func (l *Ledger) append(st *state, lns ...line) error {
 		}
 		if err := f.Sync(); err != nil {
 			_ = f.Close()
-			return fmt.Errorf("sync ledger: %w", err)
+			return fmt.Errorf("sync ledger after truncate: %w", err)
 		}
 	}
 	if _, err := f.Write(buf.Bytes()); err != nil {
