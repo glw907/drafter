@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -22,6 +23,11 @@ func CheckFile(file string, opts CheckOptions) ([]Finding, error) {
 	}
 	return append(findings, Check(file, p, opts)...), nil
 }
+
+// ErrNotGitTree is returned, wrapped, when a directory is not inside a git work tree.
+var ErrNotGitTree = errors.New("not inside a git work tree")
+
+func notGitTreeLine(line string) bool { return false }
 
 // GitRoot returns the top level of the git work tree that contains dir.
 func GitRoot(dir string) (string, error) {
