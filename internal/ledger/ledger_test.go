@@ -580,7 +580,7 @@ func TestFileStates(t *testing.T) {
 			t.Errorf("OpenIntents = %v, %v, want the one open intent", open, err)
 		}
 	})
-	t.Run("a torn final line is skipped and gets its own line", func(t *testing.T) {
+	t.Run("a torn final line is skipped, then truncated by the next writer", func(t *testing.T) {
 		l, _, dir := newLedger(t)
 		mustReserve(t, l, res("r1", "p1", "i1", 1, 2), wide)
 		path := filepath.Join(dir, "ledger.jsonl")
@@ -602,16 +602,28 @@ func TestFileStates(t *testing.T) {
 		if !strings.Contains(warn.String(), "ledger.jsonl") || !strings.Contains(warn.String(), "line 2") {
 			t.Errorf("warning %q does not name the file and line", warn.String())
 		}
-		mustReserve(t, l, res("r1", "p1", "i2", 1, 3), wide)
-		got := lines(t, dir)
-		found := false
-		for _, ln := range got {
-			if ln == frag {
-				found = true
-			}
+		if want := fmt.Sprintf("%d bytes", len(frag)); !strings.Contains(warn.String(), want) {
+			t.Errorf("warning %q does not give the fragment length %q", warn.String(), want)
 		}
-		if !found {
-			t.Errorf("the fragment is not on its own line: %q", got)
+		mustReserve(t, l, res("r1", "p1", "i2", 1, 3), wide)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bytes.Contains(data, []byte(frag)) {
+			t.Errorf("the fragment is still in the file: %q", data)
+		}
+		if bytes.IndexByte(data, 0) >= 0 {
+			t.Errorf("the file holds a NUL byte: %q", data)
+		}
+		got := lines(t, dir)
+		if len(got) != 2 {
+			t.Errorf("file has %d lines, want the 2 complete ones: %q", len(got), got)
+		}
+		for i, ln := range got {
+			if !json.Valid([]byte(ln)) {
+				t.Errorf("line %d does not parse: %q", i+1, ln)
+			}
 		}
 		// The ledger keeps working after the repair.
 		if got := pageSpend(t, l, "r1", "p1"); got != 5 {
@@ -660,6 +672,146 @@ func TestFileStates(t *testing.T) {
 			t.Errorf("PageSpend = %v, want 2", got)
 		}
 	})
+}
+
+// tornSweep is one crash-point sweep: the complete lines C, the torn fragment F, and the figures
+// the settled lines of C contribute.
+type tornSweep struct {
+	name     string
+	complete bool    // C holds the reserve and settle of intent i1
+	frag     string  // F, with no newline
+	base     float64 // settled spend of C
+}
+
+// A crash can leave the ledger as the start state C+F, or as any prefix of the file the next
+// Reserve produces. Whatever the cut, the next Reserve, Settle, and Spend must work, F must never
+// count, and i2 must show only when its line is whole.
+func TestTornRepairEveryCrashPoint(t *testing.T) {
+	settleF, err := json.Marshal(line{
+		V: version, Type: typeSettle, Time: t0,
+		Entry:  Entry{RunID: "r1", Repo: "repo", Page: "pF", Seat: "draft", Model: "plain-s", Mode: "batch"},
+		Intent: "iF", Key: "kF", Usage: &batch.Usage{}, Cost: 5, Kind: "actual",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sweeps := []tornSweep{
+		{"unparseable fragment", true, `{"v":1,"type":"reserve","intent":"torn`, 1.5},
+		{"complete settle with no newline", true, string(settleF), 1.5},
+		{"unparseable fragment, empty ledger", false, `{"v":1,"type":"reserve","intent":"torn`, 0},
+	}
+	for _, sw := range sweeps {
+		t.Run(sw.name, func(t *testing.T) {
+			var c []byte
+			if sw.complete {
+				l, _, dir := newLedger(t)
+				mustReserve(t, l, res("r1", "p1", "i1", 1, 2), wide)
+				mustSettle(t, l, settle("p1", "i1", "k1", "actual", 1.5))
+				var err error
+				if c, err = os.ReadFile(filepath.Join(dir, "ledger.jsonl")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			start := append(bytes.Clone(c), sw.frag...)
+			b := tornReserveOutput(t, start)
+			if err := checkTornState(t, start, sw.base, false); err != nil {
+				t.Errorf("start state C+F: %v", err)
+			}
+			for k := len(c); k <= len(b); k++ {
+				if err := checkTornState(t, b[:k], sw.base, k == len(b)); err != nil {
+					t.Errorf("crash at byte %d of %d: %v", k, len(b), err)
+					return
+				}
+			}
+		})
+	}
+}
+
+// tornReserveOutput returns the ledger file after Reserve(i2) runs over content.
+func tornReserveOutput(t *testing.T, content []byte) []byte {
+	t.Helper()
+	l, _, dir := newLedger(t)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "ledger.jsonl")
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mustReserve(t, l, res("r1", "p1", "i2", 1, 4), wide)
+	out, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// checkTornState writes content as the ledger, then takes Reserve(i3), Settle(i3), and a Spend,
+// and checks the figures: i3 settles at 2, i2 (reserved at worst 4) shows only when wantI2.
+func checkTornState(t *testing.T, content []byte, base float64, wantI2 bool) error {
+	t.Helper()
+	l, _, dir := newLedger(t)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "ledger.jsonl"), content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Reserve(res("r1", "p1", "i3", 1, 3), wide); err != nil {
+		return fmt.Errorf("Reserve: %w", err)
+	}
+	if err := l.Settle(settle("p1", "i3", "k3", "actual", 2)); err != nil {
+		return fmt.Errorf("Settle: %w", err)
+	}
+	rep, err := l.Spend(time.Time{}, time.Time{})
+	if err != nil {
+		return fmt.Errorf("Spend: %w", err)
+	}
+	if !near(rep.Total, base+2) {
+		return fmt.Errorf("Spend total = %v, want %v", rep.Total, base+2)
+	}
+	wantOpen, wantPage := 0, base+2
+	if wantI2 {
+		wantOpen, wantPage = 1, base+2+4
+	}
+	if rep.Open.Count != wantOpen {
+		return fmt.Errorf("open intents = %d, want %d", rep.Open.Count, wantOpen)
+	}
+	got, err := l.PageSpend("r1", "p1")
+	if err != nil {
+		return fmt.Errorf("PageSpend: %w", err)
+	}
+	if !near(got, wantPage) {
+		return fmt.Errorf("PageSpend = %v, want %v", got, wantPage)
+	}
+	return nil
+}
+
+// A torn marker line is retired: no writer emits one, so it no longer excuses the fragment line
+// before it. The marker line alone still reads, as an unknown type.
+func TestLegacyTornMarker(t *testing.T) {
+	l, _, dir := newLedger(t)
+	mustReserve(t, l, res("r1", "p1", "i1", 1, 2), wide)
+	path := filepath.Join(dir, "ledger.jsonl")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := `{"v":1,"type":"torn","time":"2027-03-10T12:00:00Z"}` + "\n"
+	if err := os.WriteFile(path, append(bytes.Clone(data), marker...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := pageSpend(t, l, "r1", "p1"); got != 2 {
+		t.Errorf("PageSpend with a legacy marker = %v, want 2", got)
+	}
+	frag := `{"v":1,"type":"reserve","intent":"torn` + "\n"
+	if err := os.WriteFile(path, append(append(bytes.Clone(data), frag...), marker...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = l.PageSpend("r1", "p1")
+	if err == nil || !strings.Contains(err.Error(), "ledger.jsonl") || !strings.Contains(err.Error(), "line 2") {
+		t.Errorf("PageSpend over a closed fragment = %v, want an error naming line 2", err)
+	}
 }
 
 func TestLineShape(t *testing.T) {
