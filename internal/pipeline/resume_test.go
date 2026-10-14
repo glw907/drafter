@@ -128,6 +128,49 @@ func TestResumeAdoptsACreateWithNoRecordedBatchID(t *testing.T) {
 	})
 }
 
+func TestResumeStopsOnATransportFailureSearchingForABatch(t *testing.T) {
+	h := newHarness(t, withoutFacts, withPages("b"))
+	h.api.crash = func(call string, ids []string) string {
+		if call == "create" && strings.Contains(ids[0], "_s2_draft_1") {
+			return "before"
+		}
+		return ""
+	}
+	if !dies(func() { _, _ = h.run() }) {
+		t.Fatal("the run did not die")
+	}
+	id := h.runID()
+	h.api.crash = nil
+	h.api.listErr = transportErr()
+	s, err := h.resume(id)
+	if err != nil {
+		t.Fatalf("resume: %v", err)
+	}
+	if s.Stop != StopTransport {
+		t.Errorf("Stop = %q, want %q", s.Stop, StopTransport)
+	}
+	if want := "drafter page --resume " + id; s.ResumeLine != want {
+		t.Errorf("ResumeLine = %q, want %q", s.ResumeLine, want)
+	}
+	if !strings.Contains(h.err.String(), "drafter page --resume "+id) {
+		t.Errorf("stderr lacks the resume line: %s", h.err.String())
+	}
+	if n := len(h.openIntents(id)); n != 1 {
+		t.Errorf("open reservations = %d, want the intent's one", n)
+	}
+	if h.settleKinds()["void"] != 0 {
+		t.Errorf("the intent was voided: %v", h.settleKinds())
+	}
+	h.api.listErr = nil
+	s, err = h.resume(id)
+	if err != nil {
+		t.Fatalf("second resume: %v", err)
+	}
+	if got := statusOf(s, pageB); got != StatusAccepted {
+		t.Errorf("status = %s (%s)", got, ruleOf(s, pageB))
+	}
+}
+
 func TestResumeSettlesAnEndedBatchOncePerCustomID(t *testing.T) {
 	h := newHarness(t, withoutFacts, withPages("b"))
 	n := 0
@@ -466,6 +509,26 @@ func TestResumeSkipsAnIntentIDTheLedgerHoldsButTheStateLacks(t *testing.T) {
 	}
 	if open := h.openIntents(id); len(open) != 0 {
 		t.Errorf("open intents after the resume: %v", open)
+	}
+	voided := 0
+	for _, l := range h.ledgerLines("settle") {
+		if l["kind"] != "void" {
+			continue
+		}
+		voided++
+		if cost, _ := l["cost"].(float64); cost != 0 {
+			t.Errorf("void of %v cost %v, want 0, so the orphans' worst amounts stay out of the spend", l["intent"], cost)
+		}
+	}
+	if voided != 5 {
+		t.Errorf("void lines = %d, want the 5 orphans", voided)
+	}
+	after := h.state(id).Pages[pageKey(pageB)].Intents
+	if len(after) <= len(ps.Intents) {
+		t.Fatalf("intents = %d, want the resume to add some to %d", len(after), len(ps.Intents))
+	}
+	if first, want := after[len(ps.Intents)].ID, fmt.Sprintf("-%d", len(ps.Intents)+2); !strings.HasSuffix(first, want) {
+		t.Errorf("first intent after the resume = %q, want sequence %s", first, want)
 	}
 }
 
