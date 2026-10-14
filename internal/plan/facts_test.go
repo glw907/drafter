@@ -3,6 +3,7 @@ package plan
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -135,5 +136,62 @@ func TestCheckFactsDir(t *testing.T) {
 				t.Errorf("error = %v, want one containing %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestFactSourcesAndGet(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(root, "docs", "facts")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "package.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	md := strings.Join([]string{
+		"- `f:one` The widget retries twice. Source: `src/x.ts:100-110,163-166`; `src/y.go#Retry`. [verified]",
+		"- `f:two` Wrapped claim. Source: `src/z.ts:7` (see `src/ignored.ts:1` and `npm run check`), `npm run build`,",
+		"  `https://example.com/page`, `package.json`, `bare`. [external: Source: https://example.com `src/out.ts:2`]",
+		"- `f:dup` First holder. [verified]",
+		"- `f:dup` Second holder. [verified]",
+		"- `f:bare` No source part here. [verified]",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(dir, "a.md"), []byte(md), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fs, err := LoadFacts(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name, id, text string
+		sources        []string
+	}{
+		{"comma list of ranges and a declaration", "f:one", "The widget retries twice.", []string{"src/x.ts:100-110,163-166", "src/y.go#Retry"}},
+		{"parentheses, commands, URL, bare name, external part", "f:two", "Wrapped claim.", []string{"src/z.ts:7", "package.json"}},
+		{"no source part", "f:bare", "No source part here.", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f, ok := fs.Get(tt.id)
+			if !ok {
+				t.Fatalf("Get(%q) = false", tt.id)
+			}
+			if f.Text != tt.text {
+				t.Errorf("Text = %q, want %q", f.Text, tt.text)
+			}
+			if !slices.Equal(f.Sources, tt.sources) {
+				t.Errorf("Sources = %q, want %q", f.Sources, tt.sources)
+			}
+		})
+	}
+	for _, id := range []string{"f:dup", "f:absent"} {
+		if _, ok := fs.Get(id); ok {
+			t.Errorf("Get(%q) = true, want false", id)
+		}
 	}
 }
