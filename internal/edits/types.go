@@ -1,0 +1,50 @@
+// Package edits is the edit contract: the shape of a redraft or gate-fix
+// answer, the schema and instructions that ask for it, and the check that
+// applies its edits or refuses it with problems the model can act on.
+package edits
+
+// Finding is one numbered item a seat or the gate raised against a page.
+// N is unique within a page's exchange.
+type Finding struct {
+	N        int
+	Seat     string
+	Location string
+	Text     string
+	Rewrite  string
+	Blocking bool
+}
+
+// Edit replaces one span of a file. File is "page" or "brief".
+type Edit struct {
+	File string `json:"file"`
+	Old  string `json:"old"`
+	New  string `json:"new"`
+}
+
+// Resolution records what an answer did about one finding. Status is
+// "edited" or "declined". Edits holds 0-based indexes into the same
+// answer's edits.
+type Resolution struct {
+	Finding int    `json:"finding"`
+	Status  string `json:"status"`
+	Edits   []int  `json:"edits"`
+	Reason  string `json:"reason"`
+}
+
+// Answer is the structured output of a redraft or gate-fix turn.
+type Answer struct {
+	Edits       []Edit       `json:"edits"`
+	Resolutions []Resolution `json:"resolutions"`
+}
+
+// Status values a Resolution takes.
+const (
+	StatusEdited   = "edited"
+	StatusDeclined = "declined"
+)
+
+// File values an Edit takes.
+const (
+	FilePage  = "page"
+	FileBrief = "brief"
+)

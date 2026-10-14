@@ -1,0 +1,26 @@
+{
+  "resolutions": [
+    {"finding": 1, "status": "edited", "edits": [], "reason": "Done in the prior round; this round needs no further edit."},
+    {"finding": 2, "status": "edited", "edits": [0, 1], "reason": "Names the dashboard's widget list as the place to start, in the page and the brief."},
+    {"finding": 3, "status": "declined", "edits": [], "reason": "No fact says how long the history is kept beyond 30 days, so the page says no more."},
+    {"finding": 4, "status": "edited", "edits": [2], "reason": "Says what the pencil icon does."},
+    {"finding": 5, "status": "declined", "edits": [], "reason": "The page already states it."}
+  ],
+  "edits": [
+    {
+      "file": "page",
+      "old": "3. Select the pencil icon next to its name.",
+      "new": "3. Select the pencil icon next to its name to open the name field."
+    },
+    {
+      "file": "brief",
+      "old": "\"text\": \"Select the pencil icon next to its name.\"",
+      "new": "\"text\": \"Select the pencil icon next to its name to open the name field.\""
+    },
+    {
+      "file": "page",
+      "old": "Type the new name and press Enter.",
+      "new": "Type the new name in the field and press Enter."
+    }
+  ]
+}
