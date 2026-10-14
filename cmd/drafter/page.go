@@ -94,7 +94,11 @@ func runPage(cmd *cobra.Command, args []string, f *pageFlags) error {
 		Version: version(), Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr(),
 	})
 	if err != nil {
-		return exitError{code: exitCannotRun, msg: err.Error()}
+		msg := err.Error()
+		if s.RunID != "" {
+			msg += "; resume with drafter page --resume " + s.RunID
+		}
+		return exitError{code: exitCannotRun, msg: msg}
 	}
 	out := cmd.OutOrStdout()
 	if c.Output == "json" {

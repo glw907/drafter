@@ -101,14 +101,23 @@ func (r *runner) submitUnit(ctx context.Context, p *page, name string, reqs []ba
 		worst += w
 		seats = append(seats, seatOf(q.CustomID))
 	}
-	intentID := fmt.Sprintf("%s-%s-%s-%d", r.state.RunID, p.hash12(), name, len(p.ps.Intents)+1)
+	// A stop between Reserve and the state save leaves a ledger intent the state never named, so
+	// the next free sequence number is found by trying, not by counting saved intents alone.
 	res := ledger.Reservation{
 		Entry:    r.entry(p, strings.Join(seats, "+"), reqs[0].Model),
-		Intent:   intentID,
 		Requests: len(reqs),
 		Worst:    worst,
 	}
-	if err := r.led.Reserve(res, r.caps()); err != nil {
+	var intentID string
+	var err error
+	for seq := len(p.ps.Intents) + 1; ; seq++ {
+		intentID = fmt.Sprintf("%s-%s-%s-%d", r.state.RunID, p.hash12(), name, seq)
+		res.Intent = intentID
+		if err = r.led.Reserve(res, r.caps()); !errors.Is(err, ledger.ErrIntentReserved) {
+			break
+		}
+	}
+	if err != nil {
 		switch {
 		case errors.Is(err, ledger.ErrPageCap):
 			return p.escalate("cap", "", nil, err.Error())

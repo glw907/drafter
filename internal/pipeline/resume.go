@@ -477,7 +477,7 @@ func (r *runner) reattach(ctx context.Context, p *page, idx int) error {
 	if in.BatchID == "" {
 		found, ok, err := r.findBatch(ctx, in)
 		if err != nil {
-			return err
+			return r.pollFailed(err)
 		}
 		if !ok {
 			return r.voidIntent(p, idx)

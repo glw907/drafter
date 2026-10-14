@@ -3,6 +3,7 @@ package pipeline
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -436,6 +437,35 @@ func TestResumeVoidsAnOpenReservationNoIntentNames(t *testing.T) {
 	}
 	if !found {
 		t.Error("the orphan reservation was not voided")
+	}
+}
+
+func TestResumeSkipsAnIntentIDTheLedgerHoldsButTheStateLacks(t *testing.T) {
+	h := newHarness(t, withoutFacts, withPages("b"))
+	stopAfterDraft(h)
+	id := mustStop(t, h, StopCycleCap)
+	ps := h.state(id).Pages[pageKey(pageB)]
+	led := ledger.Open(h.stateDir)
+	// The next stage is not fixed by the test, so every stage's next ID is taken.
+	for _, stage := range []string{"s2", "s3", "s4", "s5", "s6"} {
+		intent := fmt.Sprintf("%s-%s-%s-%d", id, hash12Of(pageB), stage, len(ps.Intents)+1)
+		orphan := ledger.Reservation{Intent: intent, Requests: 1, Worst: 0.001}
+		orphan.RunID, orphan.Repo, orphan.Page = id, "x", pageB
+		orphan.Seat, orphan.Model, orphan.Mode = "draft", "model-a", "batch"
+		if err := led.Reserve(orphan, ledger.Caps{Page: 100, Cycle: 100, CycleStart: testNow.AddDate(0, -1, 0)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raiseCeiling(h)
+	s, err := h.resume(id)
+	if err != nil {
+		t.Fatalf("resume: %v", err)
+	}
+	if s.Stop != "" {
+		t.Errorf("Stop = %q, want the run to finish", s.Stop)
+	}
+	if open := h.openIntents(id); len(open) != 0 {
+		t.Errorf("open intents after the resume: %v", open)
 	}
 }
 
