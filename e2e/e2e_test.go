@@ -41,9 +41,24 @@ type result struct {
 // run executes the drafter binary in dir with args.
 func run(t *testing.T, dir string, args ...string) result {
 	t.Helper()
+	return runEnv(t, dir, nil, args...)
+}
+
+// runEnv is run with extra environment entries. The environment has every DRAFTER_ variable
+// stripped and HOME and XDG_CONFIG_HOME set to empty temporary directories, so no setting of the
+// machine running the tests reaches the binary; an entry in extra overrides them.
+func runEnv(t *testing.T, dir string, extra []string, args ...string) result {
+	t.Helper()
 	cmd := exec.Command(binary, args...)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CEILING_DIRECTORIES="+filepath.Dir(dir))
+	for _, kv := range os.Environ() {
+		if !strings.HasPrefix(kv, "DRAFTER_") {
+			cmd.Env = append(cmd.Env, kv)
+		}
+	}
+	cmd.Env = append(cmd.Env, "HOME="+t.TempDir(), "XDG_CONFIG_HOME="+t.TempDir(),
+		"GIT_CEILING_DIRECTORIES="+filepath.Dir(dir))
+	cmd.Env = append(cmd.Env, extra...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()
@@ -298,5 +313,268 @@ func TestCheckPlanCannotRun(t *testing.T) {
 				t.Errorf("exit %d, stdout %q, stderr %q; want exit 2 and stderr containing %q", r.code, r.stdout, r.stderr, tt.contains)
 			}
 		})
+	}
+}
+
+func TestAnchors(t *testing.T) {
+	const page = "docs/reference/anchors.md"
+	want := "anchors-page setup setup-1 custom-row"
+	r := run(t, project(t), "anchors", page)
+	if r.code != 0 || r.stderr != "" || strings.Join(lines(r.stdout), " ") != want {
+		t.Errorf("exit %d, stdout %q, stderr %q", r.code, r.stdout, r.stderr)
+	}
+
+	r = run(t, project(t), "anchors", "--json", page)
+	var got []string
+	if err := json.Unmarshal([]byte(r.stdout), &got); err != nil || r.code != 0 {
+		t.Fatalf("exit %d, stdout is not a JSON array: %v\n%s", r.code, err, r.stdout)
+	}
+	if strings.Join(got, " ") != want {
+		t.Errorf("json anchors = %q, want %q", got, want)
+	}
+
+	r = run(t, project(t), "anchors", page, "docs/reference/keys.md")
+	if r.code != 0 || !strings.HasPrefix(r.stdout, page+"#anchors-page\n") || !strings.Contains(r.stdout, "docs/reference/keys.md#") {
+		t.Errorf("several files: exit %d, stdout %q", r.code, r.stdout)
+	}
+}
+
+func TestAnchorsNone(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "plain.md"), []byte("Just text.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if r := run(t, dir, "anchors", "plain.md"); r.code != 0 || r.stdout != "" {
+		t.Errorf("text: exit %d, stdout %q", r.code, r.stdout)
+	}
+	if r := run(t, dir, "anchors", "--json", "plain.md"); r.code != 0 || r.stdout != "[]\n" {
+		t.Errorf("json: exit %d, stdout %q", r.code, r.stdout)
+	}
+}
+
+func TestAnchorsErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		code     int
+		contains string
+	}{
+		{"missing file", []string{"anchors", "docs/nope.md"}, 1, "docs/nope.md"},
+		{"no file argument", []string{"anchors"}, 2, "Usage:"},
+		{"unknown flag", []string{"anchors", "--bogus", "docs/reference/keys.md"}, 2, "Usage:"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := run(t, project(t), tt.args...)
+			if r.code != tt.code || r.stdout != "" || !strings.Contains(r.stderr, tt.contains) {
+				t.Errorf("exit %d, stdout %q, stderr %q; want exit %d and stderr containing %q", r.code, r.stdout, r.stderr, tt.code, tt.contains)
+			}
+		})
+	}
+}
+
+// cfgProject is a drafter project under test: a git repository copied from testdata/config, with
+// a user config under its own XDG_CONFIG_HOME.
+type cfgProject struct {
+	dir, xdg string
+}
+
+func gitEnv() []string {
+	return []string{
+		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com",
+	}
+}
+
+func newCfgProject(t *testing.T) cfgProject {
+	t.Helper()
+	src, err := filepath.Abs("testdata/config")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := cfgProject{dir: filepath.Join(t.TempDir(), "project"), xdg: t.TempDir()}
+	if err := os.CopyFS(p.dir, os.DirFS(src)); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("git", "-C", p.dir, "init", "-q")
+	cmd.Env = append(os.Environ(), gitEnv()...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	return p
+}
+
+const completeUser = `workspace_id = "wrkspc_test"
+page_cap = 10
+cycle_ceiling = 100
+
+[prices.models.model-a]
+input = 1
+output = 5
+`
+
+func writeFile(t *testing.T, name, body string) {
+	t.Helper()
+	if err := os.WriteFile(name, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (p cfgProject) user(t *testing.T, body string) {
+	t.Helper()
+	dir := filepath.Join(p.xdg, "drafter")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(dir, "config.toml"), body)
+}
+
+func (p cfgProject) config(t *testing.T, env []string, args ...string) result {
+	t.Helper()
+	env = append(append(gitEnv(), "HOME="+p.xdg, "XDG_CONFIG_HOME="+p.xdg), env...)
+	return runEnv(t, p.dir, env, append([]string{"config"}, args...)...)
+}
+
+type cfgRow struct {
+	Key     string   `json:"key"`
+	Value   string   `json:"value"`
+	Source  string   `json:"source"`
+	Sources []string `json:"sources"`
+}
+
+func (p cfgProject) rows(t *testing.T, env []string, args ...string) map[string]cfgRow {
+	t.Helper()
+	r := p.config(t, env, append([]string{"--json"}, args...)...)
+	if r.code != 0 {
+		t.Fatalf("config --json: exit %d\n%s%s", r.code, r.stdout, r.stderr)
+	}
+	var list []cfgRow
+	if err := json.Unmarshal([]byte(r.stdout), &list); err != nil {
+		t.Fatalf("stdout is not a JSON array: %v\n%s", err, r.stdout)
+	}
+	m := map[string]cfgRow{}
+	for _, row := range list {
+		m[row.Key] = row
+	}
+	return m
+}
+
+func TestConfigModeAtEveryLayer(t *testing.T) {
+	p := newCfgProject(t)
+	proj := filepath.Join(p.dir, "drafter.toml")
+	base, err := os.ReadFile(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.user(t, completeUser)
+
+	check := func(name, value, source string, env []string, args ...string) {
+		t.Helper()
+		got := p.rows(t, env, args...)["mode"]
+		if got.Value != value || got.Source != source {
+			t.Errorf("%s: mode = %q from %q, want %q from %q", name, got.Value, got.Source, value, source)
+		}
+	}
+	check("default", "batch", "default", nil)
+	p.user(t, "mode = \"sync\"\n"+completeUser)
+	check("user", "sync", "user", nil)
+	writeFile(t, proj, "mode = \"batch\"\n"+string(base))
+	check("drafter.toml", "batch", "drafter.toml", nil)
+	writeFile(t, filepath.Join(p.dir, "drafter.local.toml"), "mode = \"sync\"\n")
+	check("drafter.local.toml", "sync", "drafter.local.toml", nil)
+	check("environment", "batch", "env DRAFTER_MODE", []string{"DRAFTER_MODE=batch"})
+	check("flag", "sync", "flag --sync", []string{"DRAFTER_MODE=batch"}, "--sync")
+}
+
+func TestConfigCapAtTwoLayers(t *testing.T) {
+	p := newCfgProject(t)
+	p.user(t, completeUser)
+	writeFile(t, filepath.Join(p.dir, "drafter.local.toml"), "page_cap = 5\n")
+
+	r := p.config(t, nil)
+	if r.code != 0 {
+		t.Fatalf("exit %d\n%s%s", r.code, r.stdout, r.stderr)
+	}
+	var line string
+	for _, l := range lines(r.stdout) {
+		if strings.HasPrefix(l, "page_cap = ") {
+			line = l
+		}
+	}
+	for _, want := range []string{"page_cap = 5  (drafter.local.toml", "user: 10", "drafter.local.toml: 5"} {
+		if !strings.Contains(line, want) {
+			t.Errorf("page_cap line %q lacks %q", line, want)
+		}
+	}
+	got := p.rows(t, nil)["page_cap"]
+	if got.Value != "5" || got.Source != "drafter.local.toml" || strings.Join(got.Sources, "|") != "user: 10|drafter.local.toml: 5" {
+		t.Errorf("json page_cap = %+v", got)
+	}
+}
+
+func TestConfigJSONMatchesText(t *testing.T) {
+	p := newCfgProject(t)
+	p.user(t, completeUser)
+	writeFile(t, filepath.Join(p.dir, "drafter.local.toml"), "page_cap = 5\n")
+
+	text := lines(p.config(t, nil).stdout)
+	var list []cfgRow
+	if err := json.Unmarshal([]byte(p.config(t, nil, "--json").stdout), &list); err != nil {
+		t.Fatal(err)
+	}
+	if len(text) != len(list) {
+		t.Fatalf("text has %d rows, json %d", len(text), len(list))
+	}
+	for i, row := range list {
+		if row.Key == "output" {
+			continue // --json is what sets it, so its source differs between the two runs
+		}
+		if want := row.Key + " = " + row.Value + "  (" + row.Source; !strings.HasPrefix(text[i], want) {
+			t.Errorf("row %d: text %q, json wants prefix %q", i, text[i], want)
+		}
+	}
+}
+
+func TestConfigRefusal(t *testing.T) {
+	p := newCfgProject(t)
+	p.user(t, completeUser)
+	proj := filepath.Join(p.dir, "drafter.toml")
+	base, err := os.ReadFile(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, proj, string(base)+"key_command = \"op read x\"\n")
+	line := strings.Count(string(base), "\n") + 1
+
+	r := p.config(t, nil)
+	if r.code != 1 || r.stdout != "" || !strings.Contains(r.stderr, "key_command") ||
+		!strings.Contains(r.stderr, fmt.Sprintf("drafter.toml:%d", line)) {
+		t.Errorf("exit %d, stdout %q, stderr %q; want exit 1 and a refusal naming key_command at line %d", r.code, r.stdout, r.stderr, line)
+	}
+}
+
+func TestConfigMissingSetting(t *testing.T) {
+	p := newCfgProject(t)
+	p.user(t, strings.Replace(completeUser, "cycle_ceiling = 100\n", "", 1))
+
+	r := p.config(t, nil)
+	if r.code != 1 || !strings.Contains(r.stderr, "cycle_ceiling is not set") {
+		t.Errorf("exit %d, stderr %q", r.code, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "workspace_id = wrkspc_test  (user)") || !strings.Contains(r.stdout, "cycle_ceiling =   (unset)") {
+		t.Errorf("the table did not print before the error:\n%s", r.stdout)
+	}
+}
+
+func TestConfigOutsideGitTree(t *testing.T) {
+	xdg := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(xdg, "drafter"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(xdg, "drafter", "config.toml"), completeUser)
+	r := runEnv(t, t.TempDir(), []string{"XDG_CONFIG_HOME=" + xdg}, "config")
+	if r.code != 0 || !strings.Contains(r.stdout, "page_cap = 10  (user;") {
+		t.Errorf("exit %d, stdout %q, stderr %q", r.code, r.stdout, r.stderr)
 	}
 }

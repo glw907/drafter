@@ -34,7 +34,8 @@ text: |
 
 A `|` block keeps the text exactly, including any `#`. The prose fields are `argument`,
 `covers`, `priorKnowledge`, `notCovered`, `orderReason`, `opens`, `text`, `symptom`, `cause`,
-`use`, `reason`, and each entry of `constraints` and `friction`.
+`use`, `reason`, the page `title`, each section `heading`, and each entry of `constraints` and
+`friction`.
 
 ## Top-level fields
 
@@ -57,8 +58,8 @@ second YAML document in the same file.
 ### page
 
 The `page` mapping has three required fields. The `path` field is the page's path relative to
-the repository root. The `title` field is the page's H1. The `type` field is the page type, as
-free text. Write the page type exactly as the project's outline names it: a project might use
+the repository root, so a path that is absolute or climbs out of the root with `..` is an error.
+The `title` field is the page's H1. The `type` field is the page type, as free text. Write the page type exactly as the project's outline names it: a project might use
 `concept`, `task guide`, `symptom row`, or `tutorial milestone`. The command checks only that
 `type` is present and not empty.
 
@@ -121,7 +122,7 @@ An item can't carry a field that its kind doesn't list.
 | `handoff` | `text` | The section's closing turn toward what comes next. |
 | `reason` | `text`, and optionally `facts` | A "why" that must survive drafting. The `facts` field lists the fact ids it rests on. |
 | `step` | `text`, and optionally `requires`, `produces`, `canFail`, `optional` | One action the reader takes. An `optional` step is one the reader may skip. |
-| `failure` | `symptom`, `handledBy`, and optionally `from`, `cause` | A failure that a step can cause, or a free-standing symptom row. |
+| `failure` | `symptom`, `handledBy`, and optionally `from`, `cause`, `facts` | A failure that a step can cause, or a free-standing symptom row. The `facts` field lists the fact ids it rests on. |
 | `code` | `text`, and optionally `source`, `facts` | A code block the section shows. The `text` says what the block shows. The `source` is `path`, `path#Symbol`, or an `http://` or `https://` URL. Omit it for an illustrative snippet with no model file. |
 | `figure` | `text`, and optionally `source` | A figure the section needs. The `text` says what it must show, and the optional `source` says where it comes from. |
 
@@ -133,7 +134,7 @@ The `canFail` field is `true` or `false`, and it defaults to `false`. The `optio
 the same way. A failure's `from` is the `id` of a step. Its `handledBy` is the `id` of the item
 that tells the reader what to do. A failure with no `from` is a free-standing symptom row, for a
 page that lists symptoms, causes, and fixes with no steps. The optional `cause` says why the
-symptom happens.
+symptom happens. The optional `facts` list names the fact ids the symptom and its cause rest on.
 
 The path part of a code item's `source` resolves from the directory of the page, as a link target
 does, and must exist. The `#Symbol` part isn't checked, and neither is a URL. A figure's `source`
@@ -149,7 +150,7 @@ fact behind a `reason` is a `fact` item beside it, and the `reason` can also lis
 `facts`.
 
 **Facts.** A `fact` item places a fact. A `facts` list cites one, on a sentence, a code item, a
-reason, or the introduction. A citation and a placement are separate, so a citation needs no item
+reason, a failure, or the introduction. A citation and a placement are separate, so a citation needs no item
 of its own, and a fact can be placed anywhere on the page: a sentence can cite a fact placed in a
 later section. A plan can't cite a fact that its `dispositions` list leaves out of the page.
 
@@ -208,7 +209,8 @@ The format has no kind for a table or a form. Describe a list or table in an ite
 plan has no field for rework input from an earlier draft.
 
 The plan carries no exemplars and no cross-links from the outline. The chain supplies both from
-the page inputs, so don't copy them into `constraints`.
+the page inputs, so don't copy them into `constraints`. The links check does read the outline's
+cross-links, to warn when the plan has no `link` item for one.
 
 ### Example
 
@@ -282,14 +284,15 @@ The decode check reads the YAML and refuses anything outside the format: malform
 file, a second document, an unknown or repeated field, a missing required field, a value of the
 wrong type, an unknown `kind`, `mode`, or `disposition`, a field that doesn't belong to the
 item's kind, a `level` other than `2` or `3`, an empty `items` list that the level rule doesn't
-allow, and a plain-style prose value with a line comment. Later checks run only on a plan
+allow, a `page.path` that is absolute or climbs out of the root, and a plain-style prose value
+with a line comment. Later checks run only on a plan
 that decodes without errors.
 
 ### ids
 
 Every `id` is unique. A failure's `from`, when present, names a step. A failure's `handledBy` names an item that
 exists. No fact is both a `fact` item and a disposition, and no `facts` list, on a sentence, a code
-item, a reason, or the introduction, names a fact that a disposition leaves out. This check runs
+item, a reason, a failure, or the introduction, names a fact that a disposition leaves out. This check runs
 with or without `--facts`.
 
 ### reader-state
@@ -307,7 +310,9 @@ list it in `preconditions`.
 ### recovery
 
 Every step with `canFail: true` must be the `from` of at least one `failure` item. A failure
-item whose handler doesn't exist is an `ids` error.
+item whose handler doesn't exist is an `ids` error. A failure whose `from` names a step that
+isn't `canFail` gets a warning, since the step is not expected to fail: mark the step `canFail`, or
+drop `from` to make the failure free-standing.
 
 ### links
 
@@ -322,6 +327,10 @@ For every `link` item, every subordinated `reference`, and the path part of ever
   match the slug of the page's `title` or of a section `heading`.
 - A target that the outline lists but that isn't on disk yet is a warning, and its anchor isn't
   checked. Any other missing target is an error.
+- A cross-link in the outline from this page that no `link` item targets is a warning. See
+  [Outline file](#outline-file).
+
+A target of just `#` names nothing and is an error.
 
 A path that begins with `/` resolves from the repository root. A path that leaves the repository
 is an error.
@@ -332,6 +341,12 @@ file, including setext headings, and never from fenced code. A heading's text ke
 inline code and drops link URLs and other markup. A leading front matter block is ignored. A
 heading written as raw HTML isn't an anchor in this version of the check.
 
+An `<a id="...">` element in the Markdown is an anchor too, as in a reference table's cells. The
+check finds it where the CommonMark parse reads it as raw HTML, so an element inside a code span
+or a fenced block doesn't count. An `<a name="...">` element doesn't count either: the sanitizer
+that a rendered page passes through prefixes both `id` and `name`, and the site strips the
+prefix from `id` only, so only an `id` anchor works on the page.
+
 In YAML, quote a same-page target such as `"#grace-period"`. Unquoted, the `#` starts a comment.
 
 A section's `anchor`, when present, must equal the slug of its `heading`, computed in page order
@@ -340,7 +355,7 @@ with the same repeated-heading suffixes. A mismatch is an error that names both 
 ### facts
 
 This check runs only when you pass `--facts`. Without it, each `fact` item and each `facts` list
-(on a sentence, a code item, a reason, or the introduction) gets a warning that names its line,
+(on a sentence, a code item, a reason, a failure, or the introduction) gets a warning that names its line,
 and no fact is checked.
 
 Every `fact` item's `fact` field, every id in any `facts` list, and every disposition's `fact`
@@ -368,15 +383,43 @@ vocabulary.
 ## Outline file
 
 The `--outline` file is JSON with a `pages` array. Each entry is an object with a `path`, relative
-to the repository root. Drafter reads nothing else from the file. A page listed there is a page
-that is planned, so a link to it isn't an error before the page exists.
+to the repository root, and optionally a `slug`, a short name for the page. A page listed there is a
+page that is planned, so a link to it isn't an error before the page exists. The file can also
+carry a top-level `crossLinks` array of objects with `from`, `to`, and `why`. The `from` and `to`
+fields each name a page, as a `slug` or as a repository-relative path. Drafter reads nothing else
+from the file.
 
 Pass `--outline` more than once to read several files. A page counts as planned when any of them
-lists it, and a file that can't be loaded is reported by its path.
+lists it, a slug resolves across all of them, and a file that can't be loaded is reported by its
+path.
+
+When the plan's own page is in the outline, the links check looks at each cross-link whose `from`
+is that page. A cross-link that no `link` item of the plan targets is a warning that names the
+`to`. A `link` item targets the page when the path part of its `target`, with or without an
+anchor, resolves to the page's path. A cross-link whose `to` names no page the outline lists is a
+warning too, never an error. A cross-link from another page isn't this plan's to satisfy, and an
+outline with no `crossLinks` adds no warning.
 
 ```json
-{ "pages": [{ "path": "docs/guides/revoke-a-key.md" }] }
+{
+  "pages": [
+    { "path": "docs/guides/rotate-a-key.md", "slug": "rotate-a-key" },
+    { "path": "docs/guides/revoke-a-key.md", "slug": "revoke-a-key" }
+  ],
+  "crossLinks": [
+    { "from": "rotate-a-key", "to": "revoke-a-key", "why": "the step that follows a rotation" }
+  ]
+}
 ```
+
+## List a file's anchors
+
+`drafter anchors [--json] <file>...` prints every anchor a Markdown file offers, one per line, in
+document order: the slug of each heading, computed as the links check computes it, and the `id`
+of each `<a id="...">` element. A repeated anchor is listed once. A file with no anchors prints
+nothing, or `[]` with `--json`. With several files, each anchor is written as `file#anchor`, in
+the text and in the JSON array. A file that can't be read is an error that names it, with exit
+status 1. No file argument or an unknown flag prints the usage text with exit status 2.
 
 ## Output and exit codes
 

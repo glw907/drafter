@@ -118,7 +118,13 @@ func TestCheckRecovery(t *testing.T) {
 		{"failing step with no failure item", "        produces: [deployed]\n", "        produces: [deployed]\n        canFail: true\n", []want{
 			{61, SeverityError, "recovery", `step "s-deploy" can fail, but no failure item names it`},
 		}},
-		{"canFail false needs no failure item", "canFail: true", "canFail: false", nil},
+		{"a failure from a step that cannot fail", "canFail: true", "canFail: false", []want{
+			{44, SeverityWarning, "recovery", `failure "x-create" follows step "s-create", which is not marked canFail`},
+		}},
+		{"a failure from a step that can fail", "canFail: true", "canFail: true", nil},
+		{"a free-standing failure needs no canFail step", "        from: s-create\n", "", []want{
+			{41, SeverityError, "recovery", `step "s-create" can fail, but no failure item names it`},
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -152,11 +158,24 @@ func TestCheckLinks(t *testing.T) {
 		{"repeated heading anchor", target, "../reference/keys.md#key-lifetime-1", nil, nil},
 		{"setext heading anchor", target, "../reference/keys.md#revocation-steps", nil, nil},
 		{"heading with code and a link", target, "../reference/keys.md#the-key-command-and-a-link--more", nil, nil},
+		{"an html id anchor", target, "../reference/keys.md#ttl-row", nil, nil},
+		{"a misspelled html id anchor", target, "../reference/keys.md#ttl-rows", nil, []want{
+			{30, SeverityError, "links", "anchor #ttl-rows matches no heading in docs/reference/keys.md"},
+		}},
+		{"an html id anchor in a fence", target, "../reference/keys.md#in-fence", nil, []want{
+			{30, SeverityError, "links", "anchor #in-fence matches no heading"},
+		}},
+		{"an html name anchor", target, "../reference/keys.md#old-name", nil, []want{
+			{30, SeverityError, "links", "anchor #old-name matches no heading"},
+		}},
 		{"front matter is no anchor", target, "../reference/keys.md#keys-reference", nil, []want{
 			{30, SeverityError, "links", "anchor #keys-reference matches no heading"},
 		}},
 		{"same-page anchor on a section heading", target, `"#create-the-new-key"`, nil, nil},
 		{"same-page anchor on the title", target, `"#rotate-the-signing-key"`, nil, nil},
+		{"a bare # names nothing", target, `"#"`, nil, []want{
+			{30, SeverityError, "links", `target "#" names neither an anchor nor a path`},
+		}},
 		{"same-page anchor with no heading", target, `"#nope"`, nil, []want{
 			{30, SeverityError, "links", "anchor #nope matches no heading on this page"},
 		}},
@@ -306,6 +325,8 @@ func TestCheckFactsLists(t *testing.T) {
 	noFacts := func(o *CheckOptions) { o.FactsDir = "" }
 	introFacts := func(ids string) string { return intro + "  facts: [" + ids + "]\n" }
 	reasonFacts := func(ids string) string { return reason + "        facts: [" + ids + "]\n" }
+	failure := "        handledBy: r-quota\n"
+	failureFacts := func(ids string) string { return failure + "        facts: [" + ids + "]\n" }
 	codeFacts := func(ids string) string {
 		return "      - id: c-demo\n        kind: code\n        text: |\n          The key command.\n        facts: [" + ids + "]\n" + handoff
 	}
@@ -329,6 +350,17 @@ func TestCheckFactsLists(t *testing.T) {
 		{"code facts with no facts directory", handoff, codeFacts("signing-key-ttl"), noFacts, []want{
 			{27, SeverityWarning, "facts", "the fact item at line 27 is not checked"},
 			{74, SeverityWarning, "facts", "the facts list at line 74 is not checked"},
+		}},
+		{"failure facts that are citable", failure, failureFacts("signing-key-ttl"), nil, nil},
+		{"failure fact that is rejected", failure, failureFacts("rejected-fact"), nil, []want{
+			{48, SeverityError, "facts", `fact "rejected-fact" is tagged [rejected]`},
+		}},
+		{"failure facts with no facts directory", failure, failureFacts("signing-key-ttl"), noFacts, []want{
+			{27, SeverityWarning, "facts", "the fact item at line 27 is not checked"},
+			{48, SeverityWarning, "facts", "the facts list at line 48 is not checked"},
+		}},
+		{"a failure cites a disposed fact", failure, failureFacts("old-key-grace"), nil, []want{
+			{48, SeverityError, "ids", `fact "old-key-grace" is cited here but disposed at line 76`},
 		}},
 		{"reason facts that are citable", reason, reasonFacts("signing-key-ttl"), nil, nil},
 		{"reason fact that is rejected", reason, reasonFacts("rejected-fact"), nil, []want{

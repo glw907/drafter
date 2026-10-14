@@ -29,3 +29,15 @@ A second heading with the same text takes a numeric suffix.
 ## The `key` command and a [link](https://example.com/docs) &amp; more
 
 Inline code keeps its text, and the link keeps its label but not its URL.
+
+| Setting | Note |
+|---|---|
+| `ttl` | <a id="ttl-row"></a>Ninety days. |
+
+An HTML anchor in a fence is not an anchor:
+
+```html
+<a id="in-fence"></a>
+```
+
+An anchor written as `name` does not survive the sanitizer. <a name="old-name"></a>

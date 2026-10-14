@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"slices"
@@ -27,7 +28,7 @@ var kinds = map[string]struct{ required, optional []string }{
 	"handoff":  {required: []string{"text"}},
 	"reason":   {required: []string{"text"}, optional: []string{"facts"}},
 	"step":     {required: []string{"text"}, optional: []string{"requires", "produces", "canFail", "optional"}},
-	"failure":  {required: []string{"symptom", "handledBy"}, optional: []string{"from", "cause"}},
+	"failure":  {required: []string{"symptom", "handledBy"}, optional: []string{"from", "cause", "facts"}},
 	"code":     {required: []string{"text"}, optional: []string{"source", "facts"}},
 	"figure":   {required: []string{"text"}, optional: []string{"source"}},
 }
@@ -240,11 +241,15 @@ func (d *decoder) faultAt(line int) bool {
 	return slices.ContainsFunc(d.findings, func(f Finding) bool { return f.Line == line })
 }
 
-// validate checks the rules that need a whole decoded value: the version, each item's kind and
-// the fields that kind allows, and each disposition.
+// validate checks the rules that need a whole decoded value: the version, the page path, each
+// item's kind and the fields that kind allows, and each disposition.
 func (d *decoder) validate(p *Plan) {
 	if line, ok := p.Lines["version"]; ok && p.Version != Version && !d.faultAt(line) {
 		d.add(line, fmt.Sprintf("unsupported version %d", p.Version), "set version: 1")
+	}
+	if line, ok := p.Page.Lines["path"]; ok && !filepath.IsLocal(p.Page.Path) && !d.faultAt(line) {
+		d.add(line, fmt.Sprintf("page: path %q is not a path inside the repository", p.Page.Path),
+			"write the path relative to the repository root, with no leading / and no .. that climbs out")
 	}
 	for i := range p.Sections {
 		s := &p.Sections[i]

@@ -34,7 +34,7 @@ type Plan struct {
 // Page names the page a plan is for.
 type Page struct {
 	Path  string `yaml:"path" plan:"required"`
-	Title string `yaml:"title" plan:"required"`
+	Title string `yaml:"title" plan:"required,prose"`
 	Type  string `yaml:"type" plan:"required"`
 
 	Line  int            `yaml:"-"`
@@ -58,7 +58,7 @@ type Introduction struct {
 // rendered page to carry it. Items must be present, and is empty only for a level-2 section
 // that the next section's level-3 headings fill.
 type Section struct {
-	Heading string `yaml:"heading" plan:"required"`
+	Heading string `yaml:"heading" plan:"required,prose"`
 	Level   int    `yaml:"level"`
 	Anchor  string `yaml:"anchor"`
 	Opens   string `yaml:"opens" plan:"required,prose"`
