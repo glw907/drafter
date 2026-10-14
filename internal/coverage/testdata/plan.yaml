@@ -1,0 +1,71 @@
+version: 1
+page:
+  path: docs/guides/rotate-the-key.md
+  title: Rotate the key
+  type: task-guide
+argument: |
+  Rotate a key by deploying the new key before you revoke the old one.
+introduction:
+  covers: |
+    How to rotate a key.
+  priorKnowledge: |
+    You can deploy the service.
+  notCovered: |
+    Key storage.
+orderReason: |
+  The new key goes live first.
+sections:
+  - heading: Before you begin
+    opens: |
+      You need deploy access.
+    items:
+      - id: f-ttl
+        kind: fact
+        fact: key-ttl
+      - id: l-keys
+        kind: link
+        target: ../reference/keys.md#key-lifetime
+      - id: l-url
+        kind: link
+        target: https://example.com/docs
+  - heading: Rotate the key
+    opens: |
+      Create the key, then deploy it.
+    items:
+      - id: f-grace
+        kind: fact
+        fact: grace-window
+      - id: f-detail
+        kind: fact
+        fact: detail-fact
+      - id: v-health
+        kind: sentence
+        mode: verbatim
+        text: "The health endpoint reports the new key ID."
+      - id: c-old
+        kind: sentence
+        mode: claim
+        text: |
+          The old key keeps working until you revoke it.
+      - id: r-why
+        kind: reason
+        text: |
+          Deploying first means a failed deploy leaves the old key working.
+      - id: l-anchor
+        kind: link
+        target: "#revoke-the-old-key"
+  - heading: Revoke the old key
+    opens: |
+      Revoke the old key last.
+    items:
+      - id: f-revoke
+        kind: fact
+        fact: revoke-step
+      - id: v-final
+        kind: sentence
+        mode: verbatim
+        text: "Revocation cannot be undone."
+      - id: h-next
+        kind: handoff
+        text: |
+          Point the reader to the key reference.

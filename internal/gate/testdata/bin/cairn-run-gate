@@ -1,0 +1,36 @@
+#!/bin/sh
+# A fake cairn-run-gate for the gate package's tests. It records each call under $FAKE_GATE_DIR,
+# copies $FAKE_GATE_LOG into the log path (the last argument) and prints the wrapper's standard
+# output lines, never writing them to the log.
+#
+# FAKE_GATE_MODE: "busy" exits 75 on the first call and finishes on the next; "vanish" prints the
+# terminal vanish line; anything else finishes at once with exit code $FAKE_GATE_EXIT.
+dir=$FAKE_GATE_DIR
+n=$(cat "$dir/count" 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" >"$dir/count"
+for last; do :; done
+{
+  echo "args: $*"
+  echo "lane: ${CAIRN_GATE_LANE-unset}"
+  echo "busy: ${RUN_GATE_IF_BUSY-unset}"
+} >>"$dir/calls"
+
+case $FAKE_GATE_MODE in
+busy)
+  if [ "$n" -eq 1 ]; then
+    echo "gate still running after 540s more"
+    exit 75
+  fi
+  ;;
+vanish)
+  echo "gate exit: 1 (vanished 3 times)"
+  exit 1
+  ;;
+esac
+
+cp "$FAKE_GATE_LOG" "$last"
+echo "gate exit: $FAKE_GATE_EXIT (log: $last, $(wc -l <"$last") lines)"
+echo "--- last 60 lines ---"
+tail -60 "$last"
+exit "$FAKE_GATE_EXIT"
