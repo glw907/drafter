@@ -239,7 +239,14 @@ func (r *runner) copyInputs() error {
 	if err != nil {
 		return err
 	}
-	_, err = put("config", "config.json", append(data, '\n'))
+	if _, err = put("config", "config.json", append(data, '\n')); err != nil {
+		return err
+	}
+	fp, err := fingerprintJSON(r.o.Config)
+	if err != nil {
+		return err
+	}
+	_, err = put("fingerprint", "fingerprint.json", fp)
 	return err
 }
 

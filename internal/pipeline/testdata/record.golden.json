@@ -15,6 +15,7 @@
   "input_hashes": {
     "agent.draft": "sha256:\u003chash\u003e",
     "config": "sha256:\u003chash\u003e",
+    "fingerprint": "sha256:\u003chash\u003e",
     "plan": "sha256:\u003chash\u003e",
     "prompts": "sha256:\u003chash\u003e"
   },

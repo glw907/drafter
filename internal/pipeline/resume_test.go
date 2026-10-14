@@ -204,7 +204,16 @@ func TestWriteInterruptedBetweenRecordAndWrite(t *testing.T) {
 		if len(w) != 1 || w[0].Post != nil {
 			t.Fatalf("writes = %+v, want one pre-write record", w)
 		}
-		before := len(h.api.requests)
+		s2Lines := func() int {
+			n := 0
+			for _, l := range h.ledgerLines("") {
+				if intent, _ := l["intent"].(string); strings.Contains(intent, "-s2-") {
+					n++
+				}
+			}
+			return n
+		}
+		callsBefore, linesBefore := len(h.api.calls), s2Lines()
 		s, err := h.resume(id)
 		if err != nil {
 			t.Fatal(err)
@@ -218,9 +227,14 @@ func TestWriteInterruptedBetweenRecordAndWrite(t *testing.T) {
 		if h.read(pageB) != goodPageB {
 			t.Error("the page is not the saved answer")
 		}
-		_ = before
-		if got := len(h.ledgerLines("reserve")); got < 1 {
-			t.Errorf("reserve lines = %d", got)
+		// The redo costs nothing: the resume's first call is the workspace check, and its
+		// second is the token count of the next stage, with no ledger line for the draft's
+		// intent beyond the two it had.
+		if got := h.api.calls[callsBefore : callsBefore+2]; got[0] != "check" || got[1] != "count" {
+			t.Errorf("calls at the start of the resume = %v, want check then count", got)
+		}
+		if got := s2Lines(); got != linesBefore {
+			t.Errorf("stage-2 ledger lines went from %d to %d", linesBefore, got)
 		}
 	})
 	t.Run("post-write hashes continue with no rewrite", func(t *testing.T) {

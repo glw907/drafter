@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -20,6 +21,8 @@ import (
 	"github.com/glw907/drafter/internal/plan"
 	"github.com/glw907/drafter/internal/run"
 )
+
+var runIDPattern = regexp.MustCompile(`^\d{8}T\d{6}Z-[0-9a-f]{8}$`)
 
 // resultsExpire is how long after a batch's creation its results stay downloadable.
 const resultsExpire = 29 * 24 * time.Hour
@@ -36,11 +39,12 @@ func (r *runner) resume(ctx context.Context) (*runner, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.dir = filepath.Join(cfg.StateDir, "runs", repo, r.o.Resume)
-	if r.state, err = run.LoadState(r.dir); err != nil {
-		return nil, fmt.Errorf("resume %s: %w", r.o.Resume, err)
+	if !runIDPattern.MatchString(r.o.Resume) {
+		return nil, fmt.Errorf("%q is not a run ID", r.o.Resume)
 	}
-	r.suffix = r.o.Resume[strings.IndexByte(r.o.Resume, '-')+1:]
+	r.dir = filepath.Join(cfg.StateDir, "runs", repo, r.o.Resume)
+	// The locks come before the state is read, so a resume that waited on another never works
+	// from the state the other one has since changed.
 	if err := r.takeWorktreeLock(); err != nil {
 		return nil, err
 	}
@@ -49,6 +53,10 @@ func (r *runner) resume(ctx context.Context) (*runner, error) {
 		return nil, err
 	}
 	r.locks = append(r.locks, l)
+	if r.state, err = run.LoadState(r.dir); err != nil {
+		return nil, fmt.Errorf("resume %s: %w", r.o.Resume, err)
+	}
+	r.suffix = r.o.Resume[strings.IndexByte(r.o.Resume, '-')+1:]
 
 	if err := r.checkPosition(); err != nil {
 		return nil, err
@@ -104,6 +112,9 @@ func (r *runner) checkPosition() error {
 // useCopies builds the run's configuration from the copies in the run directory, which win over
 // the files they were copied from, and checks each copy still has the hash it was saved with.
 func (r *runner) useCopies() error {
+	if err := r.checkConfig(); err != nil {
+		return err
+	}
 	cfg := *r.o.Config
 	cfg.Seat = maps.Clone(r.o.Config.Seat)
 	r.cfg = &cfg
@@ -173,48 +184,107 @@ func (r *runner) rehydrate() error {
 	return nil
 }
 
-// expected lists the hashes a page file may have at resume: what it was before the run, before
-// each write, and after each write.
-func (p *page) expected(rel string) []string {
-	out := []string{p.ps.Pre[rel]}
-	for _, w := range p.ps.Writes {
-		out = append(out, w.Pre[rel], w.Post[rel])
-		if w.Post == nil {
-			// The write was interrupted: the saved answer is what the file becomes.
-			if data, err := os.ReadFile(filepath.Join(p.dir, w.Saved[rel])); err == nil {
-				out = append(out, hashBytes(data))
-			}
+// checkConfig requires that the run's recorded configuration is intact and that the current one
+// differs from it only in the settings a resume reads fresh: the caps, the key source, and
+// workspace_id. The fingerprint holds every other setting a run's requests and costs depend on.
+func (r *runner) checkConfig() error {
+	in, ok := r.state.Inputs["fingerprint"]
+	if !ok {
+		return errors.New("the run's state has no copy of its configuration")
+	}
+	path := filepath.Join(r.dir, in.Name)
+	got, err := hashFile(path)
+	if err != nil {
+		return fmt.Errorf("read the run's copy of its configuration: %w", err)
+	}
+	if got != in.Hash {
+		return fmt.Errorf("the run's copy of its configuration changed: %s", path)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var was map[string]string
+	if err := json.Unmarshal(data, &was); err != nil {
+		return fmt.Errorf("read the run's copy of its configuration: %w", err)
+	}
+	// A seat's agent definition path is not compared, only whether it had one: the run holds
+	// the copies, and a seat that has an agent now but had none is a change.
+	if changed := changedSettings(was, fingerprint(r.o.Config)); len(changed) > 0 {
+		return fmt.Errorf("the configuration changed since the run started (%s); put it back or start a new run", strings.Join(changed, ", "))
+	}
+	return nil
+}
+
+// wantHashes lists the hashes a page file may have at resume, by the state the page is in:
+// after its last complete write, at the start of an interrupted one or as that write's saved
+// answer leaves it, as it was before the run, or, for an escalated page, as it was before the
+// run once the restore finished.
+func (p *page) wantHashes(rel string) []string {
+	pre := p.ps.Pre[rel]
+	n := len(p.ps.Writes)
+	last := -1
+	for i := n - 1; i >= 0; i-- {
+		if !p.ps.Writes[i].Restore {
+			last = i
+			break
 		}
+	}
+	escalated := p.ps.Status == StatusEscalated
+	switch {
+	case escalated && p.ps.Restored:
+		return []string{pre}
+	case last < 0:
+		return []string{pre}
+	}
+	w := p.ps.Writes[last]
+	out := []string{w.Post[rel]}
+	if w.Post == nil {
+		out = []string{w.Pre[rel]}
+		if data, err := os.ReadFile(filepath.Join(p.dir, w.Saved[rel])); err == nil {
+			out = append(out, hashBytes(data))
+		}
+	}
+	if escalated {
+		out = append(out, pre)
 	}
 	return out
 }
 
-// checkTree requires that the only changes in the worktree are drafter's own files at hashes the
-// state accounts for. Any other change stops the resume naming the file.
+// checkTree requires every file of the run to be at a hash the state accounts for, whatever git
+// reports, and every other change in the worktree to be a file the index-link command made at
+// the hash it left. Any other change stops the resume naming the file.
 func (r *runner) checkTree() error {
+	owned := map[string]bool{}
+	index := map[string]*page{}
+	for _, p := range r.pages {
+		for _, rel := range p.files() {
+			owned[rel] = true
+			got, err := p.hashOf(rel)
+			if err != nil {
+				return err
+			}
+			if !slices.Contains(p.wantHashes(rel), got) {
+				return fmt.Errorf("%s is not as the run left it; resolve it before resuming", rel)
+			}
+		}
+		for rel := range p.w.IndexPre {
+			index[rel] = p
+		}
+	}
 	out, err := r.gitOut("status", "--porcelain", "--untracked-files=all")
 	if err != nil {
 		return err
-	}
-	owned := map[string]*page{}
-	index := map[string]bool{}
-	for _, p := range r.pages {
-		for _, rel := range p.files() {
-			owned[rel] = p
-		}
-		for rel := range p.w.IndexPre {
-			index[rel] = true
-		}
 	}
 	for _, ln := range lines(out) {
 		if len(ln) < 4 {
 			continue
 		}
 		rel := strings.Trim(ln[3:], `"`)
-		if index[rel] {
+		if owned[rel] {
 			continue
 		}
-		p, ok := owned[rel]
+		p, ok := index[rel]
 		if !ok {
 			return fmt.Errorf("%s changed and is not a file of this run; resolve it before resuming", rel)
 		}
@@ -222,8 +292,12 @@ func (r *runner) checkTree() error {
 		if err != nil {
 			return err
 		}
-		if !slices.Contains(p.expected(rel), got) {
-			return fmt.Errorf("%s changed since the run last wrote it; resolve it before resuming", rel)
+		pre := ""
+		if c := p.w.IndexPre[rel]; c != nil {
+			pre = hashBytes([]byte(*c))
+		}
+		if got != p.w.IndexPost[rel] && got != pre {
+			return fmt.Errorf("%s changed since the index-link command left it; resolve it before resuming", rel)
 		}
 	}
 	return nil
@@ -393,6 +467,13 @@ func (r *runner) settleLost(p *page, idx int) error {
 // reservation.
 func (r *runner) reattach(ctx context.Context, p *page, idx int) error {
 	in := &p.ps.Intents[idx]
+	if in.BatchID == "" && r.now().Sub(in.Time) > resultsExpire {
+		// Any batch this intent made has expired, so there is nothing to search for or read.
+		if err := r.record(p, idx, nil); err != nil {
+			return err
+		}
+		return r.process(ctx, p, idx, nil)
+	}
 	if in.BatchID == "" {
 		found, ok, err := r.findBatch(ctx, in)
 		if err != nil {
