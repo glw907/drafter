@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -73,8 +74,10 @@ func runSpend(cmd *cobra.Command, f spendFlags) error {
 		until = until.AddDate(0, 0, 1)
 	}
 	root, err := plan.GitRoot(".")
-	if err != nil {
+	if errors.Is(err, plan.ErrNotGitTree) {
 		root = "" // outside a git tree only the user layer applies
+	} else if err != nil {
+		return err
 	}
 	c, err := config.Load(root, config.Flags{JSON: f.json})
 	if err != nil {

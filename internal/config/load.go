@@ -1,11 +1,13 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 // Load reads the user layer, then, when root holds a drafter.toml, it and drafter.local.toml
@@ -109,15 +111,28 @@ func readProject(root, home string) (project, local *layer, err error) {
 func checkIgnored(root, path string) error {
 	cmd := exec.Command("git", "check-ignore", "-q", "--", filepath.Base(path))
 	cmd.Dir = root
+	// git localizes its messages, and the refusal quotes the first one.
+	cmd.Env = append(os.Environ(), "LC_ALL=C")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err == nil {
 		return nil
 	}
-	if _, ok := errors.AsType[*exec.ExitError](err); ok {
+	ee, ok := errors.AsType[*exec.ExitError](err)
+	if !ok {
+		return fmt.Errorf("check that %s is ignored: git could not run: %w", path, err)
+	}
+	// git-check-ignore(1): exit 1 means no path is ignored; 128 and anything else is a failure.
+	if ee.ExitCode() == 1 {
 		return fmt.Errorf("%s: not ignored by git; add drafter.local.toml to .gitignore, "+
 			"because it can hold a key source and caps", path)
 	}
-	return fmt.Errorf("check that %s is ignored: %w", path, err)
+	line, _, _ := strings.Cut(strings.TrimSpace(stderr.String()), "\n")
+	if line == "" {
+		line = ee.Error()
+	}
+	return fmt.Errorf("check that %s is ignored: git check-ignore: %s", path, line)
 }
 
 func flagLayer(flags Flags) *layer {
