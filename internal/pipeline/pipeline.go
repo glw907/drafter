@@ -269,7 +269,6 @@ func (r *runner) loop(ctx context.Context) error {
 func (r *runner) finish() error {
 	if r.stop != "" {
 		r.warnf("stopped: %s; resume with: drafter page --resume %s", r.stop, r.state.RunID)
-		return r.save()
 	}
 	return r.save()
 }

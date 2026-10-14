@@ -63,12 +63,11 @@ type findingRecord struct {
 
 // resolutionEntry is a resolution with the stage that produced it.
 type resolutionEntry struct {
-	Stage      string `json:"stage"`
-	Finding    int    `json:"finding"`
-	Status     string `json:"status"`
-	Edits      []int  `json:"edits"`
-	Reason     string `json:"reason"`
-	Escalation bool   `json:"-"`
+	Stage   string `json:"stage"`
+	Finding int    `json:"finding"`
+	Status  string `json:"status"`
+	Edits   []int  `json:"edits"`
+	Reason  string `json:"reason"`
 }
 
 // escalation names the stop rule that ended a page, the seat that triggered it, and the
@@ -108,7 +107,13 @@ func (r *record) findings(stage string, fs []edits.Finding) {
 }
 
 func (r *record) resolutions(stage string, rs []edits.Resolution) {
-	r.Resolutions = r.Resolutions[:0:0]
+	kept := r.Resolutions[:0:0]
+	for _, old := range r.Resolutions {
+		if old.Stage != stage {
+			kept = append(kept, old)
+		}
+	}
+	r.Resolutions = kept
 	for _, x := range rs {
 		r.Resolutions = append(r.Resolutions, resolutionEntry{
 			Stage: stage, Finding: x.Finding, Status: x.Status, Edits: x.Edits, Reason: x.Reason,

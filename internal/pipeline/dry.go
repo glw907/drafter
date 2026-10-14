@@ -10,8 +10,6 @@ import (
 
 const defaultPoll = 30 * time.Second
 
-func newTimer(d time.Duration) *time.Timer { return time.NewTimer(d) }
-
 // dryRun assembles each page's first stage, counts the tokens of its requests, and prices them at
 // their worst case. It submits nothing and writes no ledger line, run directory, or state.
 func (r *runner) dryRun(ctx context.Context) (Summary, error) {

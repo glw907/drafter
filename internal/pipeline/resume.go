@@ -292,7 +292,8 @@ func (r *runner) recoverPage(ctx context.Context, p *page) error {
 // stand, and files at the pre-write hashes are written again from the saved answer, at no cost.
 func (p *page) finishWrite() error {
 	n := len(p.ps.Writes)
-	if n == 0 || p.ps.Writes[n-1].Post != nil {
+	if n == 0 || p.ps.Writes[n-1].Post != nil || p.ps.Writes[n-1].Restore {
+		// A restore interrupted by a stop is finished by finalize, which is safe to run again.
 		return nil
 	}
 	w := &p.ps.Writes[n-1]
@@ -393,14 +394,14 @@ func (r *runner) settleLost(p *page, idx int) error {
 func (r *runner) reattach(ctx context.Context, p *page, idx int) error {
 	in := &p.ps.Intents[idx]
 	if in.BatchID == "" {
-		id, err := r.findBatch(ctx, in)
+		found, ok, err := r.findBatch(ctx, in)
 		if err != nil {
 			return err
 		}
-		if id == "" {
+		if !ok {
 			return r.voidIntent(p, idx)
 		}
-		in.BatchID = id
+		in.BatchID, in.Created = found.ID, found.CreatedAt
 		if err := r.save(); err != nil {
 			return err
 		}

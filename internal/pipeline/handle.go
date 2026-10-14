@@ -92,7 +92,7 @@ func (p *page) round2Seats() []string {
 // noRetry is true for the reads whose stop rule allows no second try.
 func (p *page) noRetry() bool {
 	switch p.ps.Step {
-	case stRound2, stScoped, stReader2:
+	case stRound2, stScoped, stReader1, stReader2:
 		return true
 	}
 	return false
@@ -221,8 +221,14 @@ func (p *page) validate(text string) error {
 	return nil
 }
 
-// complete runs the step once every seat has an accepted answer.
+// complete runs the step once every seat has an accepted answer. The one-retry budgets of the
+// failures table are per step, so they start over for the next one.
 func (p *page) complete(ctx context.Context) error {
+	for row := range p.w.Budgets {
+		if strings.HasSuffix(row, ".answer") || strings.HasSuffix(row, ".resubmit") || strings.HasSuffix(row, ".cancel") {
+			delete(p.w.Budgets, row)
+		}
+	}
 	switch p.ps.Step {
 	case stConsistency:
 		return p.completeConsistency()

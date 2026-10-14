@@ -60,7 +60,9 @@ func TestSyntheticRunAccepts(t *testing.T) {
 				found := false
 				for _, l := range settles {
 					key, _ := l["key"].(string)
-					found = found || strings.HasSuffix(key, r.CustomID) || mode == "sync"
+					// A batch result is keyed by batch ID and custom_id; a sync result by its
+					// message ID, which the fake numbers per send.
+					found = found || strings.HasSuffix(key, r.CustomID) || (mode == "sync" && strings.HasPrefix(key, "msg_"))
 				}
 				if !found {
 					t.Errorf("no settle line for %s", r.CustomID)
@@ -296,6 +298,9 @@ func TestPlanStage(t *testing.T) {
 		if got := statusOf(s, pageA); got != StatusAccepted {
 			t.Errorf("A = %s (%s)", got, ruleOf(s, pageA))
 		}
+		if rec := h.record(s.RunID, pageA); !hasFault(rec.Warnings, "revoke-a-key.md") {
+			t.Errorf("warnings = %v, want the link to the unwritten page named", rec.Warnings)
+		}
 	})
 }
 
@@ -396,7 +401,7 @@ func TestPagesInFlight(t *testing.T) {
 			t.Errorf("page B's first request (%d) came before page A's last (%d)", firstBIdx, lastA)
 		}
 	})
-	t.Run("three pages start together", func(t *testing.T) {
+	t.Run("both pages start together", func(t *testing.T) {
 		h := newHarness(t, withoutFacts, withInFlight(3))
 		h.mustRun()
 		firstGet := indexOf(h.api.calls, "get")

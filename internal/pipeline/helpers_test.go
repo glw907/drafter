@@ -33,6 +33,9 @@ func hash12Of(pagePath string) string {
 
 func pageKey(p string) string { return run.PageKey(p) }
 
+// stateOnDisk loads the state of the one run in the state directory.
+func (h *harness) stateOnDisk() *run.State { return h.state(h.runID()) }
+
 // normalizeRecord returns a page's record.json with the parts that differ between runs
 // replaced: the custom_id prefix and the input hashes.
 func normalizeRecord(t *testing.T, runDir, pagePath string) string {

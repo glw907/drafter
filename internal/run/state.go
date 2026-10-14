@@ -98,6 +98,9 @@ type Write struct {
 	// Saved names the files in the page's record directory that hold the contents to write,
 	// keyed by repo-relative path.
 	Saved map[string]string `json:"saved"`
+	// Restore marks the write that puts an escalated page's files back to their pre-run
+	// state. Saved then names the pre-run snapshots, with no entry for a file the run created.
+	Restore bool `json:"restore,omitempty"`
 }
 
 // Open returns the page's open intent, or nil.

@@ -43,7 +43,7 @@ func (p *page) doPlan() error {
 		} `json:"args"`
 	}
 	if len(p.h.Context) > 0 {
-		if err := decodeLoose(p.h.Context, &args); err == nil && args.Args.Outline != "" {
+		if err := json.Unmarshal(p.h.Context, &args); err == nil && args.Args.Outline != "" {
 			files = append(files, p.abs(args.Args.Outline))
 		}
 	}
@@ -317,6 +317,10 @@ func (p *page) indexLink(ctx context.Context) error {
 		if pre, was := prior[path]; was && pre != nil && *pre == now {
 			continue
 		}
+		if p.w.IndexPost == nil {
+			p.w.IndexPost = map[string]string{}
+		}
+		p.w.IndexPost[path] = hashBytes([]byte(now))
 		if _, recorded := p.w.IndexPre[path]; recorded {
 			continue
 		}
@@ -337,8 +341,4 @@ func (p *page) indexLink(ctx context.Context) error {
 		}
 	}
 	return nil
-}
-
-func decodeLoose(raw []byte, v any) error {
-	return json.Unmarshal(raw, v)
 }

@@ -441,7 +441,7 @@ func TestFaults(t *testing.T) {
 		bad := draftText(goodPageB+"\nBROKEN\n", goodBriefB)
 		h.api.script("s2", "draft", okText(bad),
 			okText(jsonText(map[string]any{
-				"edits":       []map[string]string{{"file": "brief", "old": goodBriefB, "new": `{"sentences":[{"text":"x","id":"y"}]}`}},
+				"edits":       []map[string]string{{"file": "brief", "old": "not json", "new": "still not json"}},
 				"resolutions": []map[string]any{{"finding": 1, "status": "edited", "edits": []int{0}, "reason": "r"}},
 			})))
 		h.api.onSubmit = func(ids []string) {
@@ -457,7 +457,7 @@ func TestFaults(t *testing.T) {
 		if rec.Escalation == nil {
 			t.Fatalf("page %s", statusOf(s, pageB))
 		}
-		if len(rec.Faults) == 0 {
+		if !hasFault(rec.Faults, "not the answer's doing") {
 			t.Errorf("faults = %v, want the refusal the answer did not cause", rec.Faults)
 		}
 	})
@@ -554,11 +554,11 @@ func TestNoKeyInAnyOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	second := newHarness(t, withoutFacts, withPages("b"))
-	second.api.createErr = callError(500, "api_error", "reset")
-	second.api.createErrs = map[int]error{1: callError(400, "invalid_request_error", "x")}
+	second.api.createErrs = map[int]error{1: maybeSent()}
+	second.api.createErr = transportErr()
 	_, _ = second.run()
 	third := newHarness(t, withoutFacts, withPages("b"))
-	third.api.createErr = callError(429, "rate_limit_error", "You have reached your specified workspace API usage limits.")
+	third.api.createErr = spendErr()
 	_, _ = third.run()
 	for _, hh := range []*harness{h, second, third} {
 		for _, root := range []string{hh.stateDir, hh.root} {

@@ -57,10 +57,18 @@ func newRunner(ctx context.Context, o Options) (*runner, error) {
 	r := &runner{o: o, api: o.API, now: now, root: root, mods: map[string]*prompts.Module{}}
 	r.led = ledger.Open(cfg.StateDir)
 	r.led.Now = now
+	var err error
 	if o.Resume != "" {
-		return r.resume(ctx)
+		_, err = r.resume(ctx)
+	} else {
+		_, err = r.begin(ctx)
 	}
-	return r.begin(ctx)
+	if err != nil {
+		// A failed start must not leave the worktree locked for the life of the process.
+		r.release()
+		return nil, err
+	}
+	return r, nil
 }
 
 // gitOut runs git in the project and returns its standard output.

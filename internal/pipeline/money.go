@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/glw907/drafter/internal/atomicfile"
 	"github.com/glw907/drafter/internal/batch"
@@ -209,12 +210,14 @@ func (r *runner) create(ctx context.Context, p *page, idx int, name string, reqs
 // as a new intent.
 func (r *runner) recover(ctx context.Context, p *page, idx int, name string, reqs []batch.Request) error {
 	in := &p.ps.Intents[idx]
-	id, err := r.findBatch(ctx, in)
+	found, ok, err := r.findBatch(ctx, in)
 	if err != nil {
-		return r.failedSubmit(p, idx, err)
+		// A search that failed proves nothing about the batch, which may exist and be billed,
+		// so the intent stays open for a resume to settle.
+		return r.pollFailed(err)
 	}
-	if id != "" {
-		in.BatchID = id
+	if ok {
+		in.BatchID, in.Created = found.ID, found.CreatedAt
 		if err := r.save(); err != nil {
 			return err
 		}
@@ -232,31 +235,43 @@ func (r *runner) recover(ctx context.Context, p *page, idx int, name string, req
 }
 
 // findBatch lists the workspace's batches created since the intent, waits for each to end, and
-// returns the ID of the one whose results carry the intent's custom_ids, or empty.
-func (r *runner) findBatch(ctx context.Context, in *run.Intent) (string, error) {
+// returns the one whose results carry the intent's custom_ids. A batch the run already tracks
+// under another intent is skipped, since it cannot be this intent's.
+func (r *runner) findBatch(ctx context.Context, in *run.Intent) (batch.Batch, bool, error) {
 	cands, err := r.api.List(ctx, in.Time)
 	if err != nil {
-		return "", err
+		return batch.Batch{}, false, err
 	}
 	want := map[string]bool{}
 	for _, rq := range in.Requests {
 		want[rq.CustomID] = true
 	}
-	for _, c := range cands {
-		if err := r.waitEnded(ctx, c.ID); err != nil {
-			return "", err
-		}
-		results, err := r.api.Results(ctx, c.ID)
-		if err != nil {
-			return "", err
-		}
-		for _, res := range results {
-			if want[res.CustomID] {
-				return c.ID, nil
+	tracked := map[string]bool{}
+	for _, p := range r.pages {
+		for _, other := range p.ps.Intents {
+			if other.BatchID != "" {
+				tracked[other.BatchID] = true
 			}
 		}
 	}
-	return "", nil
+	for _, c := range cands {
+		if tracked[c.ID] {
+			continue
+		}
+		if err := r.waitEnded(ctx, c.ID); err != nil {
+			return batch.Batch{}, false, err
+		}
+		results, err := r.api.Results(ctx, c.ID)
+		if err != nil {
+			return batch.Batch{}, false, err
+		}
+		for _, res := range results {
+			if want[res.CustomID] {
+				return c, true, nil
+			}
+		}
+	}
+	return batch.Batch{}, false, nil
 }
 
 func (r *runner) waitEnded(ctx context.Context, id string) error {
@@ -282,7 +297,7 @@ func (r *runner) sleep(ctx context.Context) error {
 	if r.o.Sleep != nil {
 		return r.o.Sleep(ctx, d)
 	}
-	t := newTimer(d)
+	t := time.NewTimer(d)
 	defer t.Stop()
 	select {
 	case <-ctx.Done():

@@ -270,23 +270,55 @@ func (p *page) finalize(status string) error {
 // restore puts the page and its brief back to their pre-run content, or removes them when the
 // run created them, and then does the same for the files the index-link command changed.
 func (p *page) restore() error {
-	for _, rel := range p.files() {
+	w := run.Write{Pre: map[string]string{}, Saved: map[string]string{}, Restore: true}
+	for i, rel := range p.files() {
+		h, err := p.hashOf(rel)
+		if err != nil {
+			return err
+		}
+		w.Pre[rel] = h
+		if p.ps.Pre[rel] != "" {
+			w.Saved[rel] = preName(i)
+		}
+	}
+	if len(p.ps.Writes) == 0 || !p.ps.Writes[len(p.ps.Writes)-1].Restore {
+		p.ps.Writes = append(p.ps.Writes, w)
+	}
+	if err := p.r.save(); err != nil {
+		return err
+	}
+	for i, rel := range p.files() {
 		if err := p.restoreFile(rel, p.ps.Pre[rel] != "", func() ([]byte, error) {
-			i := 0
-			if rel != p.h.Page.Path {
-				i = 1
-			}
 			return os.ReadFile(filepath.Join(p.dir, preName(i)))
 		}); err != nil {
 			return err
 		}
 	}
 	for rel, pre := range p.w.IndexPre {
+		// Another page's link command may have changed the file since this page's did; the
+		// restore then leaves it, which keeps that page's link and records the dangling one.
+		now, err := p.hashOf(rel)
+		if err != nil {
+			return err
+		}
+		if want, ok := p.w.IndexPost[rel]; ok && now != want {
+			p.w.Rec.Friction = append(p.w.Rec.Friction, "index-link: "+rel+" changed after this page's link, so it was not restored")
+			continue
+		}
 		if err := p.restoreFile(rel, pre != nil, func() ([]byte, error) { return []byte(*pre), nil }); err != nil {
 			return err
 		}
 	}
-	return nil
+	post := map[string]string{}
+	for _, rel := range p.files() {
+		h, err := p.hashOf(rel)
+		if err != nil {
+			return err
+		}
+		post[rel] = h
+	}
+	p.ps.Writes[len(p.ps.Writes)-1].Post = post
+	return p.r.save()
 }
 
 func (p *page) restoreFile(rel string, existed bool, content func() ([]byte, error)) error {

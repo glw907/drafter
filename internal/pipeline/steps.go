@@ -5,12 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/glw907/drafter/internal/assemble"
+	"github.com/glw907/drafter/internal/atomicfile"
 	"github.com/glw907/drafter/internal/batch"
 	"github.com/glw907/drafter/internal/coverage"
 	"github.com/glw907/drafter/internal/edits"
@@ -383,7 +384,7 @@ func (p *page) snapshotRound1() error {
 		return nil
 	}
 	snap := filepath.Join(p.dir, "round1.page.md")
-	if err := os.WriteFile(snap, []byte(text), 0o644); err != nil {
+	if err := atomicfile.WriteFile(snap, []byte(text), 0o644); err != nil {
 		return fmt.Errorf("write round-1 snapshot: %w", err)
 	}
 	if p.w.Baseline, err = p.gitHashObject(snap); err != nil {
@@ -424,7 +425,7 @@ func decodeAnswer(text string, v any) error {
 		return err
 	}
 	if dec.More() {
-		return fmt.Errorf("data after the JSON value")
+		return errors.New("data after the JSON value")
 	}
 	return nil
 }
@@ -570,7 +571,11 @@ func (p *page) stageReader(ctx context.Context) (*stage, error) {
 		if prompt, err = p.render("reader", c); err != nil {
 			return nil, err
 		}
-		req, err = p.build(ctx, s7, "reader", assemble.AnswerReader2, prompt, p.w.Reader.History, nil)
+		var declined []edits.DeclinedFinding
+		if p.w.Reader.Retest {
+			declined = p.declinedFor("reader")
+		}
+		req, err = p.build(ctx, s7, "reader", assemble.AnswerReader2, prompt, p.w.Reader.History, declined)
 	}
 	if err != nil {
 		return nil, err

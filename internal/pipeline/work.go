@@ -21,7 +21,6 @@ const (
 	stReader2      = "reader2"
 	stFinalRedraft = "finalredraft"
 	stScoped       = "scoped"
-	stHeld         = "held"
 	stDone         = "done"
 )
 
@@ -103,7 +102,10 @@ type work struct {
 	// IndexPre is each file the index-link command changed, as it was before the page's first
 	// run of the command: its content, or absent.
 	IndexPre map[string]*string `json:"index_pre,omitempty"`
-	Rec      record             `json:"rec"`
+	// IndexPost is the hash each of those files had right after the page's last run of the
+	// command, so a restore can tell whether another page has changed the file since.
+	IndexPost map[string]string `json:"index_post,omitempty"`
+	Rec       record            `json:"rec"`
 	// PendingGate names the exchange kind of a write whose gate has not finished, so a resume
 	// that finds the files written runs the gate and never asks the model again.
 	PendingGate string `json:"pending_gate,omitempty"`
