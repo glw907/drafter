@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "worktree": "/abs/worktree",
+  "args": {"pages": ["docs/widget/install.md"], "backHalf": "drafter"},
+  "resolved": {
+    "pages": [
+      {"path": "docs/widget/install.md", "brief": "docs/internal/briefs/widget/install.json", "pageType": "task guide"}
+    ],
+    "index": "docs/widget/README.md"
+  },
+  "pages": [
+    {
+      "page": {
+        "path": "docs/widget/install.md",
+        "brief": "docs/internal/briefs/widget/install.json",
+        "type": "task-guide"
+      },
+      "plan": "docs/internal/briefs/widget/install.plan.yaml",
+      "framing": "docs/internal/briefs/widget/install.framing.md",
+      "inputs": {
+        "job": "Show a new user how to install Widget.",
+        "pageType": "task guide",
+        "registerSections": ["## Task guides"],
+        "exemplarSources": ["/abs/exemplars/guide.md"],
+        "claimInventory": [
+          {"claim": "Widget installs with one command.", "disposition": "carried", "factId": "f:abc123", "section": "Install"}
+        ],
+        "factIds": ["f:abc123"]
+      }
+    }
+  ]
+}
