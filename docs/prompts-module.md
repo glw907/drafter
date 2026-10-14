@@ -65,8 +65,8 @@ module, so every value is plain data.
 | `round` | The round the seat renders: `1`, `2`, or `"final"`. The final round is the redraft and the scoped reads that follow the last reader's read. |
 | `findings` | The findings text that the seat addresses, as a string. |
 | `afterFinalRead` | `true` when the seat renders after the final reader's read. |
-| `scope` | A string that names the scope of a narrowed read. |
-| `where` | A string that names where in the page the read applies. |
+| `scope` | The findings a scoped read after the final reader's read checks, as the redraft answered them, or an empty string. |
+| `where` | A string that names where in the page the read applies. drafter sends an empty string, and a module may ignore it. |
 | `narrow` | An object that describes a narrowed read, or `null`. |
 | `turn` | The turn number, for a seat that runs more than one turn, such as `reader`. |
 | `facts` | `true` when the project has a facts store, so a module can word the fact read for either case. |
