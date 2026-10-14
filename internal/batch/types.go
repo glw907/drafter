@@ -7,8 +7,8 @@
 // request URL. When retries run out (ErrTransport) or the API refuses at a spend limit
 // (ErrSpendLimit), the *CallError carries whatever the last failure had. A client-side refusal,
 // from CheckWorkspace or a billable call made before it passed, is a *CallError with a message
-// and no status. A caller context that ends comes back as the context's own error, except during
-// a Create or Send call, where it is a *CallError of kind ErrMaybeSent whose Cause is the context
+// and no status. A caller context that ends comes back as the context's own error, except while a
+// Create or Send request is in flight, where it is a *CallError of kind ErrMaybeSent whose Cause is the context
 // error's text. A request the client cannot build (a message role that is not "user" or
 // "assistant", or a schema that is not a JSON object) is a plain error naming the request,
 // returned before anything is sent.

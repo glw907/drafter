@@ -94,7 +94,10 @@ type Ledger struct {
 	hook func() // called between a Reserve's check and its append; nil in production
 }
 
-// Open returns the ledger kept in stateDir. It touches nothing until the first append.
+// Open returns the ledger kept in stateDir. It touches nothing until the first read or append. A
+// read creates ledger.lock in an existing state directory and never the directory; the first
+// append creates both. Nothing may remove or replace ledger.lock while a holder runs, since
+// mutual exclusion depends on the file keeping its inode.
 func Open(stateDir string) *Ledger {
 	return &Ledger{Now: time.Now, dir: stateDir}
 }
