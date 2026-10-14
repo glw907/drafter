@@ -84,7 +84,8 @@ type Report struct {
 }
 
 // Ledger is the spend ledger in one state directory. Processes sharing the directory serialize
-// their checks and appends on ledger.lock.
+// their checks and appends on ledger.lock. A read takes the lock shared, so it waits for a writer
+// mid-append and never sees a half-written line; readers do not wait for each other.
 type Ledger struct {
 	Now  func() time.Time // stamps each line; time.Now from Open
 	Warn io.Writer        // receives torn-line warnings; os.Stderr when nil
@@ -165,7 +166,7 @@ func (l *Ledger) Settle(s Settlement) error {
 
 // OpenIntents returns the run's reservations not yet closed, in the order they were made.
 func (l *Ledger) OpenIntents(runID string) ([]Reservation, error) {
-	st, err := l.read()
+	st, err := l.readShared()
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +182,7 @@ func (l *Ledger) OpenIntents(runID string) ([]Reservation, error) {
 // Spend reports the settled lines stamped at or after since and before until; a zero time leaves
 // that end open. Open reservations are summarized whatever their age.
 func (l *Ledger) Spend(since, until time.Time) (Report, error) {
-	st, err := l.read()
+	st, err := l.readShared()
 	if err != nil {
 		return Report{}, err
 	}
@@ -223,7 +224,7 @@ func (l *Ledger) Spend(since, until time.Time) (Report, error) {
 
 // PageSpend is the page's settled spend plus its open intents at their worst case.
 func (l *Ledger) PageSpend(runID, page string) (float64, error) {
-	st, err := l.read()
+	st, err := l.readShared()
 	if err != nil {
 		return 0, err
 	}

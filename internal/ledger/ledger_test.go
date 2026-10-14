@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -746,5 +747,175 @@ func TestSpendReport(t *testing.T) {
 	}
 	if rep.Total != 1.75 {
 		t.Errorf("until-exclusive Total = %v, want 1.75", rep.Total)
+	}
+}
+
+// lockFile opens ledger.lock on its own descriptor, as a second process would, and takes how.
+func lockFile(t *testing.T, dir string, how int) *os.File {
+	t.Helper()
+	f, err := os.OpenFile(filepath.Join(dir, "ledger.lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = f.Close() })
+	if err := syscall.Flock(int(f.Fd()), how); err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+func encodeLine(t *testing.T, ln line) []byte {
+	t.Helper()
+	b, err := json.Marshal(ln)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append(b, '\n')
+}
+
+// A reader that starts while a writer is mid-append waits for the lock and then sees the whole
+// line, rather than skipping a half-written tail.
+func TestReadWaitsForWriter(t *testing.T) {
+	entry := Entry{RunID: "r1", Repo: "repo", Page: "p1", Seat: "draft", Model: "plain-s", Mode: "batch"}
+	reserve := func(id string, worst float64) line {
+		return line{V: version, Type: typeReserve, Time: t0, Entry: entry, Intent: id, Requests: 1, Worst: worst}
+	}
+	tests := []struct {
+		name string
+		half line
+		read func(l *Ledger) (float64, error)
+		want float64
+	}{
+		{
+			name: "Spend counts the settle",
+			half: line{V: version, Type: typeSettle, Time: t0, Entry: entry, Intent: "i1", Key: "k1", Cost: 2, Kind: "actual"},
+			read: func(l *Ledger) (float64, error) {
+				rep, err := l.Spend(time.Time{}, time.Time{})
+				return rep.Total, err
+			},
+			want: 2,
+		},
+		{
+			name: "OpenIntents lists the reserve",
+			half: reserve("i2", 3),
+			read: func(l *Ledger) (float64, error) {
+				open, err := l.OpenIntents("r1")
+				return float64(len(open)), err
+			},
+			want: 2,
+		},
+		{
+			name: "PageSpend adds the reserve",
+			half: reserve("i2", 3),
+			read: func(l *Ledger) (float64, error) { return l.PageSpend("r1", "p1") },
+			want: 4,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l, _, dir := newLedger(t)
+			warn := l.Warn.(*bytes.Buffer)
+			if err := os.MkdirAll(dir, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(dir, "ledger.jsonl")
+			first := encodeLine(t, reserve("i1", 1))
+			if err := os.WriteFile(path, first, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			lf := lockFile(t, dir, syscall.LOCK_EX)
+			f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer f.Close()
+			second := encodeLine(t, tt.half)
+			cut := len(second) / 2
+			if _, err := f.Write(second[:cut]); err != nil {
+				t.Fatal(err)
+			}
+			type result struct {
+				got float64
+				err error
+			}
+			done := make(chan result, 1)
+			go func() {
+				got, err := tt.read(l)
+				done <- result{got, err}
+			}()
+			select {
+			case r := <-done:
+				t.Fatalf("read returned %v, %v while a writer held the lock", r.got, r.err)
+			case <-time.After(200 * time.Millisecond):
+			}
+			if _, err := f.Write(second[cut:]); err != nil {
+				t.Fatal(err)
+			}
+			if err := syscall.Flock(int(lf.Fd()), syscall.LOCK_UN); err != nil {
+				t.Fatal(err)
+			}
+			select {
+			case r := <-done:
+				if r.err != nil {
+					t.Fatal(r.err)
+				}
+				if r.got != tt.want {
+					t.Errorf("got %v, want %v", r.got, tt.want)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("blocked")
+			}
+			if warn.Len() != 0 {
+				t.Errorf("Warn received %q", warn)
+			}
+		})
+	}
+}
+
+func TestReadersShare(t *testing.T) {
+	l, _, dir := newLedger(t)
+	mustReserve(t, l, res("r1", "p1", "i1", 1, 1), wide)
+	lockFile(t, dir, syscall.LOCK_SH)
+	done := make(chan error, 1)
+	go func() {
+		_, err := l.Spend(time.Time{}, time.Time{})
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("blocked")
+	}
+}
+
+func TestReadCreatesNothingWithoutDirectory(t *testing.T) {
+	l, _, dir := newLedger(t)
+	rep, err := l.Spend(time.Time{}, time.Time{})
+	if err != nil || rep.Total != 0 {
+		t.Fatalf("Spend = %+v, %v", rep, err)
+	}
+	if _, err := os.Stat(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("state directory after read: %v, want not exist", err)
+	}
+}
+
+func TestReadCreatesLock(t *testing.T) {
+	l, _, dir := newLedger(t)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	rep, err := l.Spend(time.Time{}, time.Time{})
+	if err != nil || rep.Total != 0 {
+		t.Fatalf("Spend = %+v, %v", rep, err)
+	}
+	fi, err := os.Stat(filepath.Join(dir, "ledger.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm() != 0o600 {
+		t.Errorf("lock mode = %v, want 0600", fi.Mode().Perm())
 	}
 }
