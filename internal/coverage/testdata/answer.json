@@ -1,0 +1,7 @@
+{
+  "items": [
+    {"id": "c-old", "quote": "The old key keeps working until you revoke it."},
+    {"id": "r-why", "quote": "Deploying first means a failed deploy leaves the old key working."},
+    {"id": "h-next", "quote": "Next, read the key reference."}
+  ]
+}

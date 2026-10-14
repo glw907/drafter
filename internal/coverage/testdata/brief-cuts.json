@@ -1,0 +1,9 @@
+{
+  "page": "docs/guides/rotate-the-key.md",
+  "cuts": [{"fact": "legacy-format", "reason": "owned by the reference page"}],
+  "local": ["note"],
+  "sentences": [
+    {"text": "This page shows how to rotate a key without downtime.", "id": "no-claim"},
+    {"text": "The key lives for 90 days.", "id": ["key-ttl", "no-claim", "grace-window"]}
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "sentences": [
+    {"text": "The key lives for 90 days.", "id": "key-ttl"},
+    {"text": "The old key keeps working for 24 hours after rotation.", "id": ["grace-window"]},
+    {"text": "The deploy reads the key from the environment.", "id": "detail-fact"},
+    {"text": "Revoke the old key with the revoke command.", "id": "revoke-step"},
+    {"text": "This page shows how to rotate a key without downtime.", "id": "no-claim"}
+  ]
+}
