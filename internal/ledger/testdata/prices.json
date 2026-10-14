@@ -1,0 +1,12 @@
+{
+  "Date": "2026-10-13",
+  "Source": "synthetic",
+  "BatchDiscount": 0.5,
+  "Models": {
+    "plain-s": {"Input": 4, "Output": 16, "CacheWrite5m": 5, "CacheWrite1h": 8, "CacheRead": 0.5},
+    "haiku-s": {
+      "Input": 1, "Output": 5, "CacheWrite5m": 1.25, "CacheWrite1h": 2, "CacheRead": 0.125,
+      "LongContext": {"Threshold": 100000, "Input": 2, "Output": 8, "CacheWrite5m": 2.5, "CacheWrite1h": 4, "CacheRead": 0.25}
+    }
+  }
+}
