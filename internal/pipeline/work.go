@@ -109,8 +109,6 @@ type work struct {
 	Sent map[string][]batch.Message `json:"sent,omitempty"`
 	// DraftHist is the draft seat's conversation after the draft, the start of a gate-fix exchange.
 	DraftHist []batch.Message `json:"draft_hist,omitempty"`
-	// Plan is the plan's path inside the run directory, empty for a markdown plan.
-	Final string `json:"final,omitempty"`
 }
 
 // readerState is the final reader's two-turn conversation.
@@ -130,5 +128,3 @@ func (w *work) spend(row string) int {
 	w.Budgets[row]++
 	return w.Budgets[row]
 }
-
-func (w *work) spent(row string) int { return w.Budgets[row] }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -238,8 +239,8 @@ func (f *fakeAPI) List(ctx context.Context, since time.Time) ([]batch.Batch, err
 		return nil, f.listErr
 	}
 	var out []batch.Batch
-	for i := len(f.order) - 1; i >= 0; i-- {
-		b := f.batches[f.order[i]]
+	for _, id := range slices.Backward(f.order) {
+		b := f.batches[id]
 		out = append(out, batch.Batch{ID: b.id, Ended: b.polls > f.pollsToEnd, CreatedAt: b.created})
 	}
 	return out, nil
@@ -317,8 +318,8 @@ func readText(verdict string, findings ...map[string]any) string {
 	return jsonText(map[string]any{"verdict": verdict, "findings": findings, "summary": "read"})
 }
 
-func finding(location, text string, blocking bool) map[string]any {
-	return map[string]any{"location": location, "finding": text, "rewrite": "rewrite " + text, "blocking": blocking}
+func finding(location, text string) map[string]any {
+	return map[string]any{"location": location, "finding": text, "rewrite": "rewrite " + text, "blocking": true}
 }
 
 // defaultAnswer is the accepting answer for a request, chosen by its schema.

@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -342,20 +340,6 @@ func relTo(root, p string) string {
 	return p
 }
 
-func sortedSeats(m map[string]string) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	slices.Sort(out)
-	return out
-}
-
 func lines(s string) []string {
 	return strings.Split(strings.TrimRight(s, "\n"), "\n")
-}
-
-func fileExists(p string) bool {
-	_, err := os.Stat(p)
-	return err == nil
 }

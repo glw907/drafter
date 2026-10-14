@@ -78,7 +78,7 @@ type Intent struct {
 	// empty while the intent is open.
 	Settlement string `json:"settlement,omitempty"`
 	// Created is the time the API reported for the batch, kept for adoption.
-	Created time.Time `json:"created,omitempty"`
+	Created time.Time `json:"created,omitzero"`
 }
 
 // IntentRequest maps one custom_id to the seat it asks.

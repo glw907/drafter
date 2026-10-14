@@ -282,7 +282,6 @@ func (p *page) restore() error {
 		}
 	}
 	for rel, pre := range p.w.IndexPre {
-		pre := pre
 		if err := p.restoreFile(rel, pre != nil, func() ([]byte, error) { return []byte(*pre), nil }); err != nil {
 			return err
 		}

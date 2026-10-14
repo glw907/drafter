@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -220,11 +221,4 @@ func TestCreateWithoutWorkspaceCheckIsAnError(t *testing.T) {
 	}
 }
 
-func contains(ss []string, s string) bool {
-	for _, x := range ss {
-		if x == s {
-			return true
-		}
-	}
-	return false
-}
+func contains(ss []string, s string) bool { return slices.Contains(ss, s) }

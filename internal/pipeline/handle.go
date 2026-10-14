@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -123,7 +124,7 @@ func (p *page) take(in *run.Intent, rq run.IntentRequest, res batch.Result, pres
 	}
 	switch act {
 	case batch.ActionAccept:
-		if err := p.validate(rq.Seat, res.Text); err != nil {
+		if err := p.validate(res.Text); err != nil {
 			return p.answerFailure(rq.Seat, "did not parse: "+err.Error())
 		}
 		p.w.Got[rq.Seat] = res.Text
@@ -183,7 +184,7 @@ type readerAnswer struct {
 }
 
 // validate checks that text is an answer of the shape the current step asked for.
-func (p *page) validate(seat, text string) error {
+func (p *page) validate(text string) error {
 	switch p.ps.Step {
 	case stConsistency:
 		var a consistencyAnswer
@@ -322,9 +323,7 @@ func (p *page) completeCoverage() error {
 
 func (p *page) completeRound1() error {
 	p.w.Round1 = map[string]string{}
-	for seat, text := range p.w.Got {
-		p.w.Round1[seat] = text
-	}
+	maps.Copy(p.w.Round1, p.w.Got)
 	p.recordReads(s4)
 	return p.afterRound1()
 }

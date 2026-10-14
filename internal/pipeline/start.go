@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -184,10 +185,7 @@ func (r *runner) begin(ctx context.Context) (*runner, error) {
 // configuration into the run directory and builds the run's configuration from the copies.
 func (r *runner) copyInputs() error {
 	cfg := *r.o.Config
-	cfg.Seat = map[string]config.Seat{}
-	for name, s := range r.o.Config.Seat {
-		cfg.Seat[name] = s
-	}
+	cfg.Seat = maps.Clone(r.o.Config.Seat)
 	r.cfg = &cfg
 	if r.o.DryRun {
 		return nil

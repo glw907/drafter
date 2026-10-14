@@ -1,0 +1,107 @@
+{
+  "brief": "docs/guides/rotate-the-api-key.brief.json",
+  "cost": 0.056,
+  "escalation": null,
+  "facts": "store",
+  "faults": [],
+  "final_hashes": {
+    "final.brief.json": "sha256:5ddc98e58423c39b780d78d3042f4842b6caa401bdefccbb210b35af8c31bd7a",
+    "final.page.md": "sha256:24897b19fed7ffa6f6a6701e8945fe4da687266bf753ad852dd50ee796b601d5"
+  },
+  "final_status": "accepted",
+  "findings": [],
+  "friction": [],
+  "gate_excerpts": [],
+  "input_hashes": {
+    "agent.draft": "sha256:\u003chash\u003e",
+    "config": "sha256:\u003chash\u003e",
+    "plan": "sha256:\u003chash\u003e",
+    "prompts": "sha256:\u003chash\u003e"
+  },
+  "mode": "batch",
+  "page": "docs/guides/rotate-the-api-key.md",
+  "plan": "plans/rotate-the-api-key.plan.yaml",
+  "plan_format": "yaml",
+  "resolutions": [],
+  "seats_not_run": [],
+  "stages": [
+    {
+      "custom_id": "\u003crun\u003e_\u003cpage\u003e_s1_consistency_1",
+      "outcome": "succeeded:end_turn",
+      "seat": "consistency",
+      "stage": "s1"
+    },
+    {
+      "custom_id": "\u003crun\u003e_\u003cpage\u003e_s2_draft_1",
+      "outcome": "succeeded:end_turn",
+      "seat": "draft",
+      "stage": "s2"
+    },
+    {
+      "custom_id": "\u003crun\u003e_\u003cpage\u003e_s3_coverage_1",
+      "outcome": "succeeded:end_turn",
+      "seat": "coverage",
+      "stage": "s3"
+    },
+    {
+      "custom_id": "\u003crun\u003e_\u003cpage\u003e_s4_structure_1",
+      "outcome": "succeeded:end_turn",
+      "seat": "structure",
+      "stage": "s4"
+    },
+    {
+      "custom_id": "\u003crun\u003e_\u003cpage\u003e_s4_editor_1",
+      "outcome": "succeeded:end_turn",
+      "seat": "editor",
+      "stage": "s4"
+    },
+    {
+      "custom_id": "\u003crun\u003e_\u003cpage\u003e_s4_fact_1",
+      "outcome": "succeeded:end_turn",
+      "seat": "fact",
+      "stage": "s4"
+    },
+    {
+      "custom_id": "\u003crun\u003e_\u003cpage\u003e_s7_reader_1",
+      "outcome": "succeeded:end_turn",
+      "seat": "reader",
+      "stage": "s7"
+    },
+    {
+      "custom_id": "\u003crun\u003e_\u003cpage\u003e_s7_reader_2",
+      "outcome": "succeeded:end_turn",
+      "seat": "reader",
+      "stage": "s7"
+    }
+  ],
+  "verdicts": [
+    {
+      "seat": "consistency",
+      "stage": "s1",
+      "verdict": "ok"
+    },
+    {
+      "seat": "structure",
+      "stage": "s4",
+      "verdict": "ok"
+    },
+    {
+      "seat": "editor",
+      "stage": "s4",
+      "verdict": "ok"
+    },
+    {
+      "seat": "fact",
+      "stage": "s4",
+      "verdict": "ok"
+    },
+    {
+      "seat": "reader",
+      "stage": "s7",
+      "verdict": "ok"
+    }
+  ],
+  "warnings": [
+    "plans/rotate-the-api-key.plan.yaml:32: links: target docs/guides/revoke-a-key.md is in the outline but not on disk yet, so its anchor is not checked"
+  ]
+}

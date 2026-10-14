@@ -29,7 +29,7 @@ func hasReadItems(p *plan.Plan) bool {
 }
 
 // doPlan is stage 1's local half: the plan check. A markdown plan skips it with a warning.
-func (p *page) doPlan(ctx context.Context) error {
+func (p *page) doPlan() error {
 	if p.markdown {
 		p.w.Rec.warn("the plan is markdown, so the plan-dependent checks are skipped")
 		p.ps.Step = stDraft
@@ -62,7 +62,7 @@ func (p *page) doPlan(ctx context.Context) error {
 	}
 	var errs []string
 	for _, f := range findings {
-		line := fmt.Sprintf("%s:%d: %s: %s", f.File, f.Line, f.Check, f.Message)
+		line := fmt.Sprintf("%s:%d: %s: %s", relTo(p.r.root, f.File), f.Line, f.Check, f.Message)
 		if f.Severity == plan.SeverityError {
 			errs = append(errs, line)
 		} else {

@@ -163,10 +163,10 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		t.Fatal(err)
 	}
 	stateDir := t.TempDir()
-	seat := func(effort string, max int64) config.Seat {
-		return config.Seat{Model: "model-a", Effort: effort, MaxTokens: max}
+	seat := func(effort string) config.Seat {
+		return config.Seat{Model: "model-a", Effort: effort, MaxTokens: 4000}
 	}
-	draft := seat("high", 4000)
+	draft := seat("high")
 	draft.Agent = agent
 	cfg := &config.Config{
 		Prices: config.Prices{
@@ -181,9 +181,9 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		Prompts: module,
 		Seats:   []string{"draft", "structure", "editor", "fact", "reader", "coverage", "consistency"},
 		Seat: map[string]config.Seat{
-			"draft": draft, "structure": seat("medium", 4000), "editor": seat("medium", 4000),
-			"fact": seat("medium", 4000), "reader": seat("medium", 4000),
-			"coverage": seat("low", 4000), "consistency": seat("low", 4000),
+			"draft": draft, "structure": seat("medium"), "editor": seat("medium"),
+			"fact": seat("medium"), "reader": seat("medium"),
+			"coverage": seat("low"), "consistency": seat("low"),
 		},
 		Facts: config.Facts{Dir: filepath.Join(root, "docs/facts")},
 		Root:  root,
@@ -250,7 +250,7 @@ func (h *harness) ledgerLines(typ string) []map[string]any {
 		h.t.Fatal(err)
 	}
 	var out []map[string]any
-	for _, ln := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+	for ln := range strings.SplitSeq(strings.TrimSpace(string(data)), "\n") {
 		if ln == "" {
 			continue
 		}
@@ -270,7 +270,8 @@ func (h *harness) settleKinds() map[string]int {
 	h.t.Helper()
 	kinds := map[string]int{}
 	for _, l := range h.ledgerLines("settle") {
-		kinds[l["kind"].(string)]++
+		kind, _ := l["kind"].(string)
+		kinds[kind]++
 	}
 	return kinds
 }

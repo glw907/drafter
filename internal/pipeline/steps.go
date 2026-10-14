@@ -93,12 +93,21 @@ func (p *page) render(seat string, c prompts.Context) (string, error) {
 	return out, nil
 }
 
+// baselineFor returns the round-1 snapshot's ID for the requests that read a diff from it. Only
+// round 2 narrows to the redraft's changes, so no other request carries one.
+func (p *page) baselineFor(stage string) string {
+	if stage == s6 {
+		return p.w.Baseline
+	}
+	return ""
+}
+
 // build assembles one request and remembers its turns, which an answer extends into history.
 func (p *page) build(ctx context.Context, stage, seat string, a assemble.Answer, prompt string, hist []batch.Message, declined []edits.DeclinedFinding) (batch.Request, error) {
 	attempt := p.nextAttempt(stage, seat)
 	req, err := assemble.Build(ctx, assemble.Input{
 		Seat: seat, Answer: a, Config: p.r.cfg, Prompt: prompt, History: hist,
-		Page: p.h.Page.Path, Brief: p.h.Page.Brief, Slug: p.slug(), Baseline: p.w.Baseline,
+		Page: p.h.Page.Path, Brief: p.h.Page.Brief, Slug: p.slug(), Baseline: p.baselineFor(stage),
 		Facts: p.r.facts, FactIDs: p.h.Inputs.FactIDs, Declined: declined,
 		CustomID: p.customID(stage, seat, attempt),
 	})
@@ -123,7 +132,7 @@ func (p *page) advance(ctx context.Context) (*stage, error) {
 		var err error
 		switch p.ps.Step {
 		case stPlan:
-			err = p.doPlan(ctx)
+			err = p.doPlan()
 		case stConsistency:
 			stg, err = p.stageConsistency(ctx)
 		case stDraft:
