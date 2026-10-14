@@ -689,7 +689,7 @@ type tornSweep struct {
 func TestTornRepairEveryCrashPoint(t *testing.T) {
 	settleF, err := json.Marshal(line{
 		V: version, Type: typeSettle, Time: t0,
-		Entry:  Entry{RunID: "r1", Repo: "repo", Page: "pF", Seat: "draft", Model: "plain-s", Mode: "batch"},
+		RunID: "r1", Repo: "repo", Page: "pF", Seat: "draft", Model: "plain-s", Mode: "batch",
 		Intent: "iF", Key: "kF", Usage: &batch.Usage{}, Cost: 5, Kind: "actual",
 	})
 	if err != nil {
@@ -966,7 +966,8 @@ func TestReadWaitsForWriter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l, _, dir := newLedger(t)
-			warn := l.Warn.(*bytes.Buffer)
+			warn := &bytes.Buffer{}
+			l.Warn = warn
 			if err := os.MkdirAll(dir, 0o700); err != nil {
 				t.Fatal(err)
 			}
@@ -980,7 +981,7 @@ func TestReadWaitsForWriter(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 			second := encodeLine(t, tt.half)
 			cut := len(second) / 2
 			if _, err := f.Write(second[:cut]); err != nil {
