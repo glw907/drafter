@@ -58,8 +58,8 @@ second YAML document in the same file.
 ### page
 
 The `page` mapping has three required fields. The `path` field is the page's path relative to
-the repository root. The `title` field is the page's H1. The `type` field is the page type, as
-free text. Write the page type exactly as the project's outline names it: a project might use
+the repository root, so a path that is absolute or climbs out of the root with `..` is an error.
+The `title` field is the page's H1. The `type` field is the page type, as free text. Write the page type exactly as the project's outline names it: a project might use
 `concept`, `task guide`, `symptom row`, or `tutorial milestone`. The command checks only that
 `type` is present and not empty.
 
@@ -283,7 +283,8 @@ The decode check reads the YAML and refuses anything outside the format: malform
 file, a second document, an unknown or repeated field, a missing required field, a value of the
 wrong type, an unknown `kind`, `mode`, or `disposition`, a field that doesn't belong to the
 item's kind, a `level` other than `2` or `3`, an empty `items` list that the level rule doesn't
-allow, and a plain-style prose value with a line comment. Later checks run only on a plan
+allow, a `page.path` that is absolute or climbs out of the root, and a plain-style prose value
+with a line comment. Later checks run only on a plan
 that decodes without errors.
 
 ### ids
