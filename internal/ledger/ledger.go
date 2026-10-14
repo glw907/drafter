@@ -14,10 +14,12 @@ import (
 )
 
 // ErrPageCap and ErrCycleCap are returned, wrapped with the figures, by a Reserve that would
-// cross the page cap or the cycle ceiling.
+// cross the page cap or the cycle ceiling. ErrIntentReserved is returned, wrapped with the
+// intent, by a Reserve whose intent ID the ledger already holds, settled or not.
 var (
-	ErrPageCap  = errors.New("page cap reached")
-	ErrCycleCap = errors.New("cycle ceiling reached")
+	ErrPageCap        = errors.New("page cap reached")
+	ErrCycleCap       = errors.New("cycle ceiling reached")
+	ErrIntentReserved = errors.New("intent already reserved")
 )
 
 // Entry names what a line is for.
@@ -118,7 +120,7 @@ func (l *Ledger) Reserve(r Reservation, c Caps) error {
 		return err
 	}
 	if it, ok := st.intents[r.Intent]; ok && it.reserved {
-		return fmt.Errorf("intent %q is already reserved", r.Intent)
+		return fmt.Errorf("%w: %q", ErrIntentReserved, r.Intent)
 	}
 	if page := st.pageTotal(r.RunID, r.Page); page+r.Worst > c.Page {
 		return fmt.Errorf("%w: page %s holds %.4f, this reservation adds %.4f, cap %.4f",

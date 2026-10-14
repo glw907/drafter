@@ -12,6 +12,7 @@ import (
 const (
 	exitFindings  = 1 // a check reported an error finding
 	exitCannotRun = 2 // bad usage, or an input the command could not read
+	exitStopped   = 3 // a run stopped and can be resumed
 )
 
 // exitError carries a nonzero exit status. A message prints to stderr, then the usage text when

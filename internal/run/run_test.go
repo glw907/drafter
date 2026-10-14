@@ -87,7 +87,19 @@ func TestStateRoundTrip(t *testing.T) {
 	want := &State{
 		Schema: StateSchema, DrafterVersion: "v0.1.0", RunID: "id", Repo: "r",
 		Project: "p", Branch: "main", Head: "abc", Stopped: "cap",
-		Pages: map[string]*PageState{"a--b": {Status: "held"}, "c": {Status: "pending"}},
+		Pages: map[string]*PageState{
+			"a--b": {
+				Status: "held", Step: "gatefix", Attempts: map[string]int{"s2.draft": 2},
+				Intents: []Intent{{
+					ID: "i1", Stage: "s2", Attempt: 2, Mode: "batch", Worst: 1.5, BatchID: "b1",
+					Requests:   []IntentRequest{{CustomID: "x_s2_draft_2", Seat: "draft"}},
+					Settlement: "actual",
+				}},
+				Pre:    map[string]string{"docs/a.md": ""},
+				Writes: []Write{{Pre: map[string]string{"docs/a.md": ""}, Saved: map[string]string{"docs/a.md": "w1.page.md"}}},
+			},
+			"c": {Status: "pending"},
+		},
 	}
 	if err := want.Save(dir); err != nil {
 		t.Fatal(err)
@@ -109,7 +121,7 @@ func TestLoadStateErrors(t *testing.T) {
 	}{
 		{"missing", "", []string{"state.json"}},
 		{"malformed", "{nope", []string{"state.json"}},
-		{"other schema", `{"schema": 7}`, []string{"schema 7", "schema 1"}},
+		{"other schema", `{"schema": 7}`, []string{"schema 7", "schema 2"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

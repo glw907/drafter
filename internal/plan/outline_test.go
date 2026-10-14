@@ -81,3 +81,42 @@ func TestLoadOutlines(t *testing.T) {
 		t.Errorf("error = %v, want one naming %s", err, bad)
 	}
 }
+
+func TestOutlineWithPages(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "o.json")
+	if err := os.WriteFile(file, []byte(`{"pages":[{"path":"docs/a.md"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name    string
+		files   []string
+		pages   []string
+		listed  []string
+		missing []string
+	}{
+		{"files and pages", []string{file}, []string{"docs/b.md"}, []string{"docs/a.md", "docs/b.md"}, []string{"docs/c.md"}},
+		{"pages alone", nil, []string{"./docs/b.md"}, []string{"docs/b.md"}, []string{"docs/a.md"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o, err := OutlineWithPages(tt.files, tt.pages)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, p := range tt.listed {
+				if !o.lists(p) {
+					t.Errorf("outline does not list %s", p)
+				}
+			}
+			for _, p := range tt.missing {
+				if o.lists(p) {
+					t.Errorf("outline lists %s", p)
+				}
+			}
+		})
+	}
+	if _, err := OutlineWithPages([]string{filepath.Join(dir, "none.json")}, nil); err == nil {
+		t.Error("a missing outline file did not fail")
+	}
+}
