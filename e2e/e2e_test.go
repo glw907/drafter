@@ -300,3 +300,60 @@ func TestCheckPlanCannotRun(t *testing.T) {
 		})
 	}
 }
+
+func TestAnchors(t *testing.T) {
+	const page = "docs/reference/anchors.md"
+	want := "anchors-page setup setup-1 custom-row"
+	r := run(t, project(t), "anchors", page)
+	if r.code != 0 || r.stderr != "" || strings.Join(lines(r.stdout), " ") != want {
+		t.Errorf("exit %d, stdout %q, stderr %q", r.code, r.stdout, r.stderr)
+	}
+
+	r = run(t, project(t), "anchors", "--json", page)
+	var got []string
+	if err := json.Unmarshal([]byte(r.stdout), &got); err != nil || r.code != 0 {
+		t.Fatalf("exit %d, stdout is not a JSON array: %v\n%s", r.code, err, r.stdout)
+	}
+	if strings.Join(got, " ") != want {
+		t.Errorf("json anchors = %q, want %q", got, want)
+	}
+
+	r = run(t, project(t), "anchors", page, "docs/reference/keys.md")
+	if r.code != 0 || !strings.HasPrefix(r.stdout, page+"#anchors-page\n") || !strings.Contains(r.stdout, "docs/reference/keys.md#") {
+		t.Errorf("several files: exit %d, stdout %q", r.code, r.stdout)
+	}
+}
+
+func TestAnchorsNone(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "plain.md"), []byte("Just text.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if r := run(t, dir, "anchors", "plain.md"); r.code != 0 || r.stdout != "" {
+		t.Errorf("text: exit %d, stdout %q", r.code, r.stdout)
+	}
+	if r := run(t, dir, "anchors", "--json", "plain.md"); r.code != 0 || r.stdout != "[]\n" {
+		t.Errorf("json: exit %d, stdout %q", r.code, r.stdout)
+	}
+}
+
+func TestAnchorsErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		code     int
+		contains string
+	}{
+		{"missing file", []string{"anchors", "docs/nope.md"}, 1, "docs/nope.md"},
+		{"no file argument", []string{"anchors"}, 2, "Usage:"},
+		{"unknown flag", []string{"anchors", "--bogus", "docs/reference/keys.md"}, 2, "Usage:"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := run(t, project(t), tt.args...)
+			if r.code != tt.code || r.stdout != "" || !strings.Contains(r.stderr, tt.contains) {
+				t.Errorf("exit %d, stdout %q, stderr %q; want exit %d and stderr containing %q", r.code, r.stdout, r.stderr, tt.code, tt.contains)
+			}
+		})
+	}
+}

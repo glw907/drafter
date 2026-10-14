@@ -158,6 +158,16 @@ func TestCheckLinks(t *testing.T) {
 		{"repeated heading anchor", target, "../reference/keys.md#key-lifetime-1", nil, nil},
 		{"setext heading anchor", target, "../reference/keys.md#revocation-steps", nil, nil},
 		{"heading with code and a link", target, "../reference/keys.md#the-key-command-and-a-link--more", nil, nil},
+		{"an html id anchor", target, "../reference/keys.md#ttl-row", nil, nil},
+		{"a misspelled html id anchor", target, "../reference/keys.md#ttl-rows", nil, []want{
+			{30, SeverityError, "links", "anchor #ttl-rows matches no heading in docs/reference/keys.md"},
+		}},
+		{"an html id anchor in a fence", target, "../reference/keys.md#in-fence", nil, []want{
+			{30, SeverityError, "links", "anchor #in-fence matches no heading"},
+		}},
+		{"an html name anchor", target, "../reference/keys.md#old-name", nil, []want{
+			{30, SeverityError, "links", "anchor #old-name matches no heading"},
+		}},
 		{"front matter is no anchor", target, "../reference/keys.md#keys-reference", nil, []want{
 			{30, SeverityError, "links", "anchor #keys-reference matches no heading"},
 		}},

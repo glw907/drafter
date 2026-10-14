@@ -3,7 +3,7 @@
 drafter validates documentation page plans and, in later releases, runs the drafting and review
 of each planned page as batched calls to the Claude API. A planner, such as a Claude Code
 session, writes a page plan in drafter's YAML format. drafter checks the plan before any
-drafting happens. The tool is in early development, and only `check-plan` exists so far.
+drafting happens. The tool is in early development, and only `check-plan` and `anchors` exist so far.
 
 ## Install
 
@@ -29,6 +29,15 @@ exists and is citable. Each finding prints as `file:line: severity: check: messa
 exit status is 0 when no finding is an error, 1 when one is, and 2 when the command couldn't run.
 
 Run `drafter check-plan --help` for every flag.
+
+## List a file's anchors
+
+```sh
+drafter anchors docs/reference/keys.md
+```
+
+The command prints each anchor the Markdown file offers, one per line: the slug of every
+heading, and the `id` of every `<a id="...">` element. Add `--json` for a JSON array.
 
 ## Reference
 

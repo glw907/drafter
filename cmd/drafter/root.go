@@ -9,6 +9,6 @@ func newRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	cmd.AddCommand(newCheckPlanCmd())
+	cmd.AddCommand(newCheckPlanCmd(), newAnchorsCmd())
 	return cmd
 }

@@ -338,6 +338,12 @@ file, including setext headings, and never from fenced code. A heading's text ke
 inline code and drops link URLs and other markup. A leading front matter block is ignored. A
 heading written as raw HTML isn't an anchor in this version of the check.
 
+An `<a id="...">` element in the Markdown is an anchor too, as in a reference table's cells. The
+check finds it where the CommonMark parse reads it as raw HTML, so an element inside a code span
+or a fenced block doesn't count. An `<a name="...">` element doesn't count either: the sanitizer
+that a rendered page passes through prefixes both `id` and `name`, and the site strips the
+prefix from `id` only, so only an `id` anchor works on the page.
+
 In YAML, quote a same-page target such as `"#grace-period"`. Unquoted, the `#` starts a comment.
 
 A section's `anchor`, when present, must equal the slug of its `heading`, computed in page order
@@ -383,6 +389,15 @@ lists it, and a file that can't be loaded is reported by its path.
 ```json
 { "pages": [{ "path": "docs/guides/revoke-a-key.md" }] }
 ```
+
+## List a file's anchors
+
+`drafter anchors [--json] <file>...` prints every anchor a Markdown file offers, one per line, in
+document order: the slug of each heading, computed as the links check computes it, and the `id`
+of each `<a id="...">` element. A repeated anchor is listed once. A file with no anchors prints
+nothing, or `[]` with `--json`. With several files, each anchor is written as `file#anchor`, in
+the text and in the JSON array. A file that can't be read is an error that names it, with exit
+status 1. No file argument or an unknown flag prints the usage text with exit status 2.
 
 ## Output and exit codes
 

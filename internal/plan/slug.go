@@ -20,7 +20,9 @@ package plan
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"html"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -140,23 +142,60 @@ func removed(r rune) bool {
 	return found
 }
 
-// anchorsOf returns the slug of every heading in a Markdown file, the anchors a link to the file
-// can name. Headings come from a CommonMark parse, setext and ATX alike, and never from fenced
-// code. A heading written as raw HTML is not a heading to the parse and so yields no anchor here.
+// anchorsOf returns the set of anchors Anchors lists.
 func anchorsOf(src []byte) map[string]bool {
+	anchors := map[string]bool{}
+	for _, a := range Anchors(src) {
+		anchors[a] = true
+	}
+	return anchors
+}
+
+// htmlAnchorRe finds an <a> start tag that carries an id attribute and captures the value, quoted
+// or bare. A name attribute is not matched: the sanitizer that cairn's site renders pages through
+// prefixes id and name alike and strips the prefix from id only, so only an id anchor works.
+var htmlAnchorRe = regexp.MustCompile(`(?i)<a\s(?:[^>]*\s)?id\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))`)
+
+// Anchors returns every anchor a Markdown file offers, in document order and without repeats: the
+// slug of each heading, setext and ATX alike, and the id of each <a id> element. Headings come
+// from a CommonMark parse and never from fenced code. An element counts only where the parse
+// reads it as raw HTML, so one inside a code span or a fence does not. A heading written as raw
+// HTML is not a heading to the parse and so yields no anchor.
+func Anchors(src []byte) []string {
 	src = withoutFrontMatter(src)
 	doc := goldmark.New().Parser().Parse(text.NewReader(src))
 	sl := newSlugger()
-	anchors := map[string]bool{}
+	var anchors []string
+	seen := map[string]bool{}
+	add := func(a string) {
+		if a != "" && !seen[a] {
+			seen[a] = true
+			anchors = append(anchors, a)
+		}
+	}
+	addElements := func(markup []byte) {
+		for _, m := range htmlAnchorRe.FindAllSubmatch(markup, -1) {
+			add(cmp.Or(string(m[1]), string(m[2]), string(m[3])))
+		}
+	}
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		h, ok := n.(*ast.Heading)
-		if !ok || !entering {
+		if !entering {
 			return ast.WalkContinue, nil
 		}
-		var b strings.Builder
-		headingText(h, src, &b)
-		anchors[sl.slug(b.String())] = true
-		return ast.WalkSkipChildren, nil
+		switch n := n.(type) {
+		case *ast.Heading:
+			var b strings.Builder
+			headingText(n, src, &b)
+			add(sl.slug(b.String()))
+		case *ast.RawHTML:
+			addElements(n.Segments.Value(src))
+		case *ast.HTMLBlock:
+			// Types 6 and 7 hold markup; the others are comments, scripts, and similar.
+			if n.HTMLBlockType == ast.HTMLBlockType6 || n.HTMLBlockType == ast.HTMLBlockType7 {
+				addElements(n.Lines().Value(src))
+			}
+		}
+		return ast.WalkContinue, nil
 	})
 	return anchors
 }
