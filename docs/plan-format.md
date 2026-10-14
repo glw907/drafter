@@ -209,7 +209,8 @@ The format has no kind for a table or a form. Describe a list or table in an ite
 plan has no field for rework input from an earlier draft.
 
 The plan carries no exemplars and no cross-links from the outline. The chain supplies both from
-the page inputs, so don't copy them into `constraints`.
+the page inputs, so don't copy them into `constraints`. The links check does read the outline's
+cross-links, to warn when the plan has no `link` item for one.
 
 ### Example
 
@@ -326,6 +327,8 @@ For every `link` item, every subordinated `reference`, and the path part of ever
   match the slug of the page's `title` or of a section `heading`.
 - A target that the outline lists but that isn't on disk yet is a warning, and its anchor isn't
   checked. Any other missing target is an error.
+- A cross-link in the outline from this page that no `link` item targets is a warning. See
+  [Outline file](#outline-file).
 
 A target of just `#` names nothing and is an error.
 
@@ -380,14 +383,33 @@ vocabulary.
 ## Outline file
 
 The `--outline` file is JSON with a `pages` array. Each entry is an object with a `path`, relative
-to the repository root. Drafter reads nothing else from the file. A page listed there is a page
-that is planned, so a link to it isn't an error before the page exists.
+to the repository root, and optionally a `slug`, a short name for the page. A page listed there is a
+page that is planned, so a link to it isn't an error before the page exists. The file can also
+carry a top-level `crossLinks` array of objects with `from`, `to`, and `why`. The `from` and `to`
+fields each name a page, as a `slug` or as a repository-relative path. Drafter reads nothing else
+from the file.
 
 Pass `--outline` more than once to read several files. A page counts as planned when any of them
-lists it, and a file that can't be loaded is reported by its path.
+lists it, a slug resolves across all of them, and a file that can't be loaded is reported by its
+path.
+
+When the plan's own page is in the outline, the links check looks at each cross-link whose `from`
+is that page. A cross-link that no `link` item of the plan targets is a warning that names the
+`to`. A `link` item targets the page when the path part of its `target`, with or without an
+anchor, resolves to the page's path. A cross-link whose `to` names no page the outline lists is a
+warning too, never an error. A cross-link from another page isn't this plan's to satisfy, and an
+outline with no `crossLinks` adds no warning.
 
 ```json
-{ "pages": [{ "path": "docs/guides/revoke-a-key.md" }] }
+{
+  "pages": [
+    { "path": "docs/guides/rotate-a-key.md", "slug": "rotate-a-key" },
+    { "path": "docs/guides/revoke-a-key.md", "slug": "revoke-a-key" }
+  ],
+  "crossLinks": [
+    { "from": "rotate-a-key", "to": "revoke-a-key", "why": "the step that follows a rotation" }
+  ]
+}
 ```
 
 ## List a file's anchors

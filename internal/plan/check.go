@@ -52,6 +52,7 @@ func Check(file string, p *Plan, opts CheckOptions) []Finding {
 	c.readerState()
 	c.recovery()
 	c.links()
+	c.crossLinks()
 	c.facts()
 	slices.SortStableFunc(c.findings, func(a, b Finding) int {
 		return cmp.Or(cmp.Compare(a.Line, b.Line), cmp.Compare(a.Message, b.Message))
@@ -258,14 +259,53 @@ func isURL(s string) bool {
 	return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://")
 }
 
+// resolveFile returns the repo-relative path a link or source path names, resolved from the page's
+// directory, or from the repository root when it starts with a slash.
+func (c *checker) resolveFile(file string) string {
+	if rest, ok := strings.CutPrefix(file, "/"); ok {
+		return path.Clean(rest)
+	}
+	return path.Join(path.Dir(c.p.Page.Path), file)
+}
+
+// crossLinks warns about each outline cross-link from this page that no link item follows, and
+// about a cross-link whose target the outline does not list. The outline's own pages and slugs
+// resolve both ends, and a cross-link from another page is that page's to check.
+func (c *checker) crossLinks() {
+	o := c.opts.Outline
+	if o == nil || !o.lists(path.Clean(c.p.Page.Path)) {
+		return
+	}
+	linked := map[string]bool{}
+	c.each(func(it *Item) {
+		if file, _, _ := strings.Cut(it.Target, "#"); it.Kind == "link" && file != "" && !isURL(it.Target) {
+			linked[c.resolveFile(file)] = true
+		}
+	})
+	line := c.p.Page.Lines["path"]
+	for _, x := range o.crossLinks {
+		if from, ok := o.resolve(x.From); !ok || from != path.Clean(c.p.Page.Path) {
+			continue
+		}
+		to, ok := o.resolve(x.To)
+		switch {
+		case !ok:
+			c.add(line, SeverityWarning, checkLinks,
+				fmt.Sprintf("the outline cross-links this page to %q (%s), which names no page the outline lists", x.To, x.Why),
+				"correct the cross-link in the outline, or add the page to it")
+		case !linked[to]:
+			c.add(line, SeverityWarning, checkLinks,
+				fmt.Sprintf("the outline cross-links this page to %q (%s), and no link item targets %s", x.To, x.Why, to),
+				"add a link item to "+to+", or drop the cross-link from the outline")
+		}
+	}
+}
+
 // repoPath resolves a link or source path from the page's directory, or from the repository root
 // when it starts with a slash. It reports a finding and returns false when the path leaves the
 // repository.
 func (c *checker) repoPath(line int, file string) (string, bool) {
-	rel := path.Join(path.Dir(c.p.Page.Path), file)
-	if rest, ok := strings.CutPrefix(file, "/"); ok {
-		rel = path.Clean(rest)
-	}
+	rel := c.resolveFile(file)
 	if rel == ".." || strings.HasPrefix(rel, "../") {
 		c.add(line, SeverityError, checkLinks,
 			fmt.Sprintf("target %s leaves the repository", file), "point the link at a file under the repository root")
