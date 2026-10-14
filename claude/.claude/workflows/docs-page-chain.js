@@ -298,6 +298,44 @@
 // output tokens spent across the main loop and all workflows, so a relative measure only and
 // never a count against a pass ceiling. It is null when the runtime supplies no `budget`.
 //
+// The drafter hooks (`~/Projects/drafter`, which runs the back half of the chain). With `backHalf`
+// unset the chain runs as above. `args.backHalf: "drafter"` ends each page after its framing step
+// and returns `{ handoff, escalated }`: `handoff` is the versioned chain handoff `handoffFor`
+// builds (between the `// === HANDOFF ===` markers), one entry per framed page, and `escalated`
+// holds the records of pages that escalated before framing ended. A page carrying `figure: true`
+// or a non-empty `rework` is refused by name before any page agent runs, since drafter's back half
+// reads neither, and any other `backHalf` value throws. drafter reads only `.result.handoff` from
+// the run file.
+//
+// drafter also loads this file to render the chain's back-half prompts. It rewrites the line
+// matching `^export const meta` to `const meta`, wraps the script in an async function, and defines
+// `args` (the handoff's chain args), `DRAFTER_HOST` (`{ resolved: { pages, index } }`), no-op
+// `phase`, `log`, `parallel`, and `pipeline`, and an `agent` that fails the load when called.
+// Under `DRAFTER_HOST`, `resolvePages()` returns `DRAFTER_HOST.resolved` without a probe, and the
+// script returns `DRAFTER_SEATS` just before the slot pool, so no page runs.
+//
+// `DRAFTER_SEATS` maps `draft`, `structure`, `editor`, `fact`, and `reader` to functions of one
+// seat context object, each adapting it to the builder the chain itself calls:
+//
+//   page            the page's resolved config (an entry of `resolved.pages`)
+//   inputs          the page-inputs record: job, pageType, factIds, claimInventory
+//   round           1, 2, or "final" (the redraft and scoped reads after the final reader read)
+//   findings        the numbered findings a redraft answers, or ""
+//   afterFinalRead  true for the redraft after the final reader read
+//   scope, where    a scoped read's scope note and its location text, or ""
+//   narrow          null, or { baseline, own } for a narrowed round-2 read; `own` is null when
+//                   the seat accepted with nothing to verify
+//   turn            the final reader only: 1 for steps 1 and 2, 2 for step 3 with the job
+//   facts           whether the project has a facts store (the builders do not read it)
+//
+// The adapters pass `where || undefined`, `scope || undefined`, and `narrow || undefined`, so an
+// empty string never reaches a builder as a value the chain itself never passes. `draft` calls
+// `draftPrompt` at round 1 or 2 and never takes the snapshot instruction, since drafter keeps the
+// round-1 snapshot itself. `readerPrompt` is built from two parts. The chain's own call joins
+// steps 1 and 2 to step 3 into the one prompt it sends. drafter sends the parts as two turns, so
+// the first turn holds no job text. Turn 2 inlines `page.job` where the chain's step 3 names the
+// outline file, and names the page's path.
+//
 // Every agent starts with zero context. The runner renders each stage's prompt from args and
 // the page record; nothing load-bearing may live only in the invoking session's conversation.
 
@@ -553,6 +591,12 @@ if (PLAN_FORMAT !== "yaml" && PLAN_FORMAT !== "markdown") {
   throw new Error(`docs-page-chain: args.planFormat must be "yaml" or "markdown", not ${JSON.stringify(PLAN_FORMAT)}`);
 }
 const YAML_PLAN = PLAN_FORMAT === "yaml";
+if (a.backHalf !== undefined && a.backHalf !== "drafter") {
+  throw new Error(`docs-page-chain: args.backHalf must be unset or "drafter", not ${JSON.stringify(a.backHalf)}`);
+}
+const BACK_HALF_DRAFTER = a.backHalf === "drafter";
+// Defined only when drafter loads this script to render prompts; the workflow runtime has none.
+const HOST = typeof DRAFTER_HOST === "undefined" || !DRAFTER_HOST ? undefined : DRAFTER_HOST;
 const OPTION_MAP = a.optionMap || "docs/internal/option-map.json";
 // The runtime's budget is absent outside it (a dry run), so `spent` is guarded, not assumed.
 const HAS_BUDGET = typeof budget !== "undefined" && budget !== null && typeof budget.spent === "function";
@@ -728,6 +772,7 @@ function reworkChecksum(r) {
  * @returns {Promise<{ pages: Array<Record<string, any>>, index: string }>}
  */
 async function resolvePages() {
+  if (HOST) return HOST.resolved;
   if (!OUTLINE) return { pages: PAGES_ARG, index: "" };
   phase("Outline");
   const quoted = PAGES_ARG.map((p) => `'${p.path}'`).join(" ");
@@ -747,6 +792,14 @@ stderr. Run no other command and modify no file.`,
 }
 
 const { pages: PAGES, index: INDEX } = await resolvePages();
+
+if (BACK_HALF_DRAFTER) {
+  const refused = PAGES.flatMap((p) => [
+    ...(p.figure === true ? [`${p.path} (figure: true)`] : []),
+    ...(typeof p.rework === "string" && p.rework !== "" ? [`${p.path} (rework)`] : [])
+  ]);
+  if (refused.length) throw new Error(`docs-page-chain: backHalf "drafter" cannot take a page with a figure or a rework: ${refused.join(", ")}`);
+}
 
 /**
  * With any page carrying `rework`, one probe agent runs the helper's `rework-state` command and
@@ -1787,6 +1840,19 @@ exists; otherwise "accept".`;
  * @returns {string}
  */
 function readerPrompt(p, pageType) {
+  const job = OUTLINE
+    ? `open ${OUTLINE} and read the "job" of the entry in "pages" whose "path" is "${p.path}"`
+    : `read the page's job: ${p.job}`;
+  return `${readerOpening(p, pageType)}\n\n${readerStepThree(job)}`;
+}
+
+/**
+ * The reader's steps 1 and 2 with the preamble: the page alone, no job text.
+ * @param {Record<string, any>} p
+ * @param {string} pageType
+ * @returns {string}
+ */
+function readerOpening(p, pageType) {
   const type = String(pageType || "");
   let first;
   if (/concept/i.test(type)) {
@@ -1804,9 +1870,6 @@ what you had to infer to understand it.`;
   } else {
     first = `Read the page once, whole.`;
   }
-  const job = OUTLINE
-    ? `open ${OUTLINE} and read the "job" of the entry in "pages" whose "path" is "${p.path}"`
-    : `read the page's job: ${p.job}`;
   return `Final reader read of ${p.path} in ${WT}. You are the reader: you have this page and nothing
 else. Read no other file until step 3, and modify no file in the worktree.
 
@@ -1820,14 +1883,42 @@ Step 2. Answer Part V's open-ended questions:
   Thinking of other people you know who might get this document:
     What about the document might work well for them?
     What about the document might cause them problems?
-Return your answer to the second question as paraphrase, and the other answers in summary.
+Return your answer to the second question as paraphrase, and the other answers in summary.`;
+}
 
-Step 3. Only now, ${job}. Each mismatch between your paraphrase and that job is a blocking finding:
+/**
+ * The reader's step 3: the job, read only after steps 1 and 2 are answered.
+ * @param {string} job - the clause that says where the job text comes from
+ * @returns {string}
+ */
+function readerStepThree(job) {
+  return `Step 3. Only now, ${job}. Each mismatch between your paraphrase and that job is a blocking finding:
 "wherever participants misunderstood the message, the document has a problem that you should fix"
 (Part V). Each point where you had to infer is a finding, blocking when it is an unstated step or an
 unclassified error (the cold-reader row of docs/superpowers/specs/2026-09-21-draft-docs-design.md).
 Give each its file:line as location. The method's source is ${PRIOR_ART}, "## f. The final reader
 read". Verdict "fix" if any blocking finding exists; otherwise "accept".`;
+}
+
+/**
+ * The first turn of the reader read under drafter: steps 1 and 2, with a line that says step 3
+ * follows in the next turn.
+ * @param {Record<string, any>} p
+ * @param {string} pageType
+ * @returns {string}
+ */
+function readerTurnOne(p, pageType) {
+  return `${readerOpening(p, pageType)}\n\nStep 3 follows in the next turn.`;
+}
+
+/**
+ * The second turn of the reader read under drafter: step 3, with the page's job inlined and its
+ * path named, since drafter has no outline file to point the reader at.
+ * @param {Record<string, any>} p
+ * @returns {string}
+ */
+function readerTurnTwo(p) {
+  return `Step 3 of the final reader read of ${p.path} in ${WT}. You have read the page and answered\nsteps 1 and 2.\n\n${readerStepThree(`read the page's job: ${p.job}`)}`;
 }
 
 function combined(readList) {
@@ -1927,6 +2018,51 @@ function deriveCrossRegression(record, bothReviewers) {
   });
 }
 // === END CROSS-REGRESSION DERIVATION ===
+
+// === HANDOFF (docs-page-chain-handoff.test.mjs extracts this block) ===
+/**
+ * The chain handoff drafter reads from a `backHalf: "drafter"` run: the run's args and resolved
+ * pages verbatim, and one entry per page that finished framing. Pure and self-contained so the
+ * test can extract it verbatim without the workflow runtime.
+ * @param {Record<string, any>} args - the chain's args, verbatim
+ * @param {{ pages: Array<Record<string, any>>, index: string }} resolved
+ * @param {string} worktree
+ * @param {Array<{ page: Record<string, any>, pageInputs: Record<string, any>, brief: string, plan: string, framing: string, registerSections: string[] }>} entries
+ *   one per framed page; `page.type` maps `pageInputs.pageType || page.pageType` in the order the
+ *   reader prompt branches on it, and `inputs.pageType` keeps the chain's own wording
+ * @returns {object}
+ */
+function handoffFor(args, resolved, worktree, entries) {
+  const typeOf = (name) => {
+    const t = String(name || "");
+    if (/concept/i.test(t)) return "concept";
+    if (/task|tutorial|how-to/i.test(t)) return "task-guide";
+    return "reference";
+  };
+  return {
+    version: 1,
+    worktree,
+    args,
+    resolved: { pages: resolved.pages, index: resolved.index },
+    pages: entries.map((e) => {
+      const pageType = e.pageInputs.pageType || e.page.pageType || "";
+      return {
+        page: { path: e.page.path, brief: e.brief, type: typeOf(pageType) },
+        plan: e.plan,
+        framing: e.framing,
+        inputs: {
+          job: e.pageInputs.job,
+          pageType,
+          registerSections: e.registerSections,
+          exemplarSources: e.page.exemplarSources || [],
+          claimInventory: e.pageInputs.claimInventory || [],
+          factIds: e.pageInputs.factIds || []
+        }
+      };
+    })
+  };
+}
+// === END HANDOFF ===
 
 /**
  * The final reader read, run on a page every read has accepted. Its "fix" sends the page back for
@@ -2061,6 +2197,10 @@ async function chain(p) {
   const framed = await framingStep(p, pageInputs, record);
   if (framed.escalate) return framed.escalate;
   pageInputs = framed.pageInputs;
+  if (BACK_HALF_DRAFTER) {
+    const entry = { page: p, pageInputs, brief: record.brief, plan: record.plan, framing: record.framing, registerSections: registerSectionsFor(p.track, "drafter") };
+    return { ...record, status: "framed", entry };
+  }
   // A rework page's reads are scoped to what changed; the structural edit seat reads it whole.
   const reworkFindings = rework ? `## rework\n${p.rework}\n\nScope: ${REWORK_SCOPE}` : undefined;
   const reworkWhere = rework
@@ -2101,6 +2241,21 @@ async function chain(p) {
   return { ...record, status: "escalate", reason: "second fix verdict or red gate", findings: combined(r2.list) };
 }
 
+// The back-half seats drafter renders prompts from: one function of the seat context object per
+// seat, each adapting it to the builder the chain calls. The header comment documents the object.
+const DRAFTER_SEATS = {
+  draft: (c) => draftPrompt(c.page, c.inputs, c.round === 1 ? 1 : 2, c.findings, c.afterFinalRead === true),
+  structure: (c) => structurePrompt(c.page, "page", c.narrow || undefined),
+  editor: (c) => editorPrompt(c.page, c.scope || undefined, c.where || undefined, c.narrow || undefined),
+  fact: (c) => factPrompt(c.page, c.inputs, c.scope || undefined, c.where || undefined, c.narrow || undefined),
+  reader: (c) => {
+    if (c.turn === 1) return readerTurnOne(c.page, c.inputs.pageType || c.page.pageType);
+    if (c.turn === 2) return readerTurnTwo(c.page);
+    throw new Error(`docs-page-chain: the reader seat needs turn 1 or 2, not ${JSON.stringify(c.turn)}`);
+  }
+};
+if (HOST) return DRAFTER_SEATS;
+
 // A small slot pool: at most IN_FLIGHT pages drafted at once, no barrier between pages.
 const queue = PAGES.slice();
 const results = [];
@@ -2119,6 +2274,14 @@ phase("Page inputs");
 await parallel(Array.from({ length: Math.min(IN_FLIGHT, PAGES.length) }, (_, i) => () => worker(i + 1)));
 
 phase("Report");
+if (BACK_HALF_DRAFTER) {
+  const order = (r) => PAGES.findIndex((q) => q.id === r.id);
+  const framed = results.filter((r) => r.status === "framed").sort((x, y) => order(x) - order(y));
+  return {
+    handoff: handoffFor(a, { pages: PAGES, index: INDEX }, WT, framed.map((r) => r.entry)),
+    escalated: results.filter((r) => r.status !== "framed")
+  };
+}
 const accepted = results.filter((r) => r.status === "accepted").length;
 log(`${accepted}/${PAGES.length} pages accepted; ${PAGES.length - accepted} escalated`);
 const spent = HAS_BUDGET ? budget.spent() - SPENT_AT_START : null;
