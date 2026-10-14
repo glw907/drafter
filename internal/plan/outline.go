@@ -99,3 +99,20 @@ func (o *Outline) resolve(ref string) (string, bool) {
 	p, ok := o.slugs[ref]
 	return p, ok
 }
+
+// OutlineWithPages returns an outline that lists every page the outline files list and every
+// repo-relative path in pages. With no files it lists pages alone. A pipeline run passes the
+// pages it is about to write, so a link to one of them is not a link to a missing page.
+func OutlineWithPages(files, pages []string) (*Outline, error) {
+	o := &Outline{paths: map[string]bool{}, slugs: map[string]string{}}
+	if len(files) > 0 {
+		var err error
+		if o, err = LoadOutlines(files); err != nil {
+			return nil, err
+		}
+	}
+	for _, p := range pages {
+		o.paths[path.Clean(filepath.ToSlash(p))] = true
+	}
+	return o, nil
+}
