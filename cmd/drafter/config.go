@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -41,8 +42,10 @@ type configRow struct {
 
 func runConfig(cmd *cobra.Command, flags config.Flags) error {
 	root, err := plan.GitRoot(".")
-	if err != nil {
+	if errors.Is(err, plan.ErrNotGitTree) {
 		root = "" // outside a git tree only the user layer applies
+	} else if err != nil {
+		return err
 	}
 	c, err := config.Load(root, flags)
 	if err != nil {
