@@ -22,7 +22,6 @@ var (
 	maskSpanRe = regexp.MustCompile("`[^`]*`|\"[^\"]*\"")
 	tagRe      = regexp.MustCompile(`\[(verified|docs-drift|external|vendor|candidate|rejected)\b[^\]]*\]`)
 	anyTagRe   = regexp.MustCompile(`\[([a-zA-Z-]+)(:[^\]]*)?\]`)
-	bracketRe  = regexp.MustCompile(`\[`)
 )
 
 // skippedSections names the sections whose bullets are not facts.
@@ -184,7 +183,7 @@ func checkTag(text string) (tag, problem string) {
 	if qualifier != "" && !strings.HasPrefix(qualifier, ":") {
 		return "", fmt.Sprintf("tag [%s...] uses a space qualifier; the colon form is [%s: ...]", name, name)
 	}
-	if bracketRe.MatchString(masked[:m[0]]) {
+	if strings.Contains(masked[:m[0]], "[") {
 		return "", "a second bracket appears before the trailing status tag"
 	}
 	return name, ""
