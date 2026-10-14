@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -203,8 +204,8 @@ func decodeStrict(data []byte, v any) error {
 	if err := dec.Decode(v); err != nil {
 		return err
 	}
-	if dec.More() {
-		return fmt.Errorf("unexpected data after the JSON value")
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return errors.New("unexpected data after the JSON value")
 	}
 	return nil
 }

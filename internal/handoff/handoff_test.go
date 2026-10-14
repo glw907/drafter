@@ -105,15 +105,18 @@ func TestReadFiles(t *testing.T) {
 		}},
 		{name: "page path outside", edit: func(m map[string]any) {
 			sub(m, "page")["path"] = "../escape.md"
-		}, wantErr: "page.path"},
+		}, wantErr: "page.path \"../escape.md\" resolves outside"},
 		{name: "page path absolute outside", edit: func(m map[string]any) {
 			sub(m, "page")["path"] = "/etc/passwd"
-		}, wantErr: "page.path"},
+		}, wantErr: "page.path \"/etc/passwd\" resolves outside"},
 		{name: "brief outside", edit: func(m map[string]any) {
 			sub(m, "page")["brief"] = "docs/../../brief.json"
-		}, wantErr: "page.brief"},
-		{name: "plan outside", edit: func(m map[string]any) { m["plan"] = "../plan.yaml" }, wantErr: "plan"},
-		{name: "framing outside", edit: func(m map[string]any) { m["framing"] = "../framing.md" }, wantErr: "framing"},
+		}, wantErr: "page.brief \"docs/../../brief.json\" resolves outside"},
+		{name: "plan outside", edit: func(m map[string]any) { m["plan"] = "../plan.yaml" }, wantErr: `plan "../plan.yaml" resolves outside`},
+		{name: "framing outside", edit: func(m map[string]any) { m["framing"] = "../framing.md" }, wantErr: `framing "../framing.md" resolves outside`},
+		{name: "plan absolute", edit: func(m map[string]any) { m["plan"] = "/abs/plan.yaml" }, wantErr: "must be relative to the project"},
+		{name: "project missing", edit: func(m map[string]any) { delete(m, "project") }, wantErr: "is not an absolute path"},
+		{name: "project relative", edit: func(m map[string]any) { m["project"] = "rel/proj" }, wantErr: "is not an absolute path"},
 		{name: "exemplar outside accepted", edit: func(m map[string]any) {
 			sub(m, "inputs")["exemplarSources"] = []any{"/elsewhere/exemplar.md", "../up.md"}
 		}},
@@ -363,7 +366,11 @@ func TestReadWorkflowRun(t *testing.T) {
 		}, wantErr: "missing or null"},
 		{name: "plan outside", edit: func(h map[string]any) {
 			chainPageOf(h)["plan"] = "../plan.yaml"
-		}, wantErr: "plan"},
+		}, wantErr: `plan "../plan.yaml" resolves outside`},
+		{name: "framing outside", edit: func(h map[string]any) {
+			chainPageOf(h)["framing"] = "../framing.md"
+		}, wantErr: `framing "../framing.md" resolves outside`},
+		{name: "worktree relative", edit: func(h map[string]any) { h["worktree"] = "rel/wt" }, wantErr: "is not an absolute path"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

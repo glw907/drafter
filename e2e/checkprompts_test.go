@@ -133,7 +133,7 @@ func TestCheckPromptsCannotRun(t *testing.T) {
 		{"missing module", []string{"--module", d + "/nope.js", "--matrix", matrix}, "read module"},
 		{"missing matrix", []string{"--module", module, "--matrix", d + "/nope.json"}, "read matrix"},
 		{"no matrix flag", []string{"--module", module}, "needs --matrix"},
-		{"malformed matrix", []string{"--module", module, "--matrix", writeTemp(t, "m.json", "{not json")}, "matrix"},
+		{"malformed matrix", []string{"--module", module, "--matrix", writeTemp(t, "m.json", "{not json")}, "invalid character"},
 		{"empty cases", []string{"--module", module, "--matrix", writeTemp(t, "m.json", `{"host":{"args":{},"resolved":{}},"cases":[]}`)}, "has no cases"},
 		{"malformed expect", []string{"--module", module, "--matrix", matrix, "--expect", writeTemp(t, "e.json", "[1]")}, "expect file"},
 		{"missing expect", []string{"--module", module, "--matrix", matrix, "--expect", d + "/nope.json"}, "read expect file"},

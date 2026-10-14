@@ -115,6 +115,9 @@ func decodeStrict(data []byte, v any) error {
 // check refuses a path that resolves outside the project. The exemplar sources are exempt:
 // the chain's are absolute paths under its exemplar root.
 func (h Handoff) check() error {
+	if !filepath.IsAbs(h.Project) {
+		return fmt.Errorf("handoff %s: project %q is not an absolute path", h.File, h.Project)
+	}
 	for _, f := range []struct{ name, path string }{
 		{"page.path", h.Page.Path},
 		{"page.brief", h.Page.Brief},
@@ -126,6 +129,9 @@ func (h Handoff) check() error {
 		}
 		if f.path == "" {
 			return fmt.Errorf("handoff %s: %s is empty", h.File, f.name)
+		}
+		if (f.name == "plan" || f.name == "framing") && filepath.IsAbs(f.path) {
+			return fmt.Errorf("handoff %s: %s %q must be relative to the project", h.File, f.name, f.path)
 		}
 		if outside(h.Project, f.path) {
 			return fmt.Errorf("handoff %s: %s %q resolves outside project %s", h.File, f.name, f.path, h.Project)

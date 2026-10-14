@@ -26,6 +26,8 @@ const seats = {
   echo: (c) => JSON.stringify(c),
   throws: (c) => { throw new Error("builder broke"); },
   number: (c) => 42,
+  // The phrase mid-line must reach the module untouched: only a line-start match is rewritten.
+  phrase: (c) => "keep export const meta here",
 };
 
 if (typeof DRAFTER_HOST !== "undefined") return seats;

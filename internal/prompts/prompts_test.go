@@ -29,16 +29,13 @@ func loadFixture(t *testing.T) *Module {
 
 func TestLoadSyntheticChain(t *testing.T) {
 	m := loadFixture(t)
-	want := []string{"draft", "echo", "number", "reader", "throws"}
+	want := []string{"draft", "echo", "number", "phrase", "reader", "throws"}
 	if got := m.Seats(); !slices.Equal(got, want) {
 		t.Errorf("Seats() = %v, want %v", got, want)
 	}
-	src, err := os.ReadFile("testdata/chain.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(src), "// The phrase export const meta appears") {
-		t.Error("fixture header comment missing")
+	got, err := m.Render("phrase", Context{Round: Round1})
+	if err != nil || got != "keep export const meta here" {
+		t.Errorf("Render(phrase) = %q, %v; want the phrase untouched", got, err)
 	}
 }
 
