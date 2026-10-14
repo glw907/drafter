@@ -557,6 +557,28 @@ func TestFileStates(t *testing.T) {
 			t.Errorf("file mode = %v, want 0600", fi.Mode().Perm())
 		}
 	})
+	t.Run("a settle torn before its newline and retried counts once", func(t *testing.T) {
+		l, _, dir := newLedger(t)
+		mustReserve(t, l, res("r1", "p1", "i1", 2, 8), wide)
+		mustSettle(t, l, settle("p1", "i1", "b/a", "actual", 1))
+		path := filepath.Join(dir, "ledger.jsonl")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The crash cut the write just before its newline: the fragment is complete JSON.
+		if err := os.WriteFile(path, bytes.TrimSuffix(data, []byte("\n")), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		mustSettle(t, l, settle("p1", "i1", "b/a", "actual", 1))
+		if got := pageSpend(t, l, "r1", "p1"); got != 8 {
+			t.Errorf("PageSpend = %v, want 8: the intent still has an unsettled request", got)
+		}
+		open, err := l.OpenIntents("r1")
+		if err != nil || len(open) != 1 {
+			t.Errorf("OpenIntents = %v, %v, want the one open intent", open, err)
+		}
+	})
 	t.Run("a torn final line is skipped and gets its own line", func(t *testing.T) {
 		l, _, dir := newLedger(t)
 		mustReserve(t, l, res("r1", "p1", "i1", 1, 2), wide)
