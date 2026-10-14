@@ -34,7 +34,8 @@ text: |
 
 A `|` block keeps the text exactly, including any `#`. The prose fields are `argument`,
 `covers`, `priorKnowledge`, `notCovered`, `orderReason`, `opens`, `text`, `symptom`, `cause`,
-`use`, `reason`, and each entry of `constraints` and `friction`.
+`use`, `reason`, the page `title`, each section `heading`, and each entry of `constraints` and
+`friction`.
 
 ## Top-level fields
 
