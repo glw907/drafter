@@ -15,6 +15,7 @@ const seats = {
     const after = c.afterFinalRead ? " after the final read" : "";
     return `Redraft ${c.page.path}${after}.\nFindings:\n${c.findings}`;
   },
+  blueprint: () => "Read the blueprint below.",
   structure: (c) => `Structure read of ${c.page.path} round ${c.round}.${narrowText(c)}`,
   editor: (c) => `Editor read of ${c.page.path} round ${c.round}.${c.scope ? "\nScope: " + c.scope : ""}${narrowText(c)}`,
   fact: (c) => `Fact read of ${c.page.path} round ${c.round}.${c.scope ? "\nScope: " + c.scope : ""}${narrowText(c)}`,

@@ -9,8 +9,12 @@ import (
 	"strings"
 )
 
-// seatNames are the seven seats, in the order a default run lists them.
-var seatNames = []string{"draft", "structure", "editor", "fact", "reader", "coverage", "consistency"}
+// seatNames are the eight seats a configuration may name. A default run lists the first seven;
+// the blueprint seat runs only under drafter read, which validates it itself.
+var seatNames = []string{"draft", "structure", "editor", "fact", "reader", "coverage", "consistency", "blueprint"}
+
+// defaultSeats are the seats a run lists when no layer sets seats.
+var defaultSeats = seatNames[:7]
 
 // placeholders are the names a command template may use.
 var placeholders = []string{"page", "brief", "slug", "baseline"}

@@ -27,7 +27,7 @@ func newConfig(home string) *Config {
 		Retries:         Retries{GateFix: 2, EditContract: 2},
 		Gate:            Gate{Protocol: "plain"},
 		Blueprints:      Blueprints{Root: "blueprints"},
-		Seats:           append([]string(nil), seatNames...),
+		Seats:           append([]string(nil), defaultSeats...),
 		Seat:            map[string]Seat{},
 		Register:        map[string][]string{},
 		src:             map[string]origin{},

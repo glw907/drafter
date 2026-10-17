@@ -88,6 +88,29 @@ func (c *projectCheck) blueprint(rel string) {
 		c.add(rel, 1, plan.SeverityError, checkBlueprints, "the blueprint cannot be read: "+err.Error(), "fix the file's permissions")
 		return
 	}
+	c.blueprintData(rel, data)
+}
+
+// CheckSource checks one blueprint from its bytes against the outline's bytes, which a caller
+// reads from a commit instead of the disk. rel is the blueprint's repo-relative slash path. It
+// returns the decoded blueprint and its outline entry when the checks ran far enough to find
+// them, nil and a zero Page otherwise, and every finding. The error means the outline, the lock,
+// or the facts directory could not be read. Pairing, the lock's entries, and the convention are
+// the project walk's, not this check's.
+func (p Project) CheckSource(rel string, blueprint, outline []byte) (*Blueprint, Page, []plan.Finding, error) {
+	l, err := p.loadOutline(outline)
+	if err != nil {
+		return nil, Page{}, nil, err
+	}
+	c := &projectCheck{Project: p, l: l, usedTypes: map[string]bool{}}
+	c.findings = append(c.findings, l.findings...)
+	b, entry := c.blueprintData(rel, blueprint)
+	return b, entry, c.findings, nil
+}
+
+// blueprintData is blueprint on bytes already read. It returns the blueprint and its entry when
+// the file decoded cleanly and its page is a managed one the outline lists.
+func (c *projectCheck) blueprintData(rel string, data []byte) (*Blueprint, Page) {
 	b, findings := Decode(rel, data)
 	c.findings = append(c.findings, findings...)
 	pagePath, _ := PagePath(c.BlueprintRoot, rel)
@@ -97,21 +120,22 @@ func (c *projectCheck) blueprint(rel string) {
 		c.add(rel, 1, plan.SeverityError, checkBlueprints,
 			fmt.Sprintf("the blueprint is for %s, which the outline lists no page for", pagePath),
 			"add the page to "+c.Outline+", or move the blueprint to the path of a listed page")
-		return
+		return nil, Page{}
 	case !entry.Managed:
 		c.add(rel, 1, plan.SeverityError, checkBlueprints,
 			fmt.Sprintf("the blueprint is for %s, which the outline marks managed: false", pagePath),
 			"delete the blueprint, or remove managed: false from the outline entry")
-		return
+		return nil, Page{}
 	}
 	if b == nil || plan.HasError(findings) {
-		return
+		return nil, Page{}
 	}
 	opts := plan.CheckOptions{Root: c.Root, FactsDir: c.FactsDir, Outline: c.l.plan}
 	c.findings = append(c.findings, plan.Check(rel, View(b, entry, c.l.facts), opts)...)
 	c.references(rel, b)
 	c.sections(rel, b)
 	c.pageType(entry)
+	return b, entry
 }
 
 // sections requires a why on every section and an Only or Omit opening on every use.

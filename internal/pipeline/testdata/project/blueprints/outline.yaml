@@ -1,0 +1,19 @@
+version: 1
+types:
+  - name: task-guide
+    anatomy: Task guide
+pages:
+  - path: docs/guides/rotate-the-api-key.md
+    slug: rotate
+    title: Rotate the API key
+    type: task-guide
+    job: |
+      Rotate a Lumen API key without interrupting publishing.
+    covers:
+      - Create and publish with a new key.
+  - path: docs/guides/revoke-a-key.md
+    slug: revoke
+    title: Revoke a key
+    type: task-guide
+    job: |
+      Revoke a Lumen API key after its grace period.

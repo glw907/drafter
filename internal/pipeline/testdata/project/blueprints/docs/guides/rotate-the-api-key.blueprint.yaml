@@ -1,0 +1,60 @@
+version: 1
+argument: |
+  Rotate a Lumen API key by publishing the new key before you retire the old one.
+introduction:
+  covers: |
+    How to rotate an API key without interrupting publishing.
+  priorKnowledge: |
+    You can publish a site with Lumen.
+  notCovered: |
+    Revoking a key after the grace period.
+  facts: [lumen-key-ttl]
+framing:
+  readers: |
+    A site owner on a 90-day rotation schedule, who knows `lumen-key-ttl`.
+orderReason: |
+  The new key must be live before the old key retires, so creation comes first.
+preconditions: [key-exists]
+sections:
+  - id: before-you-begin
+    heading: Before you begin
+    why: |
+      The reader needs a workspace key before the first step.
+    opens: |
+      You need a workspace key and publish access.
+    items:
+      - id: f-ttl
+        kind: fact
+        fact: lumen-key-ttl
+        use: |
+          Only the lifetime.
+  - id: rotate
+    heading: Rotate the key
+    why: |
+      Rotation is the page's job, so it follows the prerequisites.
+    opens: |
+      Create the new key, then publish with it.
+    items:
+      - id: s-create
+        kind: step
+        text: |
+          Create a new key.
+        requires: [key-exists]
+        produces: [new-key]
+      - id: s-publish
+        kind: step
+        text: |
+          Publish the site with the new key.
+        requires: [new-key]
+        produces: [published]
+        canFail: true
+      - id: x-publish
+        kind: failure
+        from: s-publish
+        symptom: |
+          The publish is refused.
+        handledBy: h-retry
+      - id: h-retry
+        kind: handoff
+        text: |
+          Check the key, then publish again.

@@ -14,7 +14,7 @@ import (
 )
 
 // TestLive runs the smoke against the real API with the user's configuration and key. It spends
-// money: one batch of seven requests and one sync request on Haiku 5.5, priced from the user's
+// money: one batch of eight requests and one sync request on Haiku 5.5, priced from the user's
 // price table.
 func TestLive(t *testing.T) {
 	cfg, err := config.Load("", config.Flags{})

@@ -351,3 +351,14 @@ Every row maps to the item kinds above, and a test holds the format to it.
 The last row is the one prose exception. A project's gate can fail a code change whose pages
 still name something the change renamed or removed. In that pull request an agent may make only
 the page edits the gate demands, and changes the blueprint to match.
+
+## What `drafter read` does with a blueprint
+
+`drafter read` runs the checks above on the blueprint as committed at the run's start, then sends
+one batch holding the consistency read, when the project has a facts store, and the blueprint
+read. The blueprint read grades the blueprint as a plan: order, pace, and the introduction, the
+completeness of steps and failures, what a reader can know at each step, recovery before and
+after diagnosis, a `use` that restates its fact, durable fields that narrate planning history,
+and a human-origin item the blueprint would bury. A blocking finding sets the blueprint aside.
+When the run ends with every blueprint decided, the accepted blueprints' blob ids go into the
+`accepted` field of `drafted.lock`.

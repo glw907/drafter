@@ -43,6 +43,11 @@ func (p *page) handle(ctx context.Context, in *run.Intent, results []batch.Resul
 // stepSeats names the seats whose answers the current step waits for.
 func (p *page) stepSeats() []string {
 	switch p.ps.Step {
+	case stBpRead:
+		if p.runs("consistency") {
+			return []string{"consistency", "blueprint"}
+		}
+		return []string{"blueprint"}
 	case stConsistency:
 		return []string{"consistency"}
 	case stCoverage:
@@ -124,7 +129,7 @@ func (p *page) take(in *run.Intent, rq run.IntentRequest, res batch.Result, pres
 	}
 	switch act {
 	case batch.ActionAccept:
-		if err := p.validate(res.Text); err != nil {
+		if err := p.validate(rq.Seat, res.Text); err != nil {
 			return p.answerFailure(rq.Seat, "did not parse: "+err.Error())
 		}
 		p.w.Got[rq.Seat] = res.Text
@@ -183,9 +188,16 @@ type readerAnswer struct {
 	Friction   []string `json:"friction"`
 }
 
-// validate checks that text is an answer of the shape the current step asked for.
-func (p *page) validate(text string) error {
+// validate checks that text is an answer of the shape the current step asked of the seat.
+func (p *page) validate(seat, text string) error {
 	switch p.ps.Step {
+	case stBpRead:
+		if seat == "consistency" {
+			var a consistencyAnswer
+			return decodeAnswer(text, &a)
+		}
+		_, err := parseRead(text)
+		return err
 	case stConsistency:
 		var a consistencyAnswer
 		return decodeAnswer(text, &a)
@@ -230,6 +242,8 @@ func (p *page) complete(ctx context.Context) error {
 		}
 	}
 	switch p.ps.Step {
+	case stBpRead:
+		return p.completeBlueprintRead()
 	case stConsistency:
 		return p.completeConsistency()
 	case stDraft:

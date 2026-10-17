@@ -242,10 +242,16 @@ the failing lines of a red log. drafter uses the two to attribute each failing s
 `prompts` is the path to the prompts module. [The prompts module](prompts-module.md) describes its
 contract.
 
-The seven seats are `draft`, `structure`, `editor`, `fact`, `reader`, `coverage`, and
-`consistency`. `seats` lists the ones that run. The list must include `draft`, which always runs.
-Leaving a review seat out removes its stages, and the run record notes each seat that didn't run.
-The `consistency` seat runs only when `facts.dir` is set.
+The eight seats are `draft`, `structure`, `editor`, `fact`, `reader`, `coverage`, `consistency`,
+and `blueprint`. `seats` lists the ones that run in `drafter page`, and by default it names the
+first seven. The list must include `draft`, which always runs. Leaving a review seat out removes
+its stages, and the run record notes each seat that didn't run. The `consistency` seat runs only
+when `facts.dir` is set.
+
+The `blueprint` seat reads a blueprint in `drafter read`. It stays out of the default `seats`
+list, so `drafter page` runs as it did before the seat existed. `drafter read` always runs the
+seat, and it refuses to start, with exit status 2, when `[seat.blueprint]` lacks a model, an
+effort, or `max_tokens`, or when the model has no entry under `prices.models`.
 
 Replace `<name>` with a seat name. A `seat.<name>` table for any other name is an error.
 

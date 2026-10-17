@@ -3222,6 +3222,29 @@
         "turn": 2,
         "facts": true
       }
+    },
+    {
+      "name": "install-widget/blueprint",
+      "seat": "blueprint",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide"
+        },
+        "inputs": {},
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
     }
   ]
 }

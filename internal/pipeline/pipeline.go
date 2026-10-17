@@ -54,6 +54,17 @@ type Options struct {
 	PollInterval time.Duration
 	// Out receives the dry run's report; Err receives status lines. Either may be nil.
 	Out, Err io.Writer
+	// Command names the command that started the run, for the resume hint; "drafter page" when
+	// empty.
+	Command string
+}
+
+// command is the command a stopped run is resumed with.
+func (r *runner) command() string {
+	if r.o.Command == "" {
+		return "drafter page"
+	}
+	return r.o.Command
 }
 
 // PageResult is one page's end state.
@@ -63,6 +74,9 @@ type PageResult struct {
 	// Rule is the stop rule an escalated page failed on.
 	Rule string  `json:"rule,omitempty"`
 	Cost float64 `json:"cost"`
+	// Accepted is the git blob id of the blueprint a blueprint page's read accepted, set only when
+	// the page ended accepted.
+	Accepted string `json:"accepted,omitempty"`
 }
 
 // Estimate is one request of a dry run.
@@ -151,10 +165,13 @@ func (r *runner) summary() Summary {
 			res.Rule = p.w.Rec.Escalation.Rule
 		}
 		res.Cost, _ = r.led.PageSpend(r.state.RunID, p.h.Page.Path)
+		if p.ps.Status == StatusAccepted {
+			res.Accepted = p.w.Accepted
+		}
 		s.Pages = append(s.Pages, res)
 	}
 	if r.stop != "" {
-		s.ResumeLine = "drafter page --resume " + r.state.RunID
+		s.ResumeLine = r.command() + " --resume " + r.state.RunID
 	}
 	return s
 }
@@ -268,7 +285,7 @@ func (r *runner) loop(ctx context.Context) error {
 // finish writes the end state of a run that did not stop.
 func (r *runner) finish() error {
 	if r.stop != "" {
-		r.warnf("stopped: %s; resume with: drafter page --resume %s", r.stop, r.state.RunID)
+		r.warnf("stopped: %s; resume with: %s --resume %s", r.stop, r.command(), r.state.RunID)
 	}
 	return r.save()
 }

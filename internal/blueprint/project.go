@@ -56,6 +56,17 @@ func (p Project) load() (*loaded, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read outline: %w", err)
 	}
+	l, err := p.loadOutline(data)
+	if err != nil {
+		return nil, err
+	}
+	return l, p.discover(l)
+}
+
+// loadOutline decodes the outline and reads the lock and the facts store. It does not walk the
+// blueprint root.
+func (p Project) loadOutline(data []byte) (*loaded, error) {
+	var err error
 	o, outFindings := DecodeOutline(p.Outline, data)
 	if o == nil || plan.HasError(outFindings) {
 		first := outFindings[0]
@@ -96,7 +107,7 @@ func (p Project) load() (*loaded, error) {
 			return nil, err
 		}
 	}
-	return l, p.discover(l)
+	return l, nil
 }
 
 // discover lists the blueprint files under the blueprint root. A file that ends in

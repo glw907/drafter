@@ -10,6 +10,8 @@ import (
 // The steps of a page, in the order a clean page takes them. PageState.Step holds one.
 const (
 	stPlan         = "plan"
+	stBpCheck      = "bpcheck"
+	stBpRead       = "bpread"
 	stConsistency  = "consistency"
 	stDraft        = "draft"
 	stGateFix      = "gatefix"
@@ -114,6 +116,9 @@ type work struct {
 	Sent map[string][]batch.Message `json:"sent,omitempty"`
 	// DraftHist is the draft seat's conversation after the draft, the start of a gate-fix exchange.
 	DraftHist []batch.Message `json:"draft_hist,omitempty"`
+	// Accepted is the git blob id of the blueprint a blueprint page's read accepted, as it was at
+	// the run's start commit.
+	Accepted string `json:"accepted,omitempty"`
 }
 
 // readerState is the final reader's two-turn conversation.

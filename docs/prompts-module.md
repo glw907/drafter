@@ -27,8 +27,8 @@ return {
 };
 ```
 
-The seat names are `draft`, `structure`, `editor`, `fact`, `reader`, `coverage`, and
-`consistency`. The module needs a builder for each seat that runs. Asking for a seat the module
+The seat names are `draft`, `structure`, `editor`, `fact`, `reader`, `coverage`,
+`consistency`, and `blueprint`. The module needs a builder for each seat that runs. Asking for a seat the module
 doesn't define fails with an error that lists the seats it does define.
 
 A builder that throws, and a builder that returns anything other than a string, are errors that
