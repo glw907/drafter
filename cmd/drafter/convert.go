@@ -202,6 +202,10 @@ func report(conv *blueprint.Converted, res blueprint.Installed, pagePath string)
 			fmt.Fprintf(w, "  - %s\n", l)
 		}
 	}
+	if conv.Preamble != "" {
+		fmt.Fprintln(w, "framing preamble (dropped from the blueprint; put in the conversion's commit message):")
+		fmt.Fprintln(w, conv.Preamble)
+	}
 	if conv.Departures != "" {
 		fmt.Fprintln(w, "departures (dropped from the blueprint; put in the conversion's commit message):")
 		fmt.Fprintln(w, conv.Departures)

@@ -177,7 +177,6 @@ func TestConvertPlanFraming(t *testing.T) {
 		name, framing, wantErr string
 	}{
 		{"unknown heading is refused by name", "# Framing record: X\n\n## Who arrives, from where, and why\n\nA.\n\n## Surprise section\n\nB.\n", `"Surprise section"`},
-		{"text before the first heading is refused", "# Framing record: X\nstray text\n## Intro plan\nA.\n", "stray text"},
 		{"a repeated heading is refused", "## Intro plan\nA.\n## Intro plan\nB.\n", "twice"},
 		{"departures alone is known", "## Departures from the plan's introduction\nMoves.\n", ""},
 	}
@@ -199,6 +198,21 @@ func TestConvertPlanFraming(t *testing.T) {
 				t.Fatalf("err = %v, want one naming %s", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestConvertPlanFramingPreamble(t *testing.T) {
+	in := fixtureInput(t)
+	in.Framing = []byte("# Framing record: X\n\nWritten by the framing step; inputs read: the outline.\n\n## Intro plan\nA.\n")
+	conv, err := ConvertPlan(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conv.Preamble != "Written by the framing step; inputs read: the outline." {
+		t.Errorf("preamble = %q", conv.Preamble)
+	}
+	if strings.Contains(string(conv.Data), "Written by the framing step") {
+		t.Error("the preamble reached the blueprint")
 	}
 }
 

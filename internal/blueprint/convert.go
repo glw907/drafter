@@ -139,6 +139,9 @@ type Converted struct {
 	Friction []string
 	// Departures holds the framing record's departures section, which belongs in the commit message.
 	Departures string
+	// Preamble holds the framing record's text between its title and its first section: the
+	// planning session's note on what it read and wrote, which is history for the commit message.
+	Preamble string
 	// Judgment lists what the mapping could not decide: one line per item, and the lines that
 	// begin "hint:" are guesses a person may discard.
 	Judgment []string
@@ -178,7 +181,7 @@ func ConvertPlan(in PlanInput) (*Converted, error) {
 	res := &Converted{Friction: p.Friction}
 	if in.Framing != nil {
 		var err error
-		if b.Framing, res.Departures, err = parseFraming(in.Framing); err != nil {
+		if b.Framing, res.Preamble, res.Departures, err = parseFraming(in.Framing); err != nil {
 			return nil, err
 		}
 	}
@@ -220,16 +223,18 @@ func ConvertPlan(in PlanInput) (*Converted, error) {
 	return res, nil
 }
 
-// parseFraming splits a framing record into the four framing fields and the departures text. A
+// parseFraming splits a framing record into the four framing fields, the preamble under its title,
+// and the departures text. A
 // level-2 heading outside the known five is refused by name, since a section copied wrongly would
 // leave the blueprint quietly short of something the planner wrote.
-func parseFraming(data []byte) (f Framing, departures string, err error) {
+func parseFraming(data []byte) (f Framing, preamble, departures string, err error) {
 	type part struct {
 		heading string
 		lines   []string
 	}
 	var parts []*part
 	var cur *part
+	var pre []string
 	for line := range strings.SplitSeq(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n") {
 		switch {
 		case strings.HasPrefix(line, "## "):
@@ -237,15 +242,16 @@ func parseFraming(data []byte) (f Framing, departures string, err error) {
 			parts = append(parts, cur)
 		case cur != nil:
 			cur.lines = append(cur.lines, line)
-		case strings.HasPrefix(line, "# Framing record:"), strings.TrimSpace(line) == "":
+		case strings.HasPrefix(line, "# Framing record:"):
 		default:
-			return f, "", fmt.Errorf("the framing record has text before its first ## heading: %q", line)
+			pre = append(pre, line)
 		}
 	}
+	preamble = trimBlank(pre)
 	seen := map[string]bool{}
 	for _, p := range parts {
 		if seen[p.heading] {
-			return f, "", fmt.Errorf("the framing record has the heading %q twice", p.heading)
+			return f, "", "", fmt.Errorf("the framing record has the heading %q twice", p.heading)
 		}
 		seen[p.heading] = true
 		body := trimBlank(p.lines)
@@ -255,13 +261,13 @@ func parseFraming(data []byte) (f Framing, departures string, err error) {
 		}
 		i := slices.IndexFunc(framingFields, func(x framingField) bool { return x.heading == p.heading })
 		if i < 0 {
-			return f, "", fmt.Errorf("the framing record has the heading %q, which the blueprint has no field for", p.heading)
+			return f, "", "", fmt.Errorf("the framing record has the heading %q, which the blueprint has no field for", p.heading)
 		}
 		if body != "" {
 			framingFields[i].set(&f, body+"\n")
 		}
 	}
-	return f, departures, nil
+	return f, preamble, departures, nil
 }
 
 // trimBlank joins lines without the blank lines at either end. It keeps indentation and inner blank
