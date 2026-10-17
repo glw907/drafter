@@ -1,0 +1,28 @@
+{
+  "pages": [
+    {
+      "path": "docs/guides/install-the-widget.md",
+      "slug": "install-the-widget",
+      "title": "Install the widget",
+      "pageType": "task-guide",
+      "job": "Install the widget.",
+      "kept": true
+    },
+    {
+      "path": "docs/guides/rotate-the-widget-key.md",
+      "slug": "rotate-the-widget-key",
+      "title": "Rotate the widget key",
+      "pageType": "task-guide",
+      "job": "Rotate the key # without downtime: [[safely]].",
+      "covers": ["The rotation steps", "The check"],
+      "outOfScope": ["Database credentials"],
+      "exemplars": [
+        {"source": "docs/guides/install-the-widget.md", "slice": "guides", "manifestType": "task-guide", "take": "The step shape; leave the intro."},
+        {"source": "docs/guides/other.md", "take": "The failure table."}
+      ]
+    }
+  ],
+  "crossLinks": [
+    {"from": "rotate-the-widget-key", "to": "install-the-widget", "why": "The reader needs an install first."}
+  ]
+}

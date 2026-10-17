@@ -1,0 +1,5 @@
+{
+  "pages": [
+    {"path": "docs/b.md", "slug": "b", "title": "[[Page]] B: the sequel # two", "pageType": "reference", "job": "Job B.", "covers": ["x: y"], "outOfScope": []}
+  ]
+}
