@@ -59,6 +59,28 @@ type Facts struct {
 	byID map[string][]Fact
 }
 
+// Count returns the number of bullets that hold id, which Get hides when it is not exactly one.
+func (fs *Facts) Count(id string) int { return len(fs.byID[id]) }
+
+// Cites reports whether a backticked token in prose is a fact citation: the store holds a bullet
+// with that id, or the token starts with the prefix, through its first colon, that every id in
+// the store shares. The second test lets a mistyped id through to the facts check as a missing
+// fact instead of passing as ordinary code.
+func (fs *Facts) Cites(token string) bool {
+	if fs.Count(token) > 0 {
+		return true
+	}
+	prefix := ""
+	for id := range fs.byID {
+		i := strings.IndexByte(id, ':')
+		if i < 0 || (prefix != "" && id[:i+1] != prefix) {
+			return false
+		}
+		prefix = id[:i+1]
+	}
+	return prefix != "" && strings.HasPrefix(token, prefix) && len(token) > len(prefix)
+}
+
 // Get returns the fact with the given id. It reports false unless exactly one bullet holds the id.
 func (fs *Facts) Get(id string) (Fact, bool) {
 	got := fs.byID[id]

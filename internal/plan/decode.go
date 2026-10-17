@@ -58,16 +58,42 @@ func (d *decoder) add(line int, msg, fix string) {
 // file is not one YAML mapping; otherwise it is as far decoded as the faults allow, and a
 // caller runs the plan checks only when HasError reports false.
 func Decode(file string, data []byte) (*Plan, []Finding) {
+	p := new(Plan)
+	ok, findings := DecodeDocument(file, data, p, func(r *Reporter) { r.d.validate(p) })
+	if !ok {
+		return nil, findings
+	}
+	return p, findings
+}
+
+// Reporter lets the validate function passed to DecodeDocument add findings to the decode.
+type Reporter struct{ d *decoder }
+
+// Add records a decode error at line.
+func (r *Reporter) Add(line int, msg, fix string) { r.d.add(line, msg, fix) }
+
+// Faulted reports whether a finding already sits at line, so a rule that needs a well-formed
+// value can skip one the walk already refused.
+func (r *Reporter) Faulted(line int) bool { return r.d.faultAt(line) }
+
+// ValidID reports whether s is a lowercase token usable as an item or section id.
+func ValidID(s string) bool { return idPattern.MatchString(s) }
+
+// DecodeDocument parses data as one YAML mapping into v, a pointer to a struct whose fields
+// carry the yaml and plan tags that Plan's do, and reports every fault the walk finds, each at
+// its line. validate, when not nil, runs after the walk to apply the rules that need the whole
+// value. It returns false when the file is not one YAML mapping, and v is then untouched.
+func DecodeDocument(file string, data []byte, v any, validate func(*Reporter)) (bool, []Finding) {
 	d := &decoder{file: file}
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	var doc yaml.Node
 	if err := dec.Decode(&doc); err != nil {
 		if errors.Is(err, io.EOF) {
-			d.add(1, "the file holds no YAML document", "write the plan as a YAML mapping that starts with version: 1")
+			d.add(1, "the file holds no YAML document", "write the file as a YAML mapping that starts with version: 1")
 		} else {
 			d.add(errLine(err), "malformed YAML: "+strings.TrimPrefix(err.Error(), "yaml: "), "fix the syntax at this line")
 		}
-		return nil, d.findings
+		return false, d.findings
 	}
 	var extra yaml.Node
 	switch err := dec.Decode(&extra); {
@@ -76,25 +102,26 @@ func Decode(file string, data []byte) (*Plan, []Finding) {
 		if len(extra.Content) > 0 {
 			line = extra.Content[0].Line
 		}
-		d.add(line, "the file holds a second YAML document", "keep one document per plan and delete everything from the second --- on")
-		return nil, d.findings
+		d.add(line, "the file holds a second YAML document", "keep one document per file and delete everything from the second --- on")
+		return false, d.findings
 	case !errors.Is(err, io.EOF):
 		d.add(errLine(err), "malformed YAML: "+strings.TrimPrefix(err.Error(), "yaml: "), "fix the syntax at this line")
-		return nil, d.findings
+		return false, d.findings
 	}
 	if len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
 		line := 1
 		if len(doc.Content) > 0 {
 			line = doc.Content[0].Line
 		}
-		d.add(line, "the plan must be a YAML mapping", "write key: value lines, starting with version: 1")
-		return nil, d.findings
+		d.add(line, "the file must be a YAML mapping", "write key: value lines, starting with version: 1")
+		return false, d.findings
 	}
-	p := new(Plan)
-	d.structure(doc.Content[0], reflect.ValueOf(p).Elem(), "")
-	d.validate(p)
+	d.structure(doc.Content[0], reflect.ValueOf(v).Elem(), "")
+	if validate != nil {
+		validate(&Reporter{d})
+	}
 	slices.SortStableFunc(d.findings, func(a, b Finding) int { return cmp.Compare(a.Line, b.Line) })
-	return p, d.findings
+	return true, d.findings
 }
 
 func errLine(err error) int {
@@ -208,6 +235,10 @@ func (d *decoder) value(n *yaml.Node, f reflect.Value, s fieldSpec, where string
 }
 
 func (d *decoder) str(n *yaml.Node, f reflect.Value, s fieldSpec, where string) {
+	if n.Kind == yaml.SequenceNode && s.prose {
+		d.add(n.Line, at(where, "must be a string, and this value decodes as a list; a value that starts with [[ is a YAML list"), "quote the value or write it as a | block")
+		return
+	}
 	if n.Kind != yaml.ScalarNode || n.ShortTag() == "!!null" {
 		d.add(n.Line, at(where, "must be a string"), "write a value, or remove the field")
 		return

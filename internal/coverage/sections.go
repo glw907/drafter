@@ -89,3 +89,21 @@ func split(p *plan.Plan, page []byte) (preamble region, regions []region) {
 	}
 	return preamble, regions
 }
+
+// Regions cuts page by the given section headings in the way the checks here do, and returns the
+// text above the first matched heading, the text under each heading, and whether each heading was
+// found. The text under a heading runs to the next matched heading and omits the heading line;
+// a heading that is not found has no text.
+func Regions(headings []string, page []byte) (preamble string, text []string, found []bool) {
+	p := &plan.Plan{Sections: make([]plan.Section, len(headings))}
+	for i, h := range headings {
+		p.Sections[i].Heading = h
+	}
+	pre, regions := split(p, page)
+	text = make([]string, len(regions))
+	found = make([]bool, len(regions))
+	for i, r := range regions {
+		text[i], found[i] = r.raw, r.found
+	}
+	return pre.raw, text, found
+}

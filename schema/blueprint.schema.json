@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/glw907/drafter/schema/blueprint.schema.json",
+  "title": "drafter page blueprint",
+  "description": "A <page>.blueprint.yaml file under the project's blueprint root. Prose fields are written as | blocks or quoted, since a plain-style value is cut at a line comment and a value that starts with [[ reads as a list. The page's path, title, type, and job live in its outline.yaml entry, not here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "argument", "introduction", "orderReason", "sections"],
+  "properties": {
+    "version": { "const": 1, "description": "The blueprint format version." },
+    "argument": { "type": "string", "minLength": 1, "description": "The page's argument, in prose." },
+    "introduction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["covers", "priorKnowledge", "notCovered"],
+      "properties": {
+        "covers": { "type": "string", "minLength": 1, "description": "What the page covers." },
+        "priorKnowledge": { "type": "string", "minLength": 1, "description": "What the reader should already know." },
+        "notCovered": { "type": "string", "minLength": 1, "description": "What the page leaves out." },
+        "facts": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Fact ids the introduction rests on. Each must resolve to one citable bullet."
+        }
+      }
+    },
+    "framing": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The framing record's four descriptive parts. A part cites a fact as a backticked id.",
+      "properties": {
+        "readers": { "type": "string", "minLength": 1, "description": "Who arrives, from where, and why." },
+        "background": { "type": "string", "minLength": 1, "description": "The background the page rests on." },
+        "placeInDocSet": { "type": "string", "minLength": 1, "description": "Where the page sits in the doc set." },
+        "introPlan": { "type": "string", "minLength": 1, "description": "How the introduction opens and what it promises." }
+      }
+    },
+    "orderReason": { "type": "string", "minLength": 1, "description": "Why the sections run in this order, as a whole. Each section's own reason is its why." },
+    "preconditions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "State tokens the reader holds before the first step."
+    },
+    "exemplars": {
+      "type": "array",
+      "description": "Published pages to imitate.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "take"],
+        "properties": {
+          "source": { "type": "string", "minLength": 1, "description": "The exemplar page." },
+          "slice": { "type": "string", "minLength": 1, "description": "The exemplar corpus slice." },
+          "manifestType": { "type": "string", "minLength": 1, "description": "The exemplar's type in its manifest." },
+          "take": { "type": "string", "minLength": 1, "description": "What to take from it and what to leave." }
+        }
+      }
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The page's sections, in page order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "heading", "opens", "items"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "heading": { "type": "string", "minLength": 1, "description": "The section's heading, verbatim." },
+          "level": { "enum": [2, 3], "default": 2, "description": "The heading level. The section list stays flat, in page order." },
+          "anchor": { "type": "string", "minLength": 1, "description": "The heading's slug, when the blueprint pins it." },
+          "why": { "type": "string", "minLength": 1, "description": "Why the section is here and sits where it does. drafter check requires one." },
+          "opens": { "type": "string", "minLength": 1, "description": "The section's first sentence." },
+          "items": {
+            "type": "array",
+            "description": "The section's items. Empty only for a level-2 section that the next section, at level 3, fills; the decoder enforces that rule.",
+            "items": {
+              "oneOf": [
+                { "$ref": "#/$defs/item-fact" },
+                { "$ref": "#/$defs/item-sentence" },
+                { "$ref": "#/$defs/item-example" },
+                { "$ref": "#/$defs/item-link" },
+                { "$ref": "#/$defs/item-handoff" },
+                { "$ref": "#/$defs/item-reason" },
+                { "$ref": "#/$defs/item-step" },
+                { "$ref": "#/$defs/item-failure" },
+                { "$ref": "#/$defs/item-code" },
+                { "$ref": "#/$defs/item-figure" }
+              ]
+            }
+          },
+          "styleNotes": {
+            "type": "array",
+            "description": "Style-only human edits: the wording drafter wrote and the wording that replaced it. Only drafter writes them.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["old", "new"],
+              "properties": {
+                "old": { "type": "string", "minLength": 1 },
+                "new": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "dispositions": {
+      "type": "array",
+      "description": "Facts the blueprint leaves out of the page body.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fact", "disposition", "reason"],
+        "properties": {
+          "fact": { "type": "string", "minLength": 1 },
+          "disposition": { "enum": ["subordinated", "cut"] },
+          "reference": { "type": "string", "minLength": 1, "description": "The link target that carries the fact. Required when the disposition is subordinated." },
+          "reason": { "type": "string", "minLength": 1 }
+        },
+        "if": { "properties": { "disposition": { "const": "subordinated" } }, "required": ["disposition"] },
+        "then": { "required": ["reference"] }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Rules specific to this page. Never a copy of a register rule."
+    },
+    "review": { "const": "human", "description": "Set by a person for a page that must never merge unread." }
+  },
+  "$defs": {
+    "item-fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "fact"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "fact" },
+        "origin": { "$ref": "#/$defs/origin" },
+        "fact": { "type": "string", "minLength": 1, "description": "A fact id." },
+        "use": { "type": "string", "minLength": 1, "description": "Which part of the fact this placement carries. When present it starts with Only or Omit and does not restate the fact." }
+      }
+    },
+    "item-sentence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "mode", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "sentence" },
+        "origin": { "$ref": "#/$defs/origin" },
+        "mode": { "enum": ["verbatim", "claim"] },
+        "text": { "type": "string", "minLength": 1 },
+        "facts": { "$ref": "#/$defs/factList" }
+      }
+    },
+    "item-example": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "example" },
+        "origin": { "$ref": "#/$defs/origin" },
+        "text": { "type": "string", "minLength": 1, "description": "The worked example, in prose." },
+        "facts": { "$ref": "#/$defs/factList" }
+      }
+    },
+    "item-link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "target"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "link" },
+        "origin": { "$ref": "#/$defs/origin" },
+        "target": { "type": "string", "minLength": 1, "description": "path, path#anchor, #anchor, or an http(s) URL. A path resolves from the page's directory." },
+        "text": { "type": "string", "minLength": 1, "description": "The link text the page should carry." }
+      }
+    },
+    "item-handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "handoff" },
+        "origin": { "$ref": "#/$defs/origin" },
+        "text": { "type": "string", "minLength": 1 }
+      }
+    },
+    "item-reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "reason" },
+        "origin": { "$ref": "#/$defs/origin" },
+        "text": { "type": "string", "minLength": 1 },
+        "facts": { "$ref": "#/$defs/factList" }
+      }
+    },
+    "item-step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "step" },
+        "origin": { "$ref": "#/$defs/origin" },
+        "text": { "type": "string", "minLength": 1 },
+        "requires": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "produces": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "canFail": { "type": "boolean", "default": false },
+        "optional": { "type": "boolean", "default": false, "description": "True for a step the reader may skip. Its products do not satisfy a later required step." }
+      }
+    },
+    "item-failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "symptom", "handledBy"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "failure" },
+        "origin": { "$ref": "#/$defs/origin" },
+        "from": { "type": "string", "minLength": 1, "description": "The id of the step this failure follows. Omit it for a free-standing symptom row." },
+        "symptom": { "type": "string", "minLength": 1 },
+        "cause": { "type": "string", "minLength": 1, "description": "Why the symptom happens." },
+        "handledBy": { "type": "string", "minLength": 1, "description": "The id of the item that handles the failure." },
+        "facts": { "$ref": "#/$defs/factList" }
+      }
+    },
+    "item-code": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "code" },
+        "origin": { "$ref": "#/$defs/origin" },
+        "source": { "type": "string", "minLength": 1, "description": "path, path#Symbol, or an http(s) URL. A path resolves from the page's directory and must exist." },
+        "text": { "type": "string", "minLength": 1, "description": "What the code block shows." },
+        "facts": { "$ref": "#/$defs/factList" }
+      }
+    },
+    "item-figure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "figure" },
+        "origin": { "$ref": "#/$defs/origin" },
+        "text": { "type": "string", "minLength": 1, "description": "What the figure must show." },
+        "source": { "type": "string", "minLength": 1, "description": "Where the figure comes from. Not checked." }
+      }
+    },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "description": "A lowercase token. Section ids and item ids share one namespace, unique across the blueprint." },
+    "origin": { "const": "human", "description": "Set by drafter's write-back for an item a person's edit wrote. Never set by hand." },
+    "factList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Fact ids the item rests on. Each must resolve to one citable bullet."
+    }
+  }
+}

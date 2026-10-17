@@ -124,6 +124,10 @@ flag that set each one. A cap lists every source that set it. The command never 
 - [Plan format](docs/plan-format.md): every field and item kind of a page plan, each check, and the
   facts bullet format.
 - [Plan schema](schema/plan.schema.json): the JSON Schema for a plan file.
+- [Blueprint format](docs/blueprint-format.md): the durable page blueprint, `outline.yaml`,
+  `drafted.lock`, the path rule, and the edit catalog.
+- [Blueprint schema](schema/blueprint.schema.json) and [outline schema](schema/outline.schema.json):
+  the JSON Schemas for those files.
 
 ## Develop
 
