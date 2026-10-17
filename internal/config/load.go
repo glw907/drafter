@@ -66,6 +66,7 @@ func Load(root string, flags Flags) (*Config, error) {
 		}
 		c.apply(l)
 	}
+	c.applyBlueprintDefaults(root)
 	if c.Gate.Lane != "" && c.Gate.Protocol != "cairn-run-gate" {
 		return nil, laneFrom.fail("gate.lane", "needs gate.protocol cairn-run-gate, but the resolved protocol is %q",
 			c.Gate.Protocol)

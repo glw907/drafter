@@ -62,7 +62,29 @@ func (l *layer) checkValues() error {
 	if b := f.Facts; b != nil && b.BulletFormat != nil && *b.BulletFormat != "v1" {
 		return l.fail("facts.bullet_format", "must be v1, the only bullet format, not %q", *b.BulletFormat)
 	}
+	if err := l.checkBlueprints(); err != nil {
+		return err
+	}
 	return l.checkSeats()
+}
+
+// checkBlueprints refuses a blueprint path that is not a clean path inside the project. The
+// settings are project-relative, never resolved against the layer's directory, because the path
+// rule joins them to page paths.
+func (l *layer) checkBlueprints() error {
+	b := l.f.Blueprints
+	if b == nil {
+		return nil
+	}
+	for _, p := range []struct {
+		key string
+		v   *string
+	}{{"blueprints.root", b.Root}, {"blueprints.outline", b.Outline}} {
+		if p.v != nil && !filepath.IsLocal(*p.v) {
+			return l.fail(p.key, "must be a path inside the project, relative to its root, not %q", *p.v)
+		}
+	}
+	return nil
 }
 
 func (l *layer) checkGate() error {

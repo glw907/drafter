@@ -269,6 +269,67 @@ An entry with only `accepted` set belongs to a page that isn't drafted yet. A mi
 blueprint it wrote. The reshape that follows is a blueprint change, so a converted page gets
 redrafted once, the first time drafting runs on it.
 
+## What `drafter check` checks
+
+`drafter check [--root dir] [--json] [<blueprint>...]` validates every blueprint under the
+blueprint root, or the ones you name, with no network call. It prints each finding as
+`file:line: severity: check: message (fix)`. The exit status is 0 when no finding is an error, 1
+when any is, and 2 when the command can't run. It reports every file's findings and continues
+past a blueprint that fails to decode. `--json` prints the findings as one array.
+
+The command can't run, and exits 2, in these states:
+
+- The blueprint root doesn't exist.
+- `outline.yaml` doesn't exist or doesn't decode.
+- `drafted.lock` exists but doesn't parse. A missing lock is valid.
+- The facts directory is set but holds no facts file.
+- A file you name isn't a `.blueprint.yaml` file at its path-rule location.
+
+The checks that run on each blueprint use the same logic as `drafter check-plan`, applied to the
+blueprint's view: the blueprint joined to its outline entry, with each framing citation counted
+as an example item.
+
+| Check | What it requires | Severity |
+|---|---|---|
+| `decode` | The file decodes against the schema, and the ids are well formed and unique. | error |
+| `ids` | Every `from` and `handledBy` names an item, and no fact is both placed and disposed. | error |
+| `reader-state` | A step requires only state that an earlier step or `preconditions` produces. | error, or warning for state only optional steps produce |
+| `recovery` | Every step marked `canFail` has a `failure` item that names it in `from`. | error, or warning for a failure after a step that can't fail |
+| `links` | Link targets and code sources exist, anchors match a heading, and each cross-link in `outline.yaml` has a `link` item. | error, or warning for a page that's planned but not written |
+| `facts` | Every fact a blueprint places or cites is in exactly one facts file and is tagged `verified`, `external`, or `vendor`. Framing citations count. | error, or warning when no facts directory is set |
+| `blueprints` | Every managed page in `outline.yaml` has one blueprint, and every blueprint is at a path-rule location and names a managed page the outline lists. | error, or warning for a managed page with no blueprint until `blueprints.required` is `true` |
+| `refs` | Every `[[id]]` in a prose field names a section id. | error |
+| `why` | Every section has a non-empty `why`. | error |
+| `use` | A `use` that's present starts with `Only` or `Omit`. | error |
+| `types` | The page's `type` is one `types` declares, and the type's `anatomy` isn't empty. | error |
+| `lock` | An entry with a `page` id names a page on disk, and an entry with only an `accepted` id names a page the outline lists. | error |
+| `convention` | `blueprints.root` is `blueprints`, and `facts.dir` is `<root>/facts`. | warning |
+
+A prose field that carries a `[[id]]` is `argument`, `orderReason`, the `introduction` parts, the
+`framing` parts, a section's `why` and `opens`, an item's `text`, `use`, `symptom`, and `cause`,
+and `constraints`. A finding on a framing citation points at the framing field's line. A typo'd id
+reports "in no facts file", and an id on two bullets reports "on 2 bullets".
+
+When you name blueprints, `drafter check` checks only those files and the lock entries for their
+pages. The pairing of pages with blueprints and the `convention` warnings come from a run without
+names.
+
+### Find where a fact is used
+
+`drafter refs <fact-id> [--root dir] [--json]` lists every blueprint item, on every page, that
+places or cites the fact. It prints one `file:line: item-id (kind)` per line. It covers `fact`
+items, every `facts` list, the introduction's facts, dispositions, and framing citations.
+
+- A framing citation has the item id `_framing-<part>` and the kind `example`.
+- The introduction's `facts` list has the item id `introduction` and the kind `introduction`.
+- A disposition has the item id `dispositions` and the kind `disposition`, at the line of its
+  `fact`.
+
+The exit status is 0 when the command lists at least one place and 1 when it lists none. The
+message for none says whether the facts store holds the id, which tells a mistyped id from a fact
+no page uses yet. The status is 2 when the command can't run, for the same reasons as `drafter
+check`.
+
 ## The edit catalog
 
 The catalog lists the edits a live agent makes most often and the blueprint change each takes.

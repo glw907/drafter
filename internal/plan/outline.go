@@ -24,6 +24,29 @@ type crossLink struct {
 	From, To, Why string
 }
 
+// CrossLink is one cross-link of an outline built by NewOutline: the page From should link to
+// the page To, each named by slug or by repo-relative path, for the reason Why.
+type CrossLink struct {
+	From, To, Why string
+}
+
+// NewOutline returns an outline that lists the repo-relative slash paths in paths, resolves each
+// key of slugs to the path it maps to, and carries crossLinks. It serves outlines that are not
+// JSON, such as a blueprint project's outline.yaml, which LoadOutline cannot read.
+func NewOutline(paths []string, slugs map[string]string, crossLinks []CrossLink) *Outline {
+	o := &Outline{paths: map[string]bool{}, slugs: map[string]string{}}
+	for _, p := range paths {
+		o.paths[path.Clean(filepath.ToSlash(p))] = true
+	}
+	for slug, p := range slugs {
+		o.slugs[slug] = path.Clean(filepath.ToSlash(p))
+	}
+	for _, c := range crossLinks {
+		o.crossLinks = append(o.crossLinks, crossLink(c))
+	}
+	return o
+}
+
 // LoadOutline reads the outline at file. It fails when the file is missing, is not JSON, or has
 // no pages array.
 func LoadOutline(file string) (*Outline, error) {
