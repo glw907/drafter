@@ -23,6 +23,7 @@ type Config struct {
 	Seats           []string // the seats that run; draft is always among them
 	Seat            map[string]Seat
 	Facts           Facts
+	Blueprints      Blueprints
 	Register        map[string][]string
 	InlineFiles     []string
 	Root            string // the project root, empty outside a project
@@ -91,6 +92,15 @@ type Tier struct {
 type Facts struct {
 	Dir          string
 	BulletFormat string
+}
+
+// Blueprints holds the blueprint-tree settings. Root and Outline are slash paths relative to the
+// project root, not absolute: the path rule that maps a page to its blueprint works on
+// repository-relative paths.
+type Blueprints struct {
+	Root     string
+	Required bool
+	Outline  string
 }
 
 // Flags holds the only two settings that have command-line flags.

@@ -32,6 +32,7 @@ type file struct {
 	Seat            map[string]*seatFile `toml:"seat"`
 	Facts           *factsFile           `toml:"facts"`
 	Register        map[string][]string  `toml:"register"`
+	Blueprints      *blueprintsFile      `toml:"blueprints"`
 	InlineFiles     *[]string            `toml:"inline_files"`
 }
 
@@ -80,6 +81,12 @@ type seatFile struct {
 	Effort    *string   `toml:"effort"`
 	MaxTokens *int64    `toml:"max_tokens"`
 	Inputs    *[]string `toml:"inputs"`
+}
+
+type blueprintsFile struct {
+	Root     *string `toml:"root"`
+	Required *bool   `toml:"required"`
+	Outline  *string `toml:"outline"`
 }
 
 type factsFile struct {
