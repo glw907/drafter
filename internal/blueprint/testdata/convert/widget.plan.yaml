@@ -1,0 +1,121 @@
+version: 1
+page:
+  path: docs/guides/rotate-the-widget-key.md
+  title: Rotate the widget key
+  type: task-guide
+argument: |
+  Rotating the widget key takes four steps, and the old key keeps working until the reader
+  deletes it, so a failed step costs nothing.
+introduction:
+  covers: |
+    How to rotate the widget key without downtime.
+  priorKnowledge: |
+    You can deploy the widget and read its logs.
+  notCovered: |
+    Rotating the database credentials.
+  facts:
+    - key-ttl
+orderReason: |
+  The new key goes live first, so a failed deploy leaves the old key working.
+preconditions:
+  - key-exists
+sections:
+  - heading: Before you begin
+    anchor: before-you-begin
+    opens: |
+      You need deploy access and a new key. Read Create the new key first if the key is missing.
+    items:
+      - id: f-ttl
+        kind: fact
+        fact: key-ttl
+        use: Only the lifetime, not the renewal rule.
+      - id: f-renew
+        kind: fact
+        fact: key-renewal
+        use: The renewal rule and its cost.
+      - id: f-plain
+        kind: fact
+        fact: key-store
+      - id: l-keys
+        kind: link
+        target: ../reference/keys.md#key-lifetime
+        text: the key reference
+  - heading: Create the new key
+    opens: |
+      Generate the new key first.
+    items: []
+  - heading: Choose a size
+    level: 3
+    opens: |
+      Pick the size that matches your policy.
+    items:
+      - id: s-size
+        kind: sentence
+        mode: claim
+        text: |
+          The default size is enough for most services.
+        facts:
+          - key-size
+      - id: st-create
+        kind: step
+        text: |
+          Generate a new key.
+        requires:
+          - key-exists
+        produces:
+          - new-key
+        canFail: true
+        optional: true
+  - heading: Verify the key
+    opens: |
+      Check the key before you switch.
+    items:
+      - id: st-verify
+        kind: step
+        text: |
+          Run the check # not a comment: it must keep its colon.
+      - id: fl-bad
+        kind: failure
+        symptom: |
+          The check fails.
+        cause: |
+          The key was not deployed.
+        handledBy: st-verify
+        from: st-create
+        facts:
+          - key-ttl
+      - id: c-sample
+        kind: code
+        text: |
+          widget key check
+        source: examples/check.sh
+        facts:
+          - key-ttl
+      - id: h-next
+        kind: handoff
+        text: |
+          Continue to Delete the old key.
+      - id: r-why
+        kind: reason
+        text: |
+          The check is cheap and the switch is not.
+  - heading: Delete the old key
+    opens: |
+      Delete the old key only after the check passes.
+    items:
+      - id: fg
+        kind: figure
+        text: |
+          A diagram of the switch.
+        source: figures/switch.svg
+dispositions:
+  - fact: key-store
+    disposition: subordinated
+    reference: ../reference/keys.md
+    reason: |
+      The store is covered on the reference page.
+constraints:
+  - Keep every command in a code block.
+friction:
+  - The plan check reports the anchor twice.
+  - The register has no entry for a rotation page.

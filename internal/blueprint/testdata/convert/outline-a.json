@@ -1,0 +1,6 @@
+{
+  "pages": [
+    {"path": "docs/a.md", "slug": "a", "title": "Page A", "pageType": "task-guide", "job": "Job A.", "figure": true}
+  ],
+  "crossLinks": [{"from": "a", "to": "b", "why": "A leads to B."}]
+}
