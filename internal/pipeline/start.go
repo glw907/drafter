@@ -270,6 +270,9 @@ func (r *runner) addPages() error {
 			p.ps.Step = stBpCheck
 		}
 		p.w = work{Rec: newRecord()}
+		if sc, ok := r.o.Scopes[h.Page.Path]; ok {
+			p.w.Since, p.w.Scope = r.o.Since, &sc
+		}
 		r.state.Pages[p.key] = p.ps
 		r.pages = append(r.pages, p)
 		if err := p.snapshotPre(); err != nil {

@@ -42,7 +42,7 @@ func (r *runner) dryRun(ctx context.Context) (Summary, error) {
 		}
 	}
 	for _, p := range r.pages {
-		res := PageResult{Path: p.h.Page.Path, Status: p.ps.Status}
+		res := PageResult{Path: p.h.Page.Path, Status: p.ps.Status, Scope: p.w.Scope}
 		if p.w.Rec.Escalation != nil {
 			res.Rule = p.w.Rec.Escalation.Rule
 		}
