@@ -2347,7 +2347,7 @@ Verdict "fix" if any blocking finding exists; otherwise "ok".${scope ? `
 Change read. This read judges a change, as a code reviewer judges a pull request. The change block
 after the facts holds the diff of the blueprint since the earlier revision, the old and new text of
 each fact bullet that changed, and the outline entry before and after when it changed. ${scope === "page"
-    ? "No section's own content changed: the change is in the page-level fields, the order of the sections, a removed section, or the outline entry."
+    ? "No section's own content changed: the change is in the page-level fields, the order of the sections, a removed section, the outline entry, or a fact bullet cited only outside the sections."
     : `These sections changed: ${scope}.`} Read the whole blueprint for context, as Google's code review
 standard asks ("Sometimes you have to look at the whole file to be sure that the change actually makes
 sense", https://google.github.io/eng-practices/review/reviewer/looking-for.html), and judge the change

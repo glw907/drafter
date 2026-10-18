@@ -77,8 +77,20 @@ func Compare(file string, old, cur Revision) Scope {
 
 	if !sameYAML(withoutSections(ob), withoutSections(cb)) {
 		differs = true
-		addFacts(pageFacts(ob, old.Facts))
-		addFacts(pageFacts(cb, cur.Facts))
+		// Only a field that differs contributes the facts it cites; the rest of the page-level
+		// fields cite none.
+		if !sameYAML(ob.Introduction, cb.Introduction) {
+			addFacts(ob.Introduction.Facts)
+			addFacts(cb.Introduction.Facts)
+		}
+		if !sameYAML(ob.Dispositions, cb.Dispositions) {
+			addFacts(dispositionFacts(ob))
+			addFacts(dispositionFacts(cb))
+		}
+		if !sameYAML(ob.Framing, cb.Framing) {
+			addFacts(framingFacts(ob, old.Facts))
+			addFacts(framingFacts(cb, cur.Facts))
+		}
 	}
 
 	oldSec, curSec := map[string]*Section{}, map[string]*Section{}
@@ -196,16 +208,21 @@ func itemFacts(it *Item) []string {
 	return ids
 }
 
-// pageFacts lists the facts the framing, the introduction, and the dispositions place or cite.
-// The framing cites a fact as a backticked id, which counts only against a store to recognise it.
-func pageFacts(b *Blueprint, facts *plan.Facts) []string {
-	ids := slices.Clone(b.Introduction.Facts)
+func dispositionFacts(b *Blueprint) []string {
+	var ids []string
 	for _, d := range b.Dispositions {
 		ids = append(ids, d.Fact)
 	}
+	return ids
+}
+
+// framingFacts lists the facts the framing cites. It cites a fact as a backticked id, which
+// counts only against a store to recognise it.
+func framingFacts(b *Blueprint, facts *plan.Facts) []string {
 	if facts == nil {
-		return ids
+		return nil
 	}
+	var ids []string
 	for _, part := range framingParts(&b.Framing) {
 		for _, m := range codeSpan.FindAllStringSubmatch(part.text, -1) {
 			if facts.Cites(m[1]) {
@@ -214,6 +231,11 @@ func pageFacts(b *Blueprint, facts *plan.Facts) []string {
 		}
 	}
 	return ids
+}
+
+// pageFacts lists the facts the introduction, the dispositions, and the framing place or cite.
+func pageFacts(b *Blueprint, facts *plan.Facts) []string {
+	return slices.Concat(b.Introduction.Facts, dispositionFacts(b), framingFacts(b, facts))
 }
 
 // citedFacts lists every fact the page places or cites, wherever it does.

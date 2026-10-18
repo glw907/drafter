@@ -537,6 +537,8 @@ func TestReadSince(t *testing.T) {
 		}
 		if reqs := p.stub.requests(); len(reqs) != 1 || !strings.Contains(reqs[0], `Scope: two`) {
 			t.Errorf("requests = %d, want one carrying the scope line", len(reqs))
+		} else if text := requestText(reqs[0]); !strings.Contains(text, "=== blueprint diff ===") || strings.Contains(text, "=== outline entry change ===") {
+			t.Errorf("the change block should hold the diff and no entry change:\n%s", text)
 		}
 		if got := lockBytes(t, p.root); got != "" {
 			t.Errorf("lock = %q, want none after a scoped accept", got)
@@ -641,8 +643,11 @@ func TestReadSince(t *testing.T) {
 		if strings.Contains(text, "f:other") && strings.Contains(text[strings.Index(text, "=== changed facts ==="):], "f:other") {
 			t.Error("the change block lists a fact bullet the page never cites")
 		}
-		if strings.Index(text, "=== end facts ===") > strings.Index(text, "=== blueprint diff ===") {
-			t.Error("the change block comes before the facts block")
+		if end, diff := strings.Index(text, "=== end facts ==="), strings.Index(text, "=== blueprint diff ==="); end < 0 || diff < end {
+			t.Error("the change block does not follow the facts block")
+		}
+		if strings.Contains(text, "=== outline entry change ===") != true {
+			t.Error("the changed outline entry is missing from the block")
 		}
 	})
 

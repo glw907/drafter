@@ -68,7 +68,7 @@ sections:
 `
 
 const sinceFacts = "## Facts\n\n- `f:intro` The intro fact. Source: `a/b.go`. [verified]\n" +
-	"- `f:frame` The framing fact. [verified]\n- `f:one` One. [verified]\n- `f:two` Two. [verified]\n- `f:three` Three. [verified]\n"
+	"- `f:frame` The framing fact. [verified]\n- `f:one` One. [verified]\n- `f:two` Two. [verified]\n- `f:three` Three. [verified]\n- `f:other` Other. [verified]\n"
 
 var sinceEntry = Page{Path: "docs/a.md", Slug: "a", Title: "A", Type: "task guide", Job: "Do A.", Managed: true}
 
@@ -84,6 +84,7 @@ func TestCompare(t *testing.T) {
 	swapped := sinceBase[:iFirst] + sinceBase[iSecond:iThird] + sinceBase[iFirst:iSecond] + sinceBase[iThird:]
 
 	none := []string{}
+	withDisp := edit("sections:\n", "dispositions:\n  - fact: f:other\n    disposition: cut\n    reason: |\n      Another page owns it.\nsections:\n")
 	tests := []struct {
 		name  string
 		bp    string
@@ -104,7 +105,9 @@ func TestCompare(t *testing.T) {
 		{name: "a removed section", bp: sinceBase[:strings.Index(sinceBase, "  - id: third")], facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeScoped, Facts: []string{"f:three"}}},
 		{name: "a reorder", bp: swapped, facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeScoped, Facts: none}},
 		{name: "a level change", bp: edit("    heading: Second\n", "    heading: Second\n    level: 3\n"), facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeScoped, IDs: []string{"second"}, Facts: none}},
-		{name: "a field outside sections", bp: edit("Steps run in order.", "Steps run in a new order."), facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeScoped, Facts: []string{"f:frame", "f:intro"}}},
+		{name: "a field outside sections", bp: edit("Steps run in order.", "Steps run in a new order."), facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeScoped, Facts: none}},
+		{name: "a framing edit", bp: edit("Background that cites", "Revised background that cites"), facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeScoped, Facts: []string{"f:frame"}}},
+		{name: "a changed fact cited from the dispositions", bp: withDisp, oldBP: withDisp, facts: strings.Replace(sinceFacts, "Other.", "Other, revised.", 1), entry: &sinceEntry, want: Scope{Kind: ScopeScoped, Facts: []string{"f:other"}}},
 		{name: "an outline entry change", bp: sinceBase, facts: sinceFacts, entry: &changedEntry, want: Scope{Kind: ScopeScoped, Facts: none}},
 		{name: "absent at the earlier revision", bp: sinceBase, facts: sinceFacts, entry: &sinceEntry, oldBP: "-", want: Scope{Kind: ScopeWhole, Why: "absent or undecodable"}},
 		{name: "undecodable at the earlier revision", bp: sinceBase, facts: sinceFacts, entry: &sinceEntry, oldBP: "sections: [", want: Scope{Kind: ScopeWhole, Why: "absent or undecodable"}},
