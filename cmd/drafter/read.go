@@ -251,7 +251,13 @@ func revisionAt(c *config.Config, root, rev string, h handoff.Handoff) blueprint
 	}
 	dir = filepath.ToSlash(dir)
 	files := map[string]string{}
-	names, _ := gitText(root, "ls-tree", "--name-only", rev+":"+dir)
+	names, err := gitText(root, "ls-tree", "--name-only", rev+":"+dir)
+	if err != nil {
+		// A facts directory git cannot list at rev (or a path that is not under root as git
+		// reports it) would parse as an empty store and hide a fact-only change, so the page
+		// reads whole instead.
+		return blueprint.Revision{}
+	}
 	for name := range strings.SplitSeq(names, "\n") {
 		if !strings.HasSuffix(name, ".md") || name == "README.md" {
 			continue
@@ -269,6 +275,7 @@ func scopedAccept(r pipeline.PageResult) bool {
 	return r.Status == pipeline.StatusAccepted && r.Accepted != "" && r.Scope != nil && r.Scope.Kind == blueprint.ScopeScoped
 }
 
+// writeReadSummary prints the run's summary as JSON or text, whichever the config selects.
 func writeReadSummary(w io.Writer, c *config.Config, s pipeline.Summary, dry bool) error {
 	if c.Output == "json" {
 		return writeSummaryJSON(w, s)

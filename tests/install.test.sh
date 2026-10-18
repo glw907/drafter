@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # tests/install.test.sh: proves `make install` links the docs page chain workflow, its outline
-# helper, the page hook, and the blueprint skill into a temp HOME, and refuses, leaving the tree it would have written through untouched,
-# when ~/.claude/workflows is a symlink (stow's folded form). It never touches the real HOME.
+# helper, the page hook, and the blueprint skill into a temp HOME, and refuses, leaving the tree it
+# would have written through untouched, when ~/.claude/workflows is a symlink (stow's folded
+# form). It never touches the real HOME.
 set -uo pipefail
 
 cd "$(dirname "$0")/.."

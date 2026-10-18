@@ -18,6 +18,7 @@ import (
 
 	"github.com/glw907/drafter/internal/blueprint"
 	"github.com/glw907/drafter/internal/config"
+	"github.com/glw907/drafter/internal/handoff"
 	"github.com/glw907/drafter/internal/pipeline"
 	"github.com/glw907/drafter/internal/prompts"
 )
@@ -460,6 +461,17 @@ func (p *sinceProject) read(args ...string) (code int, stdout, stderr string) {
 
 func (p *sinceProject) bp(page string) string {
 	return filepath.Join(p.root, "blueprints/docs", page+".blueprint.yaml")
+}
+
+func TestRevisionAtFactsDirNotUnderRoot(t *testing.T) {
+	p := newSinceProject(t)
+	c := &config.Config{}
+	c.Blueprints.Outline = "blueprints/outline.yaml"
+	c.Facts.Dir = filepath.Join(t.TempDir(), "facts")
+	r := revisionAt(c, p.root, "HEAD", handoff.Handoff{Plan: "blueprints/docs/a.blueprint.yaml"})
+	if r.Blueprint != nil || r.Entry != nil || r.Facts != nil {
+		t.Errorf("revision = %+v, want empty so the page reads whole", r)
+	}
 }
 
 func editItem(s string) string { return strings.Replace(s, "Continue.", "Continue, carefully.", 1) }

@@ -9,7 +9,7 @@ A blueprint is the durable plan for one docs page. In a repo with a `blueprints/
 
 ## Find the blueprint
 
-The blueprint of `docs/a/b.md` is `blueprints/docs/a/b.blueprint.yaml`. See [Layout](format.md#layout). Read the blueprint whole before you edit it. Write prose fields the way [Write prose fields as blocks](format.md#write-prose-fields-as-blocks) says.
+Find the page's blueprint by the path rule in [Layout](format.md#layout). Read the blueprint whole before you edit it. Write prose fields the way [Write prose fields as blocks](format.md#write-prose-fields-as-blocks) says.
 
 ## Pick the case
 
@@ -26,7 +26,7 @@ If no catalog row fits, stop and say so in your report. Do not invent an edit.
 - Point at another section: [Refer to a section by id](format.md#refer-to-a-section-by-id).
 - Fields only drafter or a person sets, which you never write: [Who sets what](format.md#who-sets-what).
 - Fields that sit outside `sections`: [Top-level fields](format.md#top-level-fields).
-- Adding or moving a section redrafts the whole page; the catalog row says so. Prefer an item edit when one does the job.
+- Before you add or move a section, read its row in [the edit catalog](format.md#the-edit-catalog). Prefer an item edit when one does the job.
 
 ## Check
 
