@@ -147,6 +147,9 @@ cycle_ceiling = 100
 api_base_url = %q
 state_dir = %q
 
+[prices]
+batch_discount = 0
+
 [prices.models.model-a]
 input = 1
 output = 5
@@ -286,10 +289,69 @@ func TestPageDryRunTextOutput(t *testing.T) {
 	if r.code != 0 {
 		t.Fatalf("exit %d\n%s%s", r.code, r.stdout, r.stderr)
 	}
+	if first, _, _ := strings.Cut(r.stdout, "\n"); first != "prices: "+stockPricesDate+" (default)" {
+		t.Errorf("first line %q, want the stock price date from the default layer", first)
+	}
 	for _, want := range []string{"draft: 5000 input tokens, max_tokens 4000, worst case $0.0250", "estimated worst case $0.0250"} {
 		if !strings.Contains(r.stdout, want) {
 			t.Errorf("stdout lacks %q:\n%s", want, r.stdout)
 		}
+	}
+}
+
+// stockPricesDate is the date of the price table in internal/config/stock.toml.
+const stockPricesDate = "2026-10-18"
+
+// pagePricesUserLayer adds lines under [prices] in the page environment's user config.
+func (p pageEnv) pagePricesUserLayer(t *testing.T, lines string) {
+	t.Helper()
+	cfg := filepath.Join(p.xdg, "drafter", "config.toml")
+	data, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, cfg, strings.Replace(string(data), "[prices]\n", "[prices]\n"+lines, 1))
+}
+
+func TestPageDryRunJSONNamesThePricesDate(t *testing.T) {
+	tests := []struct {
+		name       string
+		userPrices string
+		wantDate   string
+		wantSource string
+	}{
+		{"stock table", "", stockPricesDate, "default"},
+		{"user rate with its date", "date = \"2026-11-02\"\n", "2026-11-02", "user"},
+		{"user layer without a date keeps the stock date", "source = \"https://example.test/pricing\"\n", stockPricesDate, "default"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newPageEnv(t, newAPIStub(t))
+			p.pagePricesUserLayer(t, tt.userPrices)
+			r := p.page(t, "--dry-run", "--json", p.handoffFile(t))
+			if r.code != 0 {
+				t.Fatalf("exit %d\nstdout: %s\nstderr: %s", r.code, r.stdout, r.stderr)
+			}
+			var got struct {
+				Date   string `json:"prices_date"`
+				Source string `json:"prices_date_source"`
+			}
+			if err := json.Unmarshal([]byte(r.stdout), &got); err != nil {
+				t.Fatalf("stdout is not JSON: %v\n%s", err, r.stdout)
+			}
+			if got.Date != tt.wantDate || got.Source != tt.wantSource {
+				t.Errorf("prices_date %q from %q, want %q from %q", got.Date, got.Source, tt.wantDate, tt.wantSource)
+			}
+		})
+	}
+}
+
+func TestPageDryRunTextShowsAUserPricesDate(t *testing.T) {
+	p := newPageEnv(t, newAPIStub(t))
+	p.pagePricesUserLayer(t, "date = \"2026-11-02\"\n")
+	r := p.page(t, "--dry-run", p.handoffFile(t))
+	if first, _, _ := strings.Cut(r.stdout, "\n"); first != "prices: 2026-11-02 (user)" {
+		t.Errorf("first line %q, want the user layer's date", first)
 	}
 }
 

@@ -41,3 +41,10 @@ func (c *Config) row(key string) Source {
 	}
 	return Source{Key: key, Value: o.value, From: o.from, Sets: c.capSets[key]}
 }
+
+// PricesDate returns the price table's date and the layer that set it. The merge is key by key,
+// so a layer that overrides a rate without setting the date leaves the date to a lower layer.
+func (c *Config) PricesDate() (date, from string) {
+	r := c.row("prices.date")
+	return r.Value, r.From
+}

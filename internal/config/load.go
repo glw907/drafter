@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// Load reads the user layer, then, when root holds a drafter.toml, it and drafter.local.toml
+// Load applies the built-in defaults, then reads the user layer, then, when root holds a drafter.toml, it and drafter.local.toml
 // under it, then the environment and flags, and returns the resolved configuration. Callers
 // pass the git top level, or empty outside a git tree; a root with no drafter.toml is outside a
 // project and leaves Config.Root empty. Load checks what each layer may hold and what each
@@ -26,7 +26,11 @@ func Load(root string, flags Flags) (*Config, error) {
 	}
 	c := newConfig(home)
 
-	var layers []*layer
+	stock, err := stockLayer()
+	if err != nil {
+		return nil, err
+	}
+	layers := []*layer{stock}
 	user, err := readLayer("user", inUser, filepath.Join(userDir, "drafter", "config.toml"), home)
 	if err != nil {
 		return nil, err
