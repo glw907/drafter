@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/glw907/drafter/internal/batch"
+	"github.com/glw907/drafter/internal/blueprint"
 	"github.com/glw907/drafter/internal/config"
 	"github.com/glw907/drafter/internal/handoff"
 	"github.com/glw907/drafter/internal/key"
@@ -54,7 +55,7 @@ func exitCodeFor(s pipeline.Summary) int {
 		return exitStopped
 	}
 	for _, p := range s.Pages {
-		if p.Status != pipeline.StatusAccepted {
+		if p.Status != pipeline.StatusAccepted && p.Status != statusUnchanged {
 			return exitFindings
 		}
 	}
@@ -165,7 +166,14 @@ func writeSummaryText(w io.Writer, s pipeline.Summary, dry bool) error {
 		fmt.Fprintf(&b, "stage %s: estimated worst case $%.4f\n", s.EstimateStage, s.EstimateTotal)
 	}
 	for _, p := range s.Pages {
+		if p.Status == statusUnchanged {
+			fmt.Fprintf(&b, "%s: %s\n", p.Path, p.Scope.Why)
+			continue
+		}
 		fmt.Fprintf(&b, "%s: %s", p.Path, p.Status)
+		if p.Scope != nil {
+			b.WriteString(" [" + scopeText(*p.Scope) + "]")
+		}
 		if p.Rule != "" {
 			fmt.Fprintf(&b, " (%s)", p.Rule)
 		}
@@ -179,4 +187,12 @@ func writeSummaryText(w io.Writer, s pipeline.Summary, dry bool) error {
 	}
 	_, err := io.WriteString(w, b.String())
 	return err
+}
+
+// scopeText describes what a read of a page was limited to.
+func scopeText(sc blueprint.Scope) string {
+	if sc.Kind == blueprint.ScopeScoped {
+		return "scoped: " + strings.Join(sc.IDs, ", ")
+	}
+	return sc.Kind + ": " + sc.Why
 }
