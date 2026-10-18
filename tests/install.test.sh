@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# tests/install.test.sh: proves `make install` links the docs page chain workflow and its outline
-# helper into a temp HOME, and refuses, leaving the tree it would have written through untouched,
+# tests/install.test.sh: proves `make install` links the docs page chain workflow, its outline
+# helper, the page hook, and the blueprint skill into a temp HOME, and refuses, leaving the tree it would have written through untouched,
 # when ~/.claude/workflows is a symlink (stow's folded form). It never touches the real HOME.
 set -uo pipefail
 
@@ -42,6 +42,10 @@ mkdir -p "$home"
 check install_into "$home"
 check under_repo "$home/.claude/workflows/docs-page-chain.js"
 check under_repo "$home/.local/bin/cairn-docs-outline"
+check under_repo "$home/.local/bin/drafter-page-hook"
+check under_repo "$home/.claude/skills/blueprint"
+check test -f "$home/.claude/skills/blueprint/SKILL.md"
+check test "$(readlink -e "$home/.claude/skills/blueprint/format.md")" = "$repo/docs/blueprint-format.md"
 check test -x "$home/.local/bin/drafter"
 check test -d "$home/.claude/workflows" -a ! -L "$home/.claude/workflows"
 check install_into "$home"
