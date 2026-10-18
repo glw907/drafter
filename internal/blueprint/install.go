@@ -87,11 +87,7 @@ func InstallConverted(root string, layout Layout, pagePath string, data []byte) 
 	if b == nil || len(findings) > 0 {
 		return res, errors.New("the blueprint to install does not decode")
 	}
-	pageBlob, err := CommitBlobID(root, "HEAD", pagePath)
-	if err != nil {
-		return res, err
-	}
-	pageBytes, err := gitRaw(root, "show", "HEAD:"+pagePath)
+	pageBlob, pageBytes, err := headPage(root, pagePath)
 	if err != nil {
 		return res, err
 	}
@@ -106,12 +102,29 @@ func InstallConverted(root string, layout Layout, pagePath string, data []byte) 
 	if lock.Pages == nil {
 		lock.Pages = map[string]LockEntry{}
 	}
-	lock.Pages[pagePath] = LockEntry{Page: pageBlob, Blueprint: bpBlob, Sections: SectionHashes(b, pageBytes)}
+	lock.Pages[pagePath] = newLockEntry(b, pageBlob, pageBytes, bpBlob)
 	if err := WriteLock(lockFile, lock); err != nil {
 		return res, fmt.Errorf("%w; the blueprint %s is written, so delete it and convert again", err, rel)
 	}
 	res.Seeded = true
 	return res, nil
+}
+
+// headPage returns the blob id and the bytes of the page as committed at HEAD.
+func headPage(root, pagePath string) (blob string, data []byte, err error) {
+	if blob, err = CommitBlobID(root, "HEAD", pagePath); err != nil {
+		return "", nil, err
+	}
+	if data, err = gitRaw(root, "show", "HEAD:"+pagePath); err != nil {
+		return "", nil, err
+	}
+	return blob, data, nil
+}
+
+// newLockEntry is the entry that records a page as drafted from a blueprint: the page and the
+// blueprint by blob id, and the page's sections by hash. Conversion and Seed both write it.
+func newLockEntry(b *Blueprint, pageBlob string, pageBytes []byte, bpBlob string) LockEntry {
+	return LockEntry{Page: pageBlob, Blueprint: bpBlob, Sections: SectionHashes(b, pageBytes)}
 }
 
 // writeExclusive creates dest with data and fails if dest exists. It writes a temporary file and
