@@ -25,16 +25,23 @@ type Installed struct {
 	Seeded bool
 }
 
-// InstallConverted writes data as the blueprint of the page at pagePath, under the default
-// blueprint root of the repository at root. It never overwrites a file: a blueprint already there
+// Layout says where a project keeps its blueprints and its lock, both as slash paths relative to
+// the repository root.
+type Layout struct {
+	BlueprintRoot string
+	LockPath      string
+}
+
+// InstallConverted writes data as the blueprint of the page at pagePath, under the layout's
+// blueprint root in the repository at root. It never overwrites a file: a blueprint already there
 // is an error. When the page file exists it also seeds the page's lock entry from the page as
 // committed at HEAD, so the next draft treats the page as drafted from this blueprint; it refuses
 // a page with uncommitted changes and a page the lock already has an entry for.
 //
 // The blueprint and the lock are two writes. A crash between them leaves a blueprint with no
 // entry, and the recovery is to delete the blueprint and convert again.
-func InstallConverted(root, pagePath string, data []byte) (Installed, error) {
-	rel := BlueprintPath(DefaultRoot, pagePath)
+func InstallConverted(root string, layout Layout, pagePath string, data []byte) (Installed, error) {
+	rel := BlueprintPath(layout.BlueprintRoot, pagePath)
 	dest := filepath.Join(root, filepath.FromSlash(rel))
 	res := Installed{Blueprint: rel}
 
@@ -68,7 +75,7 @@ func InstallConverted(root, pagePath string, data []byte) (Installed, error) {
 	if len(bytes.TrimSpace(status)) > 0 {
 		return res, fmt.Errorf("%s has uncommitted changes; commit them first so the seed records the page as it is", pagePath)
 	}
-	lockFile := filepath.Join(root, DefaultRoot, LockFile)
+	lockFile := filepath.Join(root, filepath.FromSlash(layout.LockPath))
 	lock, err := ReadLock(lockFile)
 	if err != nil {
 		return res, err

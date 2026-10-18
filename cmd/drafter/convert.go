@@ -100,7 +100,7 @@ func newConvertPlanCmd() *cobra.Command {
 		Use:   "plan [flags] <plan.yaml>",
 		Short: "Write a page's blueprint from its v1 plan and framing record",
 		Long: `Convert a v1 plan, with its framing record, to a blueprint at the page's place under
-blueprints/. The page's path comes from the plan, and its exemplars from its entry in the JSON
+the blueprint root. The page's path comes from the plan, and its exemplars from its entry in the JSON
 outline. Standard output gets the blueprint's path. Standard error gets what the conversion could
 not decide, the plan's friction lines for the project's friction log, and the framing record's
 departures for the commit message.
@@ -175,7 +175,12 @@ func runConvertPlan(cmd *cobra.Command, planFile string, f *convertPlanFlags) er
 	if err != nil {
 		return err
 	}
-	res, err := blueprint.InstallConverted(root, pagePath, conv.Data)
+	proj, err := projectFor(root)
+	if err != nil {
+		return err
+	}
+	layout := blueprint.Layout{BlueprintRoot: proj.BlueprintRoot, LockPath: path.Join(path.Dir(proj.Outline), blueprint.LockFile)}
+	res, err := blueprint.InstallConverted(root, layout, pagePath, conv.Data)
 	if err != nil {
 		return err
 	}

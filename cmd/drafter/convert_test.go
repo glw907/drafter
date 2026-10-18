@@ -175,3 +175,38 @@ func TestConvertPlanCommandRefusals(t *testing.T) {
 		})
 	}
 }
+
+func TestConvertPlanHonoursTheBlueprintSettings(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	root := t.TempDir()
+	gitIn(t, root, "init", "-q")
+	page := filepath.Join(root, "docs", "guides", "rotate-the-widget-key.md")
+	if err := os.MkdirAll(filepath.Dir(page), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(page, []byte("## Before you begin\nx\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "drafter.toml"), []byte("[blueprints]\nroot = \"plans\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, root, "add", ".")
+	gitIn(t, root, "commit", "-q", "-m", "page")
+
+	work := t.TempDir()
+	stdout, _, err := runConvert(t, "plan", "--root", root, "--outline", copyFixture(t, work, "widget.outline.json"), copyFixture(t, work, "widget.plan.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "plans/docs/guides/rotate-the-widget-key.blueprint.yaml\n"; stdout != want {
+		t.Errorf("stdout = %q, want %q", stdout, want)
+	}
+	if _, err := os.Stat(filepath.Join(root, "blueprints")); err == nil {
+		t.Error("convert wrote under the default root although blueprints.root moved it")
+	}
+	lock, err := blueprint.ReadLock(filepath.Join(root, "plans", "drafted.lock"))
+	if err != nil || lock.Pages["docs/guides/rotate-the-widget-key.md"].Blueprint == "" {
+		t.Errorf("lock beside the moved outline = %+v, %v; want the seeded entry", lock, err)
+	}
+}

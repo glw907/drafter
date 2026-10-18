@@ -36,7 +36,8 @@ passes both is accepted, and when the whole run ends with no stop, drafter recor
 accepted blueprint's blob id in drafted.lock. It writes no page. The tree must be clean, so each
 read runs on a committed blueprint, and every input is read from the commit the run starts at.
 
-The command needs [seat.blueprint] in the configuration. --dry-run counts the tokens of the
+The command needs [seat.blueprint] in the configuration, and the same required settings as
+drafter page, gate.command included, though it never runs the gate. --dry-run counts the tokens of the
 stage's requests and submits nothing. --resume continues a stopped run; give the same
 blueprints again.
 

@@ -145,7 +145,8 @@ func (p *page) stageBlueprintRead(ctx context.Context) (*stage, error) {
 
 // completeBlueprintRead decides the page from the two stage-1 reads. A consistency conflict or a
 // blueprint read that says fix sets the page aside under the plan rule, and an accepted page
-// records the blob id of the blueprint the read saw.
+// records the blob id of the blueprint the read saw. When both fire, the escalation names the
+// consistency seat, and the blueprint read's findings are still in the record.
 func (p *page) completeBlueprintRead() error {
 	a, err := parseRead(p.w.Got["blueprint"])
 	if err != nil {

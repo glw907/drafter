@@ -14,6 +14,8 @@ import (
 	"github.com/glw907/drafter/internal/plan"
 )
 
+var testLayout = Layout{BlueprintRoot: DefaultRoot, LockPath: DefaultRoot + "/" + LockFile}
+
 const convertPage = "docs/guides/rotate-the-widget-key.md"
 
 func convertFixture(t *testing.T, name string) []byte {
@@ -386,7 +388,7 @@ func TestInstallConvertedSeedsTheLock(t *testing.T) {
 	root := seedRepo(t, page)
 	conv, _ := convertedFixture(t)
 
-	got, err := InstallConverted(root, convertPage, conv.Data)
+	got, err := InstallConverted(root, testLayout, convertPage, conv.Data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,7 +432,7 @@ func TestInstallConvertedSeedsTheLock(t *testing.T) {
 	}
 
 	// A second conversion is refused twice over: the blueprint and the lock entry both exist.
-	if _, err := InstallConverted(root, convertPage, conv.Data); err == nil || !strings.Contains(err.Error(), "already exists") {
+	if _, err := InstallConverted(root, testLayout, convertPage, conv.Data); err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Errorf("a second install gave %v", err)
 	}
 }
@@ -448,7 +450,7 @@ func TestInstallConvertedRefusals(t *testing.T) {
 		if err := os.WriteFile(dest, []byte("mine\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := InstallConverted(root, convertPage, conv.Data); err == nil {
+		if _, err := InstallConverted(root, testLayout, convertPage, conv.Data); err == nil {
 			t.Fatal("expected a refusal")
 		}
 		if got, _ := os.ReadFile(dest); string(got) != "mine\n" {
@@ -465,7 +467,7 @@ func TestInstallConvertedRefusals(t *testing.T) {
 		if err := WriteLock(lockFile, &Lock{Version: Version, Pages: map[string]LockEntry{convertPage: {Accepted: "abc"}}}); err != nil {
 			t.Fatal(err)
 		}
-		_, err := InstallConverted(root, convertPage, conv.Data)
+		_, err := InstallConverted(root, testLayout, convertPage, conv.Data)
 		if err == nil || !strings.Contains(err.Error(), "already has an entry") {
 			t.Fatalf("err = %v", err)
 		}
@@ -479,7 +481,7 @@ func TestInstallConvertedRefusals(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(convertPage)), []byte("edited\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		_, err := InstallConverted(root, convertPage, conv.Data)
+		_, err := InstallConverted(root, testLayout, convertPage, conv.Data)
 		if err == nil || !strings.Contains(err.Error(), "uncommitted") {
 			t.Fatalf("err = %v", err)
 		}
@@ -490,7 +492,7 @@ func TestInstallConvertedRefusals(t *testing.T) {
 
 	t.Run("a missing page writes the blueprint and seeds nothing", func(t *testing.T) {
 		root := t.TempDir()
-		got, err := InstallConverted(root, convertPage, conv.Data)
+		got, err := InstallConverted(root, testLayout, convertPage, conv.Data)
 		if err != nil || got.Seeded {
 			t.Fatalf("got %+v, %v", got, err)
 		}
