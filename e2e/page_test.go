@@ -147,6 +147,9 @@ cycle_ceiling = 100
 api_base_url = %q
 state_dir = %q
 
+[prices]
+batch_discount = 0
+
 [prices.models.model-a]
 input = 1
 output = 5
@@ -286,10 +289,69 @@ func TestPageDryRunTextOutput(t *testing.T) {
 	if r.code != 0 {
 		t.Fatalf("exit %d\n%s%s", r.code, r.stdout, r.stderr)
 	}
+	if first, _, _ := strings.Cut(r.stdout, "\n"); first != "prices: "+stockPricesDate+" (default)" {
+		t.Errorf("first line %q, want the stock price date from the default layer", first)
+	}
 	for _, want := range []string{"draft: 5000 input tokens, max_tokens 4000, worst case $0.0250", "estimated worst case $0.0250"} {
 		if !strings.Contains(r.stdout, want) {
 			t.Errorf("stdout lacks %q:\n%s", want, r.stdout)
 		}
+	}
+}
+
+// stockPricesDate is the date of the price table in internal/config/stock.toml.
+const stockPricesDate = "2026-10-18"
+
+// pagePricesUserLayer adds lines under [prices] in the page environment's user config.
+func (p pageEnv) pagePricesUserLayer(t *testing.T, lines string) {
+	t.Helper()
+	cfg := filepath.Join(p.xdg, "drafter", "config.toml")
+	data, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, cfg, strings.Replace(string(data), "[prices]\n", "[prices]\n"+lines, 1))
+}
+
+func TestPageDryRunJSONNamesThePricesDate(t *testing.T) {
+	tests := []struct {
+		name       string
+		userPrices string
+		wantDate   string
+		wantSource string
+	}{
+		{"stock table", "", stockPricesDate, "default"},
+		{"user rate with its date", "date = \"2026-11-02\"\n", "2026-11-02", "user"},
+		{"user layer without a date keeps the stock date", "source = \"https://example.test/pricing\"\n", stockPricesDate, "default"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newPageEnv(t, newAPIStub(t))
+			p.pagePricesUserLayer(t, tt.userPrices)
+			r := p.page(t, "--dry-run", "--json", p.handoffFile(t))
+			if r.code != 0 {
+				t.Fatalf("exit %d\nstdout: %s\nstderr: %s", r.code, r.stdout, r.stderr)
+			}
+			var got struct {
+				Date   string `json:"prices_date"`
+				Source string `json:"prices_date_source"`
+			}
+			if err := json.Unmarshal([]byte(r.stdout), &got); err != nil {
+				t.Fatalf("stdout is not JSON: %v\n%s", err, r.stdout)
+			}
+			if got.Date != tt.wantDate || got.Source != tt.wantSource {
+				t.Errorf("prices_date %q from %q, want %q from %q", got.Date, got.Source, tt.wantDate, tt.wantSource)
+			}
+		})
+	}
+}
+
+func TestPageDryRunTextShowsAUserPricesDate(t *testing.T) {
+	p := newPageEnv(t, newAPIStub(t))
+	p.pagePricesUserLayer(t, "date = \"2026-11-02\"\n")
+	r := p.page(t, "--dry-run", p.handoffFile(t))
+	if first, _, _ := strings.Cut(r.stdout, "\n"); first != "prices: 2026-11-02 (user)" {
+		t.Errorf("first line %q, want the user layer's date", first)
 	}
 }
 
@@ -328,6 +390,76 @@ func TestPageRefusesAnUncleanWorktree(t *testing.T) {
 			t.Errorf("exit %d\n%s%s", r.code, r.stdout, r.stderr)
 		}
 	})
+}
+
+// requestCount is how many requests the stub saw, free calls included.
+func (s *apiStub) requestCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.paths)
+}
+
+// gatePreflightEnv is a page project whose configuration leaves gate.command at its stock value.
+func gatePreflightEnv(t *testing.T, stub *apiStub) pageEnv {
+	t.Helper()
+	if _, err := exec.LookPath("vale"); err != nil {
+		t.Fatal("Vale is required to run these tests; install it (https://vale.sh/docs/install)")
+	}
+	p := newPageEnv(t, stub)
+	writeFile(t, filepath.Join(p.dir, "drafter.toml"), `prompts = "prompts.js"
+seats = ["draft"]
+
+[seat.draft]
+model = "model-a"
+effort = "high"
+max_tokens = 4000
+`)
+	gitRun(t, p.dir, "add", "-A")
+	gitRun(t, p.dir, "commit", "-q", "-m", "stock gate")
+	return p
+}
+
+func TestPageStockGateWithoutValeConfigExitsBeforeAnyRequest(t *testing.T) {
+	stub := newAPIStub(t)
+	p := gatePreflightEnv(t, stub)
+	r := p.page(t, "--dry-run", p.handoffFile(t))
+	if r.code != 2 || !strings.Contains(r.stderr, "vale") {
+		t.Errorf("exit %d, stderr %q; want 2 naming Vale", r.code, r.stderr)
+	}
+	if n := stub.requestCount(); n != 0 {
+		t.Errorf("the API stub saw %d requests, want none", n)
+	}
+}
+
+func TestPageStockGateWithoutDrafterOnPathExitsBeforeAnyRequest(t *testing.T) {
+	stub := newAPIStub(t)
+	p := gatePreflightEnv(t, stub)
+	writeFile(t, filepath.Join(p.dir, ".vale.ini"), "StylesPath = .vale/styles\nPackages = Google\n\n[*.md]\nBasedOnStyles = Vale, Google\n")
+	if err := os.MkdirAll(filepath.Join(p.dir, ".vale", "styles", "Google"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(p.dir, ".vale", "styles", "Google", "Foo.yml"),
+		"extends: existence\nmessage: \"Avoid '%s'.\"\nlevel: error\ntokens:\n  - foo\n")
+	gitRun(t, p.dir, "add", "-A")
+	gitRun(t, p.dir, "commit", "-q", "-m", "vale setup")
+	bin := t.TempDir()
+	for _, name := range []string{"vale", "git"} {
+		found, err := exec.LookPath(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(found, filepath.Join(bin, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p.env = append(p.env, "PATH="+bin)
+	r := p.page(t, "--dry-run", p.handoffFile(t))
+	if r.code != 2 || !strings.Contains(r.stderr, "drafter is not on PATH") {
+		t.Errorf("exit %d, stderr %q; want 2 naming drafter", r.code, r.stderr)
+	}
+	if n := stub.requestCount(); n != 0 {
+		t.Errorf("the API stub saw %d requests, want none", n)
+	}
 }
 
 func TestPageUsage(t *testing.T) {

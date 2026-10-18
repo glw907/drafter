@@ -31,6 +31,10 @@ A setting resolves from the first source that sets it, in this order:
 5. The user config.
 6. The built-in default.
 
+The stock defaults are a layer of their own under the user config. They hold the gate command,
+every seat's model, effort, and `max_tokens`, and a dated price table. `drafter config` shows a
+stock value with the source `default`. A layer overrides one stock value by setting that key.
+
 A layer overrides key by key. A list, such as `seats` or `seat.<name>.inputs`, replaces the lower
 layer's list whole.
 
@@ -82,7 +86,8 @@ drafter checks each layer as it loads it and stops at the first problem, naming 
 Some problems show up only when a command needs the missing setting. `drafter config` and
 `drafter page` require `workspace_id`, `page_cap`, and `cycle_ceiling`. Inside a project, they also
 require `gate.command`, `prompts`, and, for each seat that runs, the seat's `model`, `effort`,
-`max_tokens`, and a `prices.models` entry for its model. The `consistency` seat is required only
+`max_tokens`, and a `prices.models` entry for its model. Only `prompts` has no stock default, so
+a new project sets it. The `consistency` seat is required only
 when `facts.dir` is set. drafter lists every missing setting in one error.
 
 ## Settings
@@ -151,14 +156,14 @@ price can't compute as zero.
 
 | Setting | Layers | Default | Environment variable |
 |---|---|---|---|
-| `prices.date` | user, local | None. | None. |
-| `prices.source` | user, local | None. | None. |
-| `prices.batch_discount` | user, local | `0` | None. |
-| `prices.models.<model>.input` | user, local | None. | None. |
-| `prices.models.<model>.output` | user, local | None. | None. |
-| `prices.models.<model>.cache_write_5m` | user, local | None. | None. |
-| `prices.models.<model>.cache_write_1h` | user, local | None. | None. |
-| `prices.models.<model>.cache_read` | user, local | None. | None. |
+| `prices.date` | user, local | `2026-10-18` | None. |
+| `prices.source` | user, local | The pricing page URL below. | None. |
+| `prices.batch_discount` | user, local | `0.5` | None. |
+| `prices.models.<model>.input` | user, local | `4` for `claude-opus-5-5`, otherwise none. | None. |
+| `prices.models.<model>.output` | user, local | `20` for `claude-opus-5-5`, otherwise none. | None. |
+| `prices.models.<model>.cache_write_5m` | user, local | `5` for `claude-opus-5-5`, otherwise none. | None. |
+| `prices.models.<model>.cache_write_1h` | user, local | `8` for `claude-opus-5-5`, otherwise none. | None. |
+| `prices.models.<model>.cache_read` | user, local | `0.2` for `claude-opus-5-5`, otherwise none. | None. |
 | `prices.models.<model>.long_context.threshold` | user, local | None. | None. |
 | `prices.models.<model>.long_context.input` | user, local | None. | None. |
 | `prices.models.<model>.long_context.output` | user, local | None. | None. |
@@ -166,8 +171,19 @@ price can't compute as zero.
 | `prices.models.<model>.long_context.cache_write_1h` | user, local | None. | None. |
 | `prices.models.<model>.long_context.cache_read` | user, local | None. | None. |
 
-`prices.date` and `prices.source` record when you copied the rates and from which published
-pricing page. drafter doesn't read them for cost, and `drafter config` shows them.
+The stock table holds the rates of `claude-opus-5-5`, the model the stock seats use, as the
+published pricing page (`https://platform.claude.com/docs/en/about-claude/pricing`) listed them on
+2026-10-18, and a batch discount of 0.5. The page lists no long-context tier for that model, so
+the stock table has none. Rates change, so a project that needs another model's rates, or newer
+ones, sets them in the user or local layer.
+
+`prices.date` and `prices.source` record when the rates were copied and from which published
+pricing page. drafter doesn't read them for cost, and `drafter config` shows them. Every run
+report starts with `prices: <date> (<layer>)`, and the `--json` report carries `prices_date` and
+`prices_date_source`, so a reader sees how old the rates are and whose they are. The merge is key
+by key, so a layer that overrides a rate must also set `prices.date`, in the user layer or in
+`drafter.local.toml`, the two layers that may hold `prices`. Without it the report names the
+stock date, with the stock layer, beside rates the stock table didn't set.
 
 `prices.batch_discount` is the fraction taken off every rate in `batch` mode, from 0 up to but not
 including 1. Leaving it unset means no discount, so a missing value overstates cost and never
@@ -206,7 +222,7 @@ drafter runs the gate command after each write to the project and reads the resu
 
 | Setting | Layers | Default | Environment variable |
 |---|---|---|---|
-| `gate.command` | project, local | None. Required to run. | `DRAFTER_GATE_COMMAND` |
+| `gate.command` | project, local | `drafter gate --page {page}` | `DRAFTER_GATE_COMMAND` |
 | `gate.index_link_command` | project, local | Unset. | `DRAFTER_GATE_INDEX_LINK_COMMAND` |
 | `gate.protocol` | project, local | `plain` | `DRAFTER_GATE_PROTOCOL` |
 | `gate.lane` | project, local | Unset. | `DRAFTER_GATE_LANE` |
@@ -216,6 +232,34 @@ drafter runs the gate command after each write to the project and reads the resu
 `gate.command` and `gate.index_link_command` are command templates. drafter runs each through
 `/bin/sh -c` from the project root. The placeholders are `{page}`, `{brief}`, `{slug}`, and
 `{baseline}`.
+
+The stock command runs `drafter gate`, so `drafter` must be on the `PATH` that `/bin/sh` inherits.
+Before it makes any API request, `drafter page` checks that Vale can run in the project and that
+`drafter` is on `PATH`, and exits with status 2 when either fails. It runs these checks only when
+`gate.command` starts with `drafter gate`, and they apply to dry runs and resumed runs too.
+
+`drafter gate --page <page>` checks one page, from the git top level of the working directory or
+from `--root`. It makes no network call. It runs these checks in order:
+
+1. Vale can run: `vale` is on `PATH`, the project has a `.vale.ini` at its root, and every style
+   the config names has a directory under the project's styles path. A style that exists only in
+   a global styles directory doesn't count. Run `drafter init` to create the `.vale.ini`, and
+   `vale sync` to install the styles.
+1. The page file exists.
+1. The page's blueprint, when it has one: the blueprint checks that `drafter check` runs on that
+   one blueprint, then the facts store checks on the facts the blueprint places or cites. A broken
+   fact that the blueprint doesn't cite doesn't fail the gate. With no blueprint, the gate prints
+   `no blueprint for <page>; blueprint and fact checks skipped` and goes on.
+1. The page's internal links: each Markdown link or image whose destination has no URL scheme
+   must resolve to an existing path inside the repository, and each `#anchor` must match a
+   heading of its target, or of the page itself for a bare `#anchor`. The gate doesn't check
+   `https://` links.
+1. Vale, at the error level only: `vale --output=line --minAlertLevel=error <page>`.
+
+The gate prints findings as `file:line: severity: check: message (fix)`, and Vale's alerts as
+Vale prints them. The exit status is 0 when nothing failed, 1 when a finding is an error or Vale
+reports an error-level alert, and 2 when the gate can't run. A Vale runtime error, such as a rule
+file that doesn't load, is exit status 2.
 
 `gate.protocol` is `plain` or `cairn-run-gate`. With `plain`, exit status 0 is a green gate and
 anything else is red, and drafter writes the combined output to a log in the run directory. With
@@ -234,9 +278,9 @@ the failing lines of a red log. drafter uses the two to attribute each failing s
 | `prompts` | project, local | None. Required to run. | `DRAFTER_PROMPTS` |
 | `seats` | project, local | Every seat. | None. |
 | `seat.<name>.agent` | project, local | Unset. | None. |
-| `seat.<name>.model` | project, local | None. Required for each seat that runs. | None. |
-| `seat.<name>.effort` | project, local | None. Required for each seat that runs. | None. |
-| `seat.<name>.max_tokens` | project, local | None. Required for each seat that runs. | None. |
+| `seat.<name>.model` | project, local | `claude-opus-5-5` | None. |
+| `seat.<name>.effort` | project, local | `high` for `draft`, `low` for `coverage` and `consistency`, `medium` for the rest. | None. |
+| `seat.<name>.max_tokens` | project, local | `64000` for `draft`, `32000` for the rest. | None. |
 | `seat.<name>.inputs` | project, local | None. | None. |
 
 `prompts` is the path to the prompts module. [The prompts module](prompts-module.md) describes its
@@ -252,6 +296,9 @@ The `blueprint` seat reads a blueprint in `drafter read`. It stays out of the de
 list, so `drafter page` runs as it did before the seat existed. `drafter read` always runs the
 seat, and it refuses to start, with exit status 2, when `[seat.blueprint]` lacks a model, an
 effort, or `max_tokens`, or when the model has no entry under `prices.models`.
+
+The stock defaults set a model, an effort, and `max_tokens` for all eight seats, so a project
+sets a seat's value only to change it. They are the values the cairn docs project measured.
 
 Replace `<name>` with a seat name. A `seat.<name>` table for any other name is an error.
 

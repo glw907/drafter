@@ -1,0 +1,3 @@
+# drafter reads this project's settings from here. Run drafter config to see every setting and
+# where it came from. Keys, caps, and other personal settings go in your user config or in
+# drafter.local.toml, never in this file.

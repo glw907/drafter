@@ -269,6 +269,13 @@ An entry with only `accepted` set belongs to a page that isn't drafted yet. A mi
 blueprint it wrote. The reshape that follows is a blueprint change, so a converted page gets
 redrafted once, the first time drafting runs on it.
 
+`drafter seed <blueprint>...` gives an existing page the same entry without a conversion, so the
+page's first run keeps its prose. Run `drafter read` on the blueprint first and commit the page and
+the blueprint. A blueprint qualifies when its entry holds an `accepted` id equal to the blueprint as
+committed at `HEAD`, holds no `page` id, and neither file has uncommitted changes. Seed checks every
+named blueprint before it writes anything, and the first one that doesn't qualify stops the call with
+the page and the fix. The entry it writes keeps `accepted`.
+
 ## What `drafter check` checks
 
 `drafter check [--root dir] [--json] [<blueprint>...]` validates every blueprint under the
@@ -304,6 +311,7 @@ as an example item.
 | `types` | The page's `type` is one `types` declares, and the type's `anatomy` isn't empty. | error |
 | `lock` | An entry with a `page` id names a page on disk, and an entry with only an `accepted` id names a page the outline lists. | error |
 | `convention` | `blueprints.root` is `blueprints`, and `facts.dir` is `<root>/facts`. | warning |
+| `store` | Every fact bullet in the facts store has an id no other bullet has, a `Source:`, and one valid tag, and each source pointer names something that exists. See [The facts store](#the-facts-store). | error, or warning for a bare path that doesn't exist |
 
 A prose field that carries a `[[id]]` is `argument`, `orderReason`, the `introduction` parts, the
 `framing` parts, a section's `why` and `opens`, an item's `text`, `use`, `symptom`, and `cause`,
@@ -311,8 +319,8 @@ and `constraints`. A finding on a framing citation points at the framing field's
 reports "in no facts file", and an id on two bullets reports "on 2 bullets".
 
 When you name blueprints, `drafter check` checks only those files and the lock entries for their
-pages. The pairing of pages with blueprints and the `convention` warnings come from a run without
-names.
+pages. The pairing of pages with blueprints, the `convention` warnings, and the `store` check come
+from a run without names.
 
 ### Find where a fact is used
 
@@ -329,6 +337,85 @@ The exit status is 0 when the command lists at least one place and 1 when it lis
 message for none says whether the facts store holds the id, which tells a mistyped id from a fact
 no page uses yet. The status is 2 when the command can't run, for the same reasons as `drafter
 check`.
+
+## The facts store
+
+The facts store is a directory of Markdown files, `blueprints/facts` unless `facts.dir` says
+otherwise. Every file in it except `README.md` is a facts file. Each fact is one bullet, and a
+blueprint places or cites a fact by its id.
+
+```markdown
+- `f:k3x9a2` A key is 32 bytes long. Source: `src/keys.go:12` (`KeyBytes`), `src/keys.go#KeyBytes`. [verified]
+```
+
+### The bullet grammar
+
+A bullet starts with `- `, runs over the non-blank lines that follow, and ends at a blank line,
+the next bullet, or a `## ` heading.
+
+- The bullet opens with its id as a code span. Any id works, and `f:` plus six base36
+  characters, such as `f:k3x9a2`, is the recommended shape. An id appears on one bullet in the
+  whole store.
+- The claim follows the id.
+- `Source:` follows the claim and says where the claim comes from. A pointer is a code span. An
+  anchor is a second code span in parentheses right after the pointer, and it quotes or names
+  what the pointer should show.
+- One status tag ends the bullet, in the colon form `[tag: note]` or bare `[tag]`. The tags are
+  `verified`, `docs-drift`, `external`, `vendor`, `candidate`, and `rejected`. A blueprint can
+  cite only a `verified`, `external`, or `vendor` fact.
+- A bullet under a `## Harvest record` or `## Provenance` heading isn't a fact. It needs no
+  source or tag, and it can't carry an id.
+
+### The `Source:` grammar
+
+The pointers are the code spans between `Source:` and the status tag that sit outside
+parentheses and brackets and aren't URLs. A span in parentheses is commentary, and so is a span
+that isn't path-shaped. A slashless span counts as a path when the file exists at the project
+root, or when it carries a `:lines` or `#name` and has a dot.
+
+| Form | Verified as | Fails, as an error, when |
+|---|---|---|
+| `path:lines` | The path from the project root. A path with no slash that isn't at the root resolves to the one file with that name in the repository. | No file or more than one file matches, the target is a directory, a cited line is outside the file, or an anchor word is absent from the cited lines plus 10 on each side |
+| `path#name`, with a path ending `.go`, `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, or `.cjs` and a `name` of one identifier | The path and the declaration of `name` in it | The file is missing, no declaration matches, or an anchor word is absent from the declaration |
+| `path`, with a slash, or a name that exists at the root | The path exists | Never. A path that doesn't exist is a warning, and its anchor isn't checked |
+
+`lines` is a list such as `12`, `12-20`, or `3,12-20`. A line is in range when it is at most
+the number of lines `split("\n")` gives for the file, so a file that ends in a newline has one
+more line than `wc -l` counts. An anchor word is a match of `[A-Za-z_][A-Za-z0-9_]{2,}`. A
+word is present when the text contains it, even inside a longer word.
+
+The bare path is a warning because it names things that are not always files of the project: a
+package, a path inside a dependency, or a path a scaffold makes. Nothing separates those from a
+stale path, so the check reports the path and leaves the call to you.
+
+A declaration is one of these.
+
+- In Go, a `func`, method, `type`, `var`, or `const` at column 0, or a name inside a grouped
+  `const`, `var`, or `type` block.
+- In TypeScript and JavaScript, a `function`, `class`, `interface`, `type`, `enum`, `const`,
+  `let`, `var`, `namespace`, or `module` at column 0, with any `export`, `default`, `declare`,
+  `abstract`, or `async`, and `declare global` for the name `global`. When no column-0 line
+  matches, an indented `const`, `let`, `var`, or `function` counts, such as a `const` inside a
+  test callback.
+
+The declaration runs from its line to the line before the next column-0 declaration, or to the
+end of the file.
+
+### What verification skips
+
+A pointer is skipped, and counted as skipped, rather than checked in these cases.
+
+- A `#name` with a dot, such as `Class.method`.
+- A `#name` on any file that isn't one of the extensions above, such as `.md`, `.json`, or `.svelte`.
+- A pointer whose path has a character outside letters, digits, `_`, `.`, `/`, and `-`. Route
+  paths such as `src/routes/(site)/[id]/+page.svelte` and `@scope` package paths fall here.
+
+### Where it runs
+
+`drafter check` with no blueprint named verifies the whole store, adds the findings under the
+check name `store`, and prints `facts store: <n> pointers checked, <k> skipped` on stderr before
+the totals. Each finding is on the facts file and the line of its bullet. A run that names
+blueprints doesn't verify the store.
 
 ## The edit catalog
 

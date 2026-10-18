@@ -333,9 +333,9 @@ func scopedAccept(r pipeline.PageResult) bool {
 // writeReadSummary prints the run's summary as JSON or text, whichever the config selects.
 func writeReadSummary(w io.Writer, c *config.Config, s pipeline.Summary, dry bool) error {
 	if c.Output == "json" {
-		return writeSummaryJSON(w, s)
+		return writeSummaryJSON(w, c, s)
 	}
-	return writeSummaryText(w, s, dry)
+	return writeSummaryText(w, c, s, dry)
 }
 
 // blueprintHandoffs builds one handoff per blueprint argument. Each page's outline entry comes

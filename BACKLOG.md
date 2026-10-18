@@ -23,6 +23,15 @@
 
 ## Low
 
+- [ ] **#9** Resolve every name on a multi-name Go declaration line in a fact pointer `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
+  A grouped `const` or `var` line such as `A, B = 1, 2` resolves neither name, so a pointer to either gets a false "no declaration" error. `internal/plan/verify.go`
+
+- [ ] **#10** Keep an existing `.vale/styles/.gitignore` when `drafter init` runs `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
+  `init` always writes it, so a user's own ignore lines are replaced without a word. It could append `/Google/` when the file exists, or report the replacement. `internal/scaffold/scaffold.go`
+
+- [ ] **#11** Make `drafter gate`'s totals line count Vale's result `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
+  When only Vale fails, the gate exits 1 under a "0 errors, 0 warnings" line on stderr. `cmd/drafter/gate.go`
+
 - [ ] **#5** Read `blueprints.root` from `drafter.toml` in the page hook `#improvement` `#drafter` *(2026-10-18)*
   The hook checks only the conventional `blueprints/` root. `bin/.local/bin/drafter-page-hook`
 

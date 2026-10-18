@@ -176,8 +176,9 @@ flag that set each one. A cap lists every source that set it. The command never 
 
 ## Develop
 
-`make check` runs `go vet`, `golangci-lint`, and the tests. It also runs the docs page chain's
-Node tests, the prompt parity check between Node and the built binary, and the install test. The
-chain's tests read two agent definitions from a workstation checkout. They look in
+`make check` runs `go vet`, `golangci-lint`, and the tests. It needs `node` and
+[Vale](https://vale.sh/docs/install) on `PATH`: the gate's tests run Vale and fail when it is
+missing. It also runs the docs page chain's Node tests, the prompt parity check between Node and
+the built binary, and the install test. The chain's tests read two agent definitions from a workstation checkout. They look in
 `~/Projects/workstation` and fail when it is missing, so set `WORKSTATION_DIR` where your checkout
 lives. Run `make check` before each commit.

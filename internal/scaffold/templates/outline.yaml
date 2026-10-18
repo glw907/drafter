@@ -1,0 +1,11 @@
+version: 1
+types:
+  - name: concept
+    anatomy: Concept page
+  - name: task guide
+    anatomy: Task guide
+  - name: reference
+    anatomy: Reference page
+pages:
+  - path: README.md
+    managed: false
