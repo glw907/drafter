@@ -7,6 +7,35 @@ spending more than you intend.
 drafter enforces two caps itself, and the Console can enforce a third limit on the server. This
 page covers each.
 
+## Start a project
+
+In a git repository that doesn't use drafter yet, run `drafter init` from anywhere in the work
+tree. Use `--root` to name the project root instead. The command writes these files and prints
+each path:
+
+- `drafter.toml`, a header that points to `drafter config`.
+- `blueprints/outline.yaml`, with the types `concept`, `task guide`, and `reference` and one
+  unmanaged page, `README.md`.
+- `blueprints/facts/README.md`, a short guide to the facts store, and `blueprints/facts/project.md`,
+  which holds one verified seed fact so the store isn't empty.
+- `.vale.ini`, which pins the Google style package at v0.7.1, and `.vale/styles/.gitignore`, which
+  keeps the synced style out of `git status`. drafter refuses to run in a work tree with untracked
+  files, so the ignore file matters.
+
+`drafter init` refuses, and writes nothing, when the directory isn't in a git work tree or when
+`drafter.toml` or `blueprints/` already exists. It keeps a `.vale.ini` you already have and says
+so. In that case, add the Google package to your file yourself.
+
+Then sync the style and check the result:
+
+```sh
+vale sync
+drafter check
+```
+
+A fresh project passes `drafter check` with no errors and no warnings. Commit the new files
+before your first run.
+
 ## Choose the key source
 
 drafter takes its API key from one of two sources. Both are settings in your user config or in
