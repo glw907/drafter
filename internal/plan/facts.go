@@ -2,6 +2,7 @@ package plan
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -133,14 +134,23 @@ func LoadFacts(dir string) (*Facts, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read facts directory: %w", err)
 	}
-	fs := &Facts{byID: map[string][]Fact{}}
-	root := repoRoot(dir)
+	files := map[string]string{}
 	for _, name := range names {
 		data, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
 			return nil, fmt.Errorf("read facts file: %w", err)
 		}
-		for _, b := range extractBullets(string(data)) {
+		files[name] = string(data)
+	}
+	return ParseFacts(files, repoRoot(dir)), nil
+}
+
+// ParseFacts reads facts files given as content by base name, as LoadFacts reads a directory.
+// Source pointers are judged against root, the repository the facts store lives in.
+func ParseFacts(files map[string]string, root string) *Facts {
+	fs := &Facts{byID: map[string][]Fact{}}
+	for _, name := range slices.Sorted(maps.Keys(files)) {
+		for _, b := range extractBullets(files[name]) {
 			if slices.Contains(skippedSections, strings.ToLower(strings.TrimSpace(b.section))) {
 				continue
 			}
@@ -154,7 +164,7 @@ func LoadFacts(dir string) (*Facts, error) {
 			fs.byID[f.ID] = append(fs.byID[f.ID], f)
 		}
 	}
-	return fs, nil
+	return fs
 }
 
 type bullet struct {
