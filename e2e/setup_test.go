@@ -195,7 +195,7 @@ func TestSetupFromNothing(t *testing.T) {
 	r = e.mustRun(t, "drafter", "config")
 	for _, key := range []string{"gate.command", "seat.draft.model", "prices.date"} {
 		found := false
-		for _, line := range strings.Split(r.stdout, "\n") {
+		for line := range strings.SplitSeq(r.stdout, "\n") {
 			if strings.Contains(line, key) && strings.Contains(line, "default") {
 				found = true
 			}
