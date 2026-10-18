@@ -352,6 +352,19 @@ The last row is the one prose exception. A project's gate can fail a code change
 still name something the change renamed or removed. In that pull request an agent may make only
 the page edits the gate demands, and changes the blueprint to match.
 
+## Check what you add
+
+The blueprint read (`blueprintPrompt`) checks each item a change adds or alters against these
+lines, and a change read blocks on a defect in one.
+
+- An `example` appears only for a recorded fact, and it never invents output (drafter's own rule: an `example`'s `facts` names what it rests on, see [Items](#items)). See [what the read does](#what-drafter-read-does-with-a-blueprint).
+- A `failure` follows the diagnosis that tells the reader which failure they have, its handler is a next action, and its symptom differs from every existing row (the last clause is drafter's own rule). See [what the read does](#what-drafter-read-does-with-a-blueprint), the Red Hat peer review guide's [Structure checklist](https://redhat-documentation.github.io/peer-review/#_structure) on logical order and troubleshooting steps, and the "Add a failure case" row of [the edit catalog](#the-edit-catalog).
+- A caution about something that can go wrong is a `failure` item with a handler, never a `sentence`. See [what the read does](#what-drafter-read-does-with-a-blueprint), the Red Hat [Structure checklist](https://redhat-documentation.github.io/peer-review/#_structure) on troubleshooting, and the "Add a failure case" row of [the edit catalog](#the-edit-catalog).
+- A `heading` names what the section delivers. See Google's [Headings and titles](https://developers.google.com/style/headings).
+- A `use` scopes a placed fact and never restates it. See [what the read does](#what-drafter-read-does-with-a-blueprint) and [Say what a placement carries](#say-what-a-placement-carries).
+- In a task section, the steps (the actions the reader takes) come before the explanation. See the Red Hat [Structure checklist](https://redhat-documentation.github.io/peer-review/#_structure) on mixed module types and logical order.
+- A new item agrees with its section's facts, and the consistency read reports a conflict only when both sides cannot be true together. A difference of scope is not one. The agreement check is drafter's own code: [`ConsistencyPrompt`](../internal/assemble/consistency.go#L25).
+
 ## What `drafter read` does with a blueprint
 
 `drafter read` runs the checks above on the blueprint as committed at the run's start, then sends
@@ -368,5 +381,6 @@ still reads the whole blueprint, and it also receives the diff of the blueprint,
 bullets, and the outline entry when it changed. A finding blocks only for a defect the change
 adds, alters, or causes. Every other defect is reported as non-blocking, with a finding that
 starts "Already present:". The consistency read blocks only on a conflict that touches a fact the
-change touched, and reports any other conflict as already present. A blueprint with no earlier
+change touched, and reports any other conflict as already present. In a change read, a conflict that names no fact
+and no page is recorded as a warning starting "Unplaced:" and never blocks. A blueprint with no earlier
 version at `<rev>` is read whole. A change read writes no `drafted.lock` entry when it accepts.
