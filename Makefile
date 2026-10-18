@@ -2,7 +2,7 @@ BINARY := drafter
 PREFIX ?= $(HOME)/.local
 CLAUDE_DIR ?= $(HOME)/.claude
 
-.PHONY: build test vet lint chain-test prompts-parity install-test install check smoke clean
+.PHONY: build test vet lint chain-test prompts-parity install-test hook-test install check smoke clean
 
 build:
 	go build -o $(BINARY) ./cmd/drafter
@@ -30,10 +30,13 @@ prompts-parity: build
 install-test:
 	bash tests/install.test.sh
 
+hook-test:
+	bash tests/page-hook.test.sh
+
 # A symlinked destination directory (stow folds ~/.claude/workflows into its package) would send
 # the links into that package's tree, so install refuses before it writes anything.
 install: build
-	@for d in $(CLAUDE_DIR)/workflows $(PREFIX)/bin; do \
+	@for d in $(CLAUDE_DIR)/workflows $(CLAUDE_DIR)/skills $(PREFIX)/bin; do \
 		if [ -L "$$d" ]; then \
 			echo "install: $$d is a symlink; replace it with a real directory first" >&2; \
 			exit 1; \
@@ -42,10 +45,13 @@ install: build
 	install -d $(PREFIX)/bin
 	install -m 0755 $(BINARY) $(PREFIX)/bin/$(BINARY)
 	ln -sfn $(CURDIR)/bin/.local/bin/cairn-docs-outline $(PREFIX)/bin/cairn-docs-outline
+	ln -sfn $(CURDIR)/bin/.local/bin/drafter-page-hook $(PREFIX)/bin/drafter-page-hook
 	install -d $(CLAUDE_DIR)/workflows
 	ln -sfn $(CURDIR)/claude/.claude/workflows/docs-page-chain.js $(CLAUDE_DIR)/workflows/docs-page-chain.js
+	install -d $(CLAUDE_DIR)/skills
+	ln -sfn $(CURDIR)/claude/.claude/skills/blueprint $(CLAUDE_DIR)/skills/blueprint
 
-check: vet lint test chain-test prompts-parity install-test
+check: vet lint test chain-test prompts-parity install-test hook-test
 
 # smoke spends real money; it is never part of check.
 smoke:

@@ -316,8 +316,10 @@
 //
 // `DRAFTER_SEATS` maps `draft`, `structure`, `editor`, `fact`, `reader`, and `blueprint` to
 // functions of one seat context object, each adapting it to the builder the chain itself calls
-// (`blueprint` has no chain counterpart and ignores the context; drafter loads the module for a
-// blueprint read with no chain args, so the args guard below runs only outside `DRAFTER_HOST`):
+// (`blueprint` has no chain counterpart and reads only `scope`, which drafter sets to the
+// comma-separated ids of the sections a blueprint read may block on, or leaves empty for a whole
+// read; drafter loads the module for a blueprint read with no chain args, so the args guard below
+// runs only outside `DRAFTER_HOST`):
 //
 //   page            the page's resolved config (an entry of `resolved.pages`)
 //   inputs          the page-inputs record: job, pageType, factIds, claimInventory
@@ -2254,10 +2256,13 @@ async function chain(p) {
  * plan, with the reads that stopped both real pilot pages (reader state, recovery, completeness)
  * and the reads a durable file adds. drafter appends the blueprint, its outline entry, and the
  * facts it places after this text, so the prompt names no file but the register and takes nothing
- * from the run's args. The bar is the chain's: any blocking finding means "fix".
+ * from the run's args. The bar is the chain's: any blocking finding means "fix". With `scope`, a
+ * comma-separated list of the section ids that changed since a revision, one paragraph narrows
+ * which findings may block; the blueprint is still read whole.
+ * @param {string} [scope]
  * @returns {string}
  */
-function blueprintPrompt() {
+function blueprintPrompt(scope) {
   return `Blueprint read. The blueprint below is a documentation page's durable plan, a YAML file with
 an \`id\` and a \`why\` on each section, items of several kinds, and a \`framing\` block. No prose exists
 yet: read the blueprint, never a page. The page's job, type, and what it covers sit in its outline
@@ -2336,13 +2341,18 @@ where the section's order or its \`opens\` line leaves it a clause, a parentheti
 
 A checklist item the blueprint fails is a blocking finding: its section id, and item id where one
 applies, as location, the item it fails and how, and in rewrite a suggestion for how to address it.
-Verdict "fix" if any blocking finding exists; otherwise "ok".`;
+Verdict "fix" if any blocking finding exists; otherwise "ok".${scope ? `
+
+Scope. Only these sections changed since the earlier revision: ${scope}. Read the whole blueprint for context.
+Return a blocking finding only when its location is one of those sections, when one of those sections
+now fails another section's \`requires\`, or when a \`failure\` item elsewhere now names a step that no
+longer exists. Report anything else as non-blocking.` : ""}`;
 }
 
 // The back-half seats drafter renders prompts from: one function of the seat context object per
 // seat, each adapting it to the builder the chain calls. The header comment documents the object.
 const DRAFTER_SEATS = {
-  blueprint: () => blueprintPrompt(),
+  blueprint: (c) => blueprintPrompt(c.scope || undefined),
   draft: (c) => draftPrompt(c.page, c.inputs, c.round === 1 ? 1 : 2, c.findings, c.afterFinalRead === true),
   structure: (c) => structurePrompt(c.page, "page", c.narrow || undefined),
   editor: (c) => editorPrompt(c.page, c.scope || undefined, c.where || undefined, c.narrow || undefined),

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/glw907/drafter/internal/blueprint"
 	"github.com/glw907/drafter/internal/config"
 	"github.com/glw907/drafter/internal/handoff"
 	"github.com/glw907/drafter/internal/ledger"
@@ -54,6 +55,11 @@ type Options struct {
 	PollInterval time.Duration
 	// Out receives the dry run's report; Err receives status lines. Either may be nil.
 	Out, Err io.Writer
+	// Since is the revision a blueprint read compared against, resolved to a commit, and Scopes
+	// holds each page's comparison keyed by page path. Both are recorded in the pages' state, so
+	// a resume needs neither.
+	Since  string
+	Scopes map[string]blueprint.Scope
 	// Command names the command that started the run, for the resume hint; "drafter page" when
 	// empty.
 	Command string
@@ -74,6 +80,9 @@ type PageResult struct {
 	// Rule is the stop rule an escalated page failed on.
 	Rule string  `json:"rule,omitempty"`
 	Cost float64 `json:"cost"`
+	// Scope is what the page's read was limited to when the run compared against an earlier
+	// revision, and nil for a read of the whole blueprint with no comparison.
+	Scope *blueprint.Scope `json:"scope,omitempty"`
 	// Accepted is the git blob id of the blueprint a blueprint page's read accepted, set only when
 	// the page ended accepted.
 	Accepted string `json:"accepted,omitempty"`
@@ -160,7 +169,7 @@ func (r *runner) warnf(format string, a ...any) {
 func (r *runner) summary() Summary {
 	s := Summary{RunID: r.state.RunID, Stop: r.stop}
 	for _, p := range r.pages {
-		res := PageResult{Path: p.h.Page.Path, Status: p.ps.Status}
+		res := PageResult{Path: p.h.Page.Path, Status: p.ps.Status, Scope: p.w.Scope}
 		if p.w.Rec.Escalation != nil {
 			res.Rule = p.w.Rec.Escalation.Rule
 		}

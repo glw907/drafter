@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# PreToolUse hook (Write|Edit): when the target is a docs page that has a blueprint, add context
+# that points the agent at the blueprint and the blueprint skill. Never blocks, and every path
+# ends in exit 0, so a missing jq or an odd payload costs nothing.
+command -v jq >/dev/null 2>&1 || exit 0
+
+path=$(jq -r '.tool_input.file_path // empty' 2>/dev/null) || exit 0
+case "$path" in
+/*.md) ;;
+*) exit 0 ;;
+esac
+
+# Walk up to the first directory that exists, so a new file in a new directory still resolves.
+dir=$(dirname "$path")
+while [ ! -d "$dir" ]; do
+    dir=$(dirname "$dir")
+done
+rest=${path#"$dir"/}
+
+# git reports the repo's physical path while the payload may carry a symlinked one (/home),
+# so the repo-relative path comes from --show-prefix, never from stripping the toplevel.
+prefix=$(git -C "$dir" rev-parse --show-prefix 2>/dev/null) || exit 0
+top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || exit 0
+rel=$prefix$rest
+
+[ -d "$top/blueprints" ] || exit 0
+blueprint=blueprints/${rel%.md}.blueprint.yaml
+[ -f "$top/$blueprint" ] || exit 0
+
+msg="This page is generated from a blueprint: $blueprint. Change the blueprint, not the page. Use the blueprint skill, and run drafter check on the blueprint after each edit. Edit the page only when the project's gate fails a code change whose pages still name something it renamed or removed: make just the page edits the gate demands, and change the blueprint to match."
+jq -n --arg msg "$msg" '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: $msg}}' 2>/dev/null
+exit 0
