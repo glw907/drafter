@@ -30,7 +30,7 @@ If no catalog row fits, stop and say so in your report. Do not invent an edit.
 
 ## Check
 
-Run `drafter check` after every blueprint edit and fix each error before you commit. [What `drafter check` checks](format.md#what-drafter-check-checks) lists the checks, the severities, and the exit codes. To check one file, name it: `drafter check <blueprint>`.
+For each item the edit adds or changes, walk [Check what you add](format.md#check-what-you-add) before `drafter check` and the commit. Run `drafter check` after every blueprint edit and fix each error before you commit. [What `drafter check` checks](format.md#what-drafter-check-checks) lists the checks, the severities, and the exit codes. To check one file, name it: `drafter check <blueprint>`.
 
 When a fact changes, `drafter refs` is the lookup: [Find where a fact is used](format.md#find-where-a-fact-is-used).
 
