@@ -2,7 +2,7 @@ BINARY := drafter
 PREFIX ?= $(HOME)/.local
 CLAUDE_DIR ?= $(HOME)/.claude
 
-.PHONY: build test vet lint chain-test prompts-parity install-test install check smoke clean
+.PHONY: build test vet lint chain-test prompts-parity install-test hook-test install check smoke clean
 
 build:
 	go build -o $(BINARY) ./cmd/drafter
@@ -30,6 +30,9 @@ prompts-parity: build
 install-test:
 	bash tests/install.test.sh
 
+hook-test:
+	bash tests/page-hook.test.sh
+
 # A symlinked destination directory (stow folds ~/.claude/workflows into its package) would send
 # the links into that package's tree, so install refuses before it writes anything.
 install: build
@@ -48,7 +51,7 @@ install: build
 	install -d $(CLAUDE_DIR)/skills
 	ln -sfn $(CURDIR)/claude/.claude/skills/blueprint $(CLAUDE_DIR)/skills/blueprint
 
-check: vet lint test chain-test prompts-parity install-test
+check: vet lint test chain-test prompts-parity install-test hook-test
 
 # smoke spends real money; it is never part of check.
 smoke:
