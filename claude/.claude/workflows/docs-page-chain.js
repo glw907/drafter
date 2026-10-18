@@ -2313,9 +2313,12 @@ prerequisite a reader cannot hold at that point: the step relies on something th
 produces and no precondition lists, even where \`requires\` does not declare it. A dependency stated
 only in prose, such as a step that assumes a deployed Worker, is the case this read exists for.
 
-Recovery. Return a blocking finding for a failure a reader can meet at a step but that has no
-\`from\`, or whose \`from\` names a step where it cannot occur, and for a recovery route that appears
-before the diagnosis that tells the reader which failure they have.
+Recovery. Return a blocking finding for a failure a reader following the steps can meet at a step
+but that has no \`from\`, or whose \`from\` names a step where it cannot occur, and for a recovery
+route that appears before the diagnosis that tells the reader which failure they have. A failure
+with no \`from\` is a free-standing symptom row, which the format allows for a symptom met in the
+site's ordinary use after the steps end, such as an editor's failed publish. Do not ask for a step
+the page does not contain.
 
 A \`use\` names scope only. Compare each \`use\` with its fact in the facts block. Return a blocking
 finding for each \`use\` that restates the fact's content instead of scoping it, since a corrected
