@@ -13,7 +13,7 @@ import (
 	"github.com/glw907/drafter/internal/run"
 )
 
-// LockFile is the name of the lock inside the blueprint root.
+// LockFile is the name of the lock, which sits beside the outline.
 const LockFile = "drafted.lock"
 
 // Installed reports what InstallConverted wrote.
