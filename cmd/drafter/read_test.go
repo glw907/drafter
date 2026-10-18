@@ -696,22 +696,36 @@ func TestReadSince(t *testing.T) {
 	})
 }
 
+// stockSummaryConfig loads the configuration of a machine with no config files, so every
+// setting is the stock default.
+func stockSummaryConfig(t *testing.T) *config.Config {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	c, err := config.Load("", config.Flags{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
 func TestSummaryCountsDemotedAndAlreadyPresent(t *testing.T) {
 	s := pipeline.Summary{Pages: []pipeline.PageResult{{
 		Path: "docs/a.md", Status: pipeline.StatusAccepted, Cost: 0.5, Demoted: 1, AlreadyPresent: 2,
 		Scope: &blueprint.Scope{Kind: blueprint.ScopeScoped, Facts: []string{}},
 	}}}
 	var text, js bytes.Buffer
-	if err := writeSummaryText(&text, s, false); err != nil {
+	c := stockSummaryConfig(t)
+	if err := writeSummaryText(&text, c, s, false); err != nil {
 		t.Fatal(err)
 	}
-	if want := "docs/a.md: accepted [scoped: page] already present: 2 demoted conflicts: 1 $0.5000\n"; text.String() != want {
+	if want := "prices: 2026-10-18 (default)\ndocs/a.md: accepted [scoped: page] already present: 2 demoted conflicts: 1 $0.5000\n"; text.String() != want {
 		t.Errorf("text summary = %q, want %q", text.String(), want)
 	}
-	if err := writeSummaryJSON(&js, s); err != nil {
+	if err := writeSummaryJSON(&js, c, s); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"demoted": 1`, `"already_present": 2`, `"facts": []`} {
+	for _, want := range []string{`"demoted": 1`, `"already_present": 2`, `"facts": []`, `"prices_date": "2026-10-18"`, `"prices_date_source": "default"`} {
 		if !strings.Contains(js.String(), want) {
 			t.Errorf("JSON summary lacks %q\n%s", want, js.String())
 		}

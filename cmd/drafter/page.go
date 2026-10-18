@@ -103,9 +103,9 @@ func runPage(cmd *cobra.Command, args []string, f *pageFlags) error {
 	}
 	out := cmd.OutOrStdout()
 	if c.Output == "json" {
-		err = writeSummaryJSON(out, s)
+		err = writeSummaryJSON(out, c, s)
 	} else {
-		err = writeSummaryText(out, s, f.dryRun)
+		err = writeSummaryText(out, c, s, f.dryRun)
 	}
 	if err != nil {
 		return err
@@ -148,17 +148,28 @@ func version() string {
 	return "dev"
 }
 
-func writeSummaryJSON(w io.Writer, s pipeline.Summary) error {
+// pricedSummary is the run summary with the date of the price table the costs came from and the
+// layer that set the date.
+type pricedSummary struct {
+	pipeline.Summary
+	PricesDate       string `json:"prices_date"`
+	PricesDateSource string `json:"prices_date_source"`
+}
+
+func writeSummaryJSON(w io.Writer, c *config.Config, s pipeline.Summary) error {
 	if s.Pages == nil {
 		s.Pages = []pipeline.PageResult{}
 	}
+	date, from := c.PricesDate()
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	return enc.Encode(s)
+	return enc.Encode(pricedSummary{Summary: s, PricesDate: date, PricesDateSource: from})
 }
 
-func writeSummaryText(w io.Writer, s pipeline.Summary, dry bool) error {
+func writeSummaryText(w io.Writer, c *config.Config, s pipeline.Summary, dry bool) error {
 	var b strings.Builder
+	date, from := c.PricesDate()
+	fmt.Fprintf(&b, "prices: %s (%s)\n", date, from)
 	if dry {
 		for _, e := range s.Estimates {
 			fmt.Fprintf(&b, "%s: %d input tokens, max_tokens %d, worst case $%.4f\n", e.Seat, e.Tokens, e.MaxTokens, e.Worst)
