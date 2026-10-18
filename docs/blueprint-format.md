@@ -361,4 +361,5 @@ completeness of steps and failures, what a reader can know at each step, recover
 after diagnosis, a `use` that restates its fact, durable fields that narrate planning history,
 and a human-origin item the blueprint would bury. A blocking finding sets the blueprint aside.
 When the run ends with every blueprint decided, the accepted blueprints' blob ids go into the
-`accepted` field of `drafted.lock`.
+`accepted` field of `drafted.lock`. With `--since <rev>`, a blueprint whose changes stay inside
+named sections blocks only on those sections, and its acceptance writes no `drafted.lock` entry.

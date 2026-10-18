@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/glw907/drafter/internal/batch"
+	"github.com/glw907/drafter/internal/blueprint"
 	"github.com/glw907/drafter/internal/edits"
 )
 
@@ -119,6 +120,11 @@ type work struct {
 	// Accepted is the git blob id of the blueprint a blueprint page's read accepted, as it was at
 	// the run's start commit.
 	Accepted string `json:"accepted,omitempty"`
+	// Since is the commit a blueprint read compared against and Scope the page's comparison. A
+	// resume reads both from here, so it needs no revision of its own. Both are empty for an
+	// ordinary read, which is how a state from before they existed resumes: as a whole read.
+	Since string           `json:"since,omitempty"`
+	Scope *blueprint.Scope `json:"scope,omitempty"`
 }
 
 // readerState is the final reader's two-turn conversation.

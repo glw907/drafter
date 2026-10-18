@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"path"
 	"path/filepath"
@@ -20,8 +21,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// statusUnchanged is the status of a page a read did not send: nothing changed since the revision
+// given to --since, or the page is not part of the run being resumed.
+const statusUnchanged = "unchanged"
+
 type readFlags struct {
-	resume             string
+	resume, since      string
 	dryRun, sync, json bool
 }
 
@@ -41,6 +46,11 @@ drafter page, gate.command included, though it never runs the gate. --dry-run co
 stage's requests and submits nothing. --resume continues a stopped run; give the same
 blueprints again.
 
+--since <rev> reads only what changed since that revision. A page with no change is not read. A
+page whose changes stay inside named sections is read whole but may be blocked only on those
+sections; any other change makes the page read as a whole. A read limited to named sections
+writes no drafted.lock entry. A resume takes no --since: the run recorded each page's scope.
+
 The exit status is 0 when every blueprint was accepted, 1 when any was set aside, 2 when the run
 could not start or hit an error, and 3 when the run stopped and can be resumed, which outranks 1.`,
 		Args: func(cmd *cobra.Command, args []string) error {
@@ -49,10 +59,16 @@ could not start or hit an error, and 3 when the run stopped and can be resumed, 
 			}
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error { return runRead(cmd, args, &f) },
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if f.since != "" && f.resume != "" {
+				return usageError(cmd, "--since and --resume cannot be used together; the run recorded its scope")
+			}
+			return runRead(cmd, args, &f)
+		},
 	}
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error { return usageError(cmd, err.Error()) })
 	cmd.Flags().StringVar(&f.resume, "resume", "", "continue the stopped run with this ID")
+	cmd.Flags().StringVar(&f.since, "since", "", "read only what changed in each blueprint since this revision")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "estimate the stage and submit nothing")
 	cmd.Flags().BoolVar(&f.sync, "sync", false, "send ordinary Messages calls instead of a batch")
 	cmd.Flags().BoolVar(&f.json, "json", false, "print the result as one JSON object")
@@ -79,7 +95,7 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 	if err := c.ValidateSeat("blueprint"); err != nil {
 		return cannot(fmt.Errorf("drafter read needs the blueprint seat: %w", err))
 	}
-	head, err := startCommit(c, root, f.resume)
+	head, st, err := startCommit(c, root, f.resume)
 	if err != nil {
 		return cannot(err)
 	}
@@ -87,13 +103,32 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 	if err != nil {
 		return cannot(err)
 	}
+	var skipped []pipeline.PageResult
+	var since string
+	scopes := map[string]blueprint.Scope{}
+	switch {
+	case st != nil:
+		handoffs, skipped = inRun(handoffs, st)
+	case f.since != "":
+		if since, err = gitText(root, "rev-parse", "--verify", f.since+"^{commit}"); err != nil {
+			return cannot(fmt.Errorf("cannot resolve --since %s: %w", f.since, err))
+		}
+		handoffs, skipped = scopePages(c, root, since, head, f.since, handoffs, scopes)
+	}
+	out := cmd.OutOrStdout()
+	if len(handoffs) == 0 {
+		if st != nil {
+			return cannot(fmt.Errorf("none of the blueprints is in run %s", f.resume))
+		}
+		return writeReadSummary(out, c, pipeline.Summary{Pages: skipped}, f.dryRun)
+	}
 	k, err := key.Resolve(c)
 	if err != nil {
 		return cannot(err)
 	}
 	client := batch.New(batch.Options{Key: k, BaseURL: c.APIBaseURL, WorkspaceID: c.WorkspaceID})
 	s, err := pipeline.Run(cmd.Context(), pipeline.Options{
-		Config: c, Handoffs: handoffs, API: client, Resume: f.resume, DryRun: f.dryRun,
+		Config: c, Handoffs: handoffs, API: client, Resume: f.resume, DryRun: f.dryRun, Since: since, Scopes: scopes,
 		Version: version(), Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr(), Command: "drafter read",
 	})
 	if err != nil {
@@ -106,13 +141,15 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 	if err := recordAccepted(c, root, s, f.dryRun); err != nil {
 		return cannot(err)
 	}
-	out := cmd.OutOrStdout()
-	if c.Output == "json" {
-		err = writeSummaryJSON(out, s)
-	} else {
-		err = writeSummaryText(out, s, f.dryRun)
+	if !f.dryRun && s.Stop == "" {
+		for _, r := range s.Pages {
+			if scopedAccept(r) {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s: accepted on a scoped read; drafted.lock keeps its earlier entry\n", r.Path)
+			}
+		}
 	}
-	if err != nil {
+	s.Pages = append(s.Pages, skipped...)
+	if err := writeReadSummary(out, c, s, f.dryRun); err != nil {
 		return err
 	}
 	code := exitCodeFor(s)
@@ -135,20 +172,108 @@ func gitText(dir string, args ...string) (string, error) {
 }
 
 // startCommit is the commit a read's inputs come from: the run's recorded start commit on a
-// resume, else HEAD.
-func startCommit(c *config.Config, root, resume string) (string, error) {
+// resume, else HEAD. It returns the loaded state of a resumed run, and nil for a new one.
+func startCommit(c *config.Config, root, resume string) (string, *runstate.State, error) {
 	if resume == "" {
-		return gitText(root, "rev-parse", "HEAD")
+		head, err := gitText(root, "rev-parse", "HEAD")
+		return head, nil, err
 	}
 	repo, err := runstate.Repo(root)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	st, err := runstate.LoadState(filepath.Join(c.StateDir, "runs", repo, resume))
 	if err != nil {
-		return "", fmt.Errorf("resume %s: %w", resume, err)
+		return "", nil, fmt.Errorf("resume %s: %w", resume, err)
 	}
-	return st.Head, nil
+	return st.Head, st, nil
+}
+
+// inRun keeps the handoffs whose page the resumed run holds. A page the run left out was
+// unchanged when it started, so the resume has nothing to say about it.
+func inRun(handoffs []handoff.Handoff, st *runstate.State) (kept []handoff.Handoff, skipped []pipeline.PageResult) {
+	for _, h := range handoffs {
+		if _, ok := st.Pages[runstate.PageKey(h.Page.Path)]; ok {
+			kept = append(kept, h)
+			continue
+		}
+		skipped = append(skipped, unchangedPage(h.Page.Path, "unchanged (not in run)"))
+	}
+	return kept, skipped
+}
+
+// unchangedPage is the result of a page the read did not send. Why holds the line to print.
+func unchangedPage(path, line string) pipeline.PageResult {
+	return pipeline.PageResult{Path: path, Status: statusUnchanged, Scope: &blueprint.Scope{Kind: blueprint.ScopeUnchanged, Why: line}}
+}
+
+// scopePages compares each page's blueprint at since with the run's start commit. It records a
+// scope in scopes for every page that will be read, and returns the pages with nothing to read.
+func scopePages(c *config.Config, root, since, head, rev string, handoffs []handoff.Handoff, scopes map[string]blueprint.Scope) (kept []handoff.Handoff, skipped []pipeline.PageResult) {
+	for _, h := range handoffs {
+		sc := blueprint.Compare(h.Plan, revisionAt(c, root, since, h), revisionAt(c, root, head, h))
+		if sc.Kind == blueprint.ScopeUnchanged {
+			skipped = append(skipped, unchangedPage(h.Page.Path, "nothing changed since "+rev))
+			continue
+		}
+		scopes[h.Page.Path] = sc
+		kept = append(kept, h)
+	}
+	return kept, skipped
+}
+
+// revisionAt gathers a page's blueprint, outline entry, and facts store as committed at rev. What
+// rev lacks or cannot decode comes back empty, which Compare reads as a reason to read the whole
+// page.
+func revisionAt(c *config.Config, root, rev string, h handoff.Handoff) blueprint.Revision {
+	show := func(rel string) ([]byte, error) {
+		return exec.Command("git", "-C", root, "show", rev+":"+rel).Output()
+	}
+	var r blueprint.Revision
+	if out, err := show(h.Plan); err == nil {
+		r.Blueprint = out
+	}
+	if out, err := show(c.Blueprints.Outline); err == nil {
+		if o, fs := blueprint.DecodeOutline(c.Blueprints.Outline, out); o != nil && !plan.HasError(fs) {
+			for i := range o.Pages {
+				if path.Clean(o.Pages[i].Path) == h.Page.Path {
+					r.Entry = &o.Pages[i]
+				}
+			}
+		}
+	}
+	if c.Facts.Dir == "" {
+		return r
+	}
+	dir, err := filepath.Rel(root, c.Facts.Dir)
+	if err != nil {
+		return r
+	}
+	dir = filepath.ToSlash(dir)
+	files := map[string]string{}
+	names, _ := gitText(root, "ls-tree", "--name-only", rev+":"+dir)
+	for name := range strings.SplitSeq(names, "\n") {
+		if !strings.HasSuffix(name, ".md") || name == "README.md" {
+			continue
+		}
+		if out, err := show(dir + "/" + name); err == nil {
+			files[name] = string(out)
+		}
+	}
+	r.Facts = plan.ParseFacts(files, root)
+	return r
+}
+
+// scopedAccept reports whether the page was accepted on a read limited to named sections.
+func scopedAccept(r pipeline.PageResult) bool {
+	return r.Status == pipeline.StatusAccepted && r.Accepted != "" && r.Scope != nil && r.Scope.Kind == blueprint.ScopeScoped
+}
+
+func writeReadSummary(w io.Writer, c *config.Config, s pipeline.Summary, dry bool) error {
+	if c.Output == "json" {
+		return writeSummaryJSON(w, s)
+	}
+	return writeSummaryText(w, s, dry)
 }
 
 // blueprintHandoffs builds one handoff per blueprint argument. Each page's outline entry comes
@@ -244,7 +369,7 @@ func recordAccepted(c *config.Config, root string, s pipeline.Summary, dry bool)
 	}
 	changed := false
 	for _, r := range s.Pages {
-		if r.Status != pipeline.StatusAccepted || r.Accepted == "" {
+		if r.Status != pipeline.StatusAccepted || r.Accepted == "" || scopedAccept(r) {
 			continue
 		}
 		e := lock.Pages[r.Path]

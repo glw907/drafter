@@ -126,7 +126,11 @@ func (p *page) stageBlueprintRead(ctx context.Context) (*stage, error) {
 				return nil, err
 			}
 		default:
-			prompt, err := p.render(seat, p.context(prompts.Round1))
+			c := p.context(prompts.Round1)
+			if p.w.Scope != nil && p.w.Scope.Kind == blueprint.ScopeScoped {
+				c.Scope = strings.Join(p.w.Scope.IDs, ",")
+			}
+			prompt, err := p.render(seat, c)
 			if err != nil {
 				return nil, err
 			}
