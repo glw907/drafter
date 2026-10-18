@@ -233,6 +233,34 @@ drafter runs the gate command after each write to the project and reads the resu
 `/bin/sh -c` from the project root. The placeholders are `{page}`, `{brief}`, `{slug}`, and
 `{baseline}`.
 
+The stock command runs `drafter gate`, so `drafter` must be on the `PATH` that `/bin/sh` inherits.
+Before it makes any API request, `drafter page` checks that Vale can run in the project and that
+`drafter` is on `PATH`, and exits with status 2 when either fails. It runs these checks only when
+`gate.command` starts with `drafter gate`, and they apply to dry runs and resumed runs too.
+
+`drafter gate --page <page>` checks one page, from the git top level of the working directory or
+from `--root`. It makes no network call. It runs these checks in order:
+
+1. Vale can run: `vale` is on `PATH`, the project has a `.vale.ini` at its root, and every style
+   the config names has a directory under the project's styles path. A style that exists only in
+   a global styles directory doesn't count. Run `drafter init` to create the `.vale.ini`, and
+   `vale sync` to install the styles.
+1. The page file exists.
+1. The page's blueprint, when it has one: the blueprint checks that `drafter check` runs on that
+   one blueprint, then the facts store checks on the facts the blueprint places or cites. A broken
+   fact that the blueprint doesn't cite doesn't fail the gate. With no blueprint, the gate prints
+   `no blueprint for <page>; blueprint and fact checks skipped` and goes on.
+1. The page's internal links: each Markdown link or image whose destination has no URL scheme
+   must resolve to an existing path inside the repository, and each `#anchor` must match a
+   heading of its target, or of the page itself for a bare `#anchor`. The gate doesn't check
+   `https://` links.
+1. Vale, at the error level only: `vale --output=line --minAlertLevel=error <page>`.
+
+The gate prints findings as `file:line: severity: check: message (fix)`, and Vale's alerts as
+Vale prints them. The exit status is 0 when nothing failed, 1 when a finding is an error or Vale
+reports an error-level alert, and 2 when the gate can't run. A Vale runtime error, such as a rule
+file that doesn't load, is exit status 2.
+
 `gate.protocol` is `plain` or `cairn-run-gate`. With `plain`, exit status 0 is a green gate and
 anything else is red, and drafter writes the combined output to a log in the run directory. With
 `cairn-run-gate`, drafter runs the command through that wrapper and follows its protocol.
