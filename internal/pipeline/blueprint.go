@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/glw907/drafter/internal/assemble"
@@ -45,6 +46,20 @@ type outlineEntry struct {
 	Figure     bool     `json:"figure,omitempty"`
 }
 
+// EntryJSON is an outline entry as the blueprint read shows it.
+func EntryJSON(e blueprint.Page) ([]byte, error) {
+	return json.MarshalIndent(outlineEntry{
+		Path: e.Path, Slug: e.Slug, Title: e.Title, Type: e.Type, Job: e.Job,
+		Covers: e.Covers, OutOfScope: e.OutOfScope, Figure: e.Figure,
+	}, "", "  ")
+}
+
+// changeRead reports whether the page's read judges a change: its comparison is scoped and carries
+// the facts it touched. A scoped state from before Scope.Facts existed reads as whole.
+func (p *page) changeRead() bool {
+	return p.w.Scope != nil && p.w.Scope.Kind == blueprint.ScopeScoped && p.w.Scope.Facts != nil
+}
+
 // blueprintInputs loads the page's blueprint and outline at the start commit and runs the
 // blueprint checks on them, once.
 func (p *page) blueprintInputs() (*bpInputs, error) {
@@ -70,11 +85,7 @@ func (p *page) blueprintInputs() (*bpInputs, error) {
 	in := &bpInputs{raw: raw, bp: bp, findings: findings}
 	if bp != nil {
 		in.view = blueprint.View(bp, entry, p.r.facts)
-		in.entryJSON, err = json.MarshalIndent(outlineEntry{
-			Path: entry.Path, Slug: entry.Slug, Title: entry.Title, Type: entry.Type, Job: entry.Job,
-			Covers: entry.Covers, OutOfScope: entry.OutOfScope, Figure: entry.Figure,
-		}, "", "  ")
-		if err != nil {
+		if in.entryJSON, err = EntryJSON(entry); err != nil {
 			return nil, err
 		}
 	}
@@ -127,17 +138,19 @@ func (p *page) stageBlueprintRead(ctx context.Context) (*stage, error) {
 			}
 		default:
 			c := p.context(prompts.Round1)
-			if p.w.Scope != nil && p.w.Scope.Kind == blueprint.ScopeScoped {
-				c.Scope = strings.Join(p.w.Scope.IDs, ",")
+			extra := assemble.BlueprintBlock(in.view, in.raw, in.entryJSON, p.r.facts)
+			if p.changeRead() {
+				c.Scope = "page"
+				if len(p.w.Scope.IDs) > 0 {
+					c.Scope = strings.Join(p.w.Scope.IDs, ",")
+				}
+				extra += "\n\n" + p.w.Change
 			}
 			prompt, err := p.render(seat, c)
 			if err != nil {
 				return nil, err
 			}
-			req, err = p.buildInput(ctx, s1, seat, assemble.Input{
-				Answer: assemble.AnswerRead, Prompt: prompt,
-				Extra: assemble.BlueprintBlock(in.view, in.raw, in.entryJSON, p.r.facts),
-			})
+			req, err = p.buildInput(ctx, s1, seat, assemble.Input{Answer: assemble.AnswerRead, Prompt: prompt, Extra: extra})
 			if err != nil {
 				return nil, err
 			}
@@ -147,10 +160,33 @@ func (p *page) stageBlueprintRead(ctx context.Context) (*stage, error) {
 	return &stage{page: p, name: s1, reqs: reqs}, nil
 }
 
+// untouched reports whether a consistency conflict, between the facts ids and with, lies wholly
+// outside what a change read touched. It fails closed: a conflict that names no fact, a fact the
+// store lacks, or a with that is neither a store fact nor a page the plan links is touched. with
+// names a page as page#heading, so the heading is cut before the page is looked up.
+func (p *page) untouched(in *bpInputs, ids []string, with string) bool {
+	if !p.changeRead() || p.r.facts == nil || len(ids) == 0 {
+		return false
+	}
+	touched := p.w.Scope.Facts
+	for _, id := range ids {
+		if p.r.facts.Count(id) == 0 || slices.Contains(touched, id) {
+			return false
+		}
+	}
+	if p.r.facts.Count(with) > 0 {
+		return !slices.Contains(touched, with)
+	}
+	file, _, _ := strings.Cut(with, "#")
+	return slices.Contains(assemble.LinkedPages(in.view), file)
+}
+
 // completeBlueprintRead decides the page from the two stage-1 reads. A consistency conflict or a
 // blueprint read that says fix sets the page aside under the plan rule, and an accepted page
 // records the blob id of the blueprint the read saw. When both fire, the escalation names the
-// consistency seat, and the blueprint read's findings are still in the record.
+// consistency seat. The blueprint read's findings are in the record whatever its verdict. A change
+// read demotes a conflict that lies outside what the change touched to a warning, and the page
+// goes on to the blueprint verdict.
 func (p *page) completeBlueprintRead() error {
 	a, err := parseRead(p.w.Got["blueprint"])
 	if err != nil {
@@ -159,23 +195,35 @@ func (p *page) completeBlueprintRead() error {
 	p.w.Rec.verdict(s1, "blueprint", a.Verdict)
 	p.w.Rec.addFriction("blueprint", a.Friction)
 	fs := a.findings("blueprint", 0)
-	if a.Verdict == "fix" {
-		p.w.Rec.findings(s1, fs)
-	}
+	p.w.Rec.findings(s1, fs)
 	if raw, ok := p.w.Got["consistency"]; ok {
 		var c consistencyAnswer
 		if err := decodeAnswer(raw, &c); err != nil {
 			return err
 		}
 		if len(c.Conflicts) > 0 {
-			p.w.Rec.verdict(s1, "consistency", "conflicts")
+			in, err := p.blueprintInputs()
+			if err != nil {
+				return err
+			}
 			var parts []string
+			touched := false
 			for _, x := range c.Conflicts {
 				parts = append(parts, fmt.Sprintf("%s conflicts with %s: %s", strings.Join(x.Facts, ", "), x.With, x.Conflict))
+				touched = touched || !p.untouched(in, x.Facts, x.With)
 			}
-			return p.escalate("plan", "consistency", nil, strings.Join(parts, "; "))
+			if touched {
+				p.w.Rec.verdict(s1, "consistency", "conflicts")
+				return p.escalate("plan", "consistency", nil, strings.Join(parts, "; "))
+			}
+			p.w.Rec.verdict(s1, "consistency", "demoted")
+			p.w.Demoted = len(parts)
+			for _, part := range parts {
+				p.w.Rec.warn(alreadyPresentPrefix + " " + part)
+			}
+		} else {
+			p.w.Rec.verdict(s1, "consistency", "ok")
 		}
-		p.w.Rec.verdict(s1, "consistency", "ok")
 	}
 	if a.Verdict == "fix" {
 		ns := make([]int, 0, len(fs))

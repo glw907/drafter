@@ -271,7 +271,7 @@ func (r *runner) addPages() error {
 		}
 		p.w = work{Rec: newRecord()}
 		if sc, ok := r.o.Scopes[h.Page.Path]; ok {
-			p.w.Since, p.w.Scope = r.o.Since, &sc
+			p.w.Since, p.w.Scope, p.w.Change = r.o.Since, &sc, r.o.Changes[h.Page.Path]
 		}
 		r.state.Pages[p.key] = p.ps
 		r.pages = append(r.pages, p)

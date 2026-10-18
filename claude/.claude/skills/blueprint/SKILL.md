@@ -14,7 +14,7 @@ Find the page's blueprint by the path rule in [Layout](format.md#layout). Read t
 ## Pick the case
 
 1. **A code change alters documented behavior.** Update the fact bullet for the behavior. Run `drafter refs <fact-id>` before you correct a fact: it lists every item on every page that places or cites it. Fix each placement the new fact makes wrong. Run `drafter check`, then commit the facts, the blueprints, and the code together. The change is not done until the blueprints match.
-2. **You notice a deficiency while reading.** Fix the blueprint, not the page. Choose the row of [the edit catalog](format.md#the-edit-catalog) that matches what you want to do, and make the change it names. Use the item kinds in [Items](format.md#items).
+2. **You notice a deficiency while reading.** Fix the blueprint, not the page. Choose the row of [the edit catalog](format.md#the-edit-catalog) that matches what you want to do, and make the change it names. Use the item kinds in [Items](format.md#items). When the deficiency is a wrong fact, run `drafter refs <fact-id>` before you correct it, then fix each placement the corrected fact makes wrong. A caution about something that can go wrong is a `failure` item with a handler, not a `sentence`: use the "Add a failure case" row of [the edit catalog](format.md#the-edit-catalog).
 3. **A page is missing.** Follow [new-page.md](new-page.md).
 
 If no catalog row fits, stop and say so in your report. Do not invent an edit.

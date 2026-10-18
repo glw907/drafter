@@ -3268,6 +3268,29 @@
         "turn": 0,
         "facts": true
       }
+    },
+    {
+      "name": "install-widget/blueprint-scoped-page",
+      "seat": "blueprint",
+      "context": {
+        "page": {
+          "id": "install-widget",
+          "path": "docs/guide/install-widget.md",
+          "track": "extend",
+          "title": "Install the widget",
+          "job": "Install the widget CLI and run it once.",
+          "pageType": "task guide"
+        },
+        "inputs": {},
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "page",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
     }
   ]
 }

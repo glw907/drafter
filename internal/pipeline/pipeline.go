@@ -60,6 +60,10 @@ type Options struct {
 	// a resume needs neither.
 	Since  string
 	Scopes map[string]blueprint.Scope
+	// Changes holds each scoped page's change block, keyed by page path: what the page's read
+	// judges beside the blueprint. It is recorded in the pages' state, so a resume sends the same
+	// bytes.
+	Changes map[string]string
 	// Command names the command that started the run, for the resume hint; "drafter page" when
 	// empty.
 	Command string
@@ -86,6 +90,10 @@ type PageResult struct {
 	// Accepted is the git blob id of the blueprint a blueprint page's read accepted, set only when
 	// the page ended accepted.
 	Accepted string `json:"accepted,omitempty"`
+	// Demoted counts the consistency conflicts a change read reported as already present, and
+	// AlreadyPresent the non-blocking findings of the blueprint read that say so.
+	Demoted        int `json:"demoted,omitempty"`
+	AlreadyPresent int `json:"already_present,omitempty"`
 }
 
 // Estimate is one request of a dry run.
@@ -173,6 +181,7 @@ func (r *runner) summary() Summary {
 		if p.w.Rec.Escalation != nil {
 			res.Rule = p.w.Rec.Escalation.Rule
 		}
+		res.Demoted, res.AlreadyPresent = p.w.Demoted, p.w.Rec.alreadyPresent()
 		res.Cost, _ = r.led.PageSpend(r.state.RunID, p.h.Page.Path)
 		if p.ps.Status == StatusAccepted {
 			res.Accepted = p.w.Accepted

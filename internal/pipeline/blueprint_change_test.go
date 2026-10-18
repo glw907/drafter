@@ -1,0 +1,234 @@
+package pipeline
+
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"github.com/glw907/drafter/internal/blueprint"
+)
+
+// changeBlockA is a change block as drafter read builds it, shortened to the parts the tests find.
+const changeBlockA = "The change this read judges follows.\n\n=== blueprint diff ===\n-old line\n+new line\n=== end blueprint diff ===\n\n" +
+	"=== changed facts ===\n- lumen-key-ttl\n  was: [verified] ninety days\n  now: [verified] sixty days\n=== end changed facts ==="
+
+func scopedFacts(ids []string, facts ...string) blueprint.Scope {
+	if facts == nil {
+		facts = []string{}
+	}
+	return blueprint.Scope{Kind: blueprint.ScopeScoped, IDs: ids, Facts: facts}
+}
+
+func statusPage(s Summary, page string) PageResult {
+	for _, p := range s.Pages {
+		if p.Path == page {
+			return p
+		}
+	}
+	return PageResult{}
+}
+
+// TestScopeReachesTheBlueprintPrompt checks that a scoped page's ids and change block reach the
+// request, that a whole page sends neither, and that a resume with no scope in its options sends
+// the bytes the run recorded. The scoped page is the one whose request is built after the resume.
+func TestScopeReachesTheBlueprintPrompt(t *testing.T) {
+	h := newBlueprintHarness(t, withInFlight(1))
+	h.api.crash = func(call string, ids []string) string {
+		if call == "create" && h.api.creates == 2 {
+			return "before"
+		}
+		return ""
+	}
+	o := h.options()
+	o.Since = h.head()
+	o.Scopes = map[string]blueprint.Scope{
+		pageA: {Kind: blueprint.ScopeWhole, Why: "no earlier blueprint"},
+		pageB: scopedFacts([]string{"intro", "steps"}, "lumen-key-ttl"),
+	}
+	o.Changes = map[string]string{pageB: changeBlockA}
+	if !dies(func() { _, _ = Run(context.Background(), o) }) {
+		t.Fatal("the run did not die before the second page's batch")
+	}
+	h.api.crash = nil
+	s, err := h.resume(h.runID())
+	if err != nil {
+		t.Fatalf("resume: %v\nstderr: %s", err, h.err.String())
+	}
+	reqs := requestsFor(h, "s1", "blueprint")
+	if len(reqs) != 2 {
+		t.Fatalf("%d blueprint requests, want 2", len(reqs))
+	}
+	var scoped, whole string
+	for _, r := range reqs {
+		if strings.Contains(userText(r), "Scope: ") {
+			scoped = userText(r)
+		} else {
+			whole = userText(r)
+		}
+	}
+	if !strings.Contains(scoped, "Scope: intro,steps") {
+		t.Errorf("no request carries the scope line:\n%s", scoped)
+	}
+	if strings.Contains(whole, "=== blueprint diff ===") || whole == "" {
+		t.Errorf("the whole page's request is %q, want no change block", whole)
+	}
+	prompt, data, ok := strings.Cut(scoped, "=== blueprint ===")
+	if !ok || strings.Contains(prompt, "blueprint diff") {
+		t.Errorf("the change block is in the prompt, not the data:\n%s", scoped)
+	}
+	if end, at := strings.Index(data, "=== end facts ==="), strings.Index(data, "\n\n"+changeBlockA); end < 0 || at < end {
+		t.Errorf("the change block, byte for byte, does not follow the facts block:\n%s", data)
+	}
+	if !strings.Contains(scoped, "apart from the change block") {
+		t.Error("the blueprint block still says it is everything the reader reads")
+	}
+	got := statusPage(s, pageB)
+	if got.Scope == nil || got.Scope.Kind != blueprint.ScopeScoped || got.Scope.Facts == nil || len(got.Scope.Facts) != 1 || got.Scope.Facts[0] != "lumen-key-ttl" {
+		t.Errorf("summary scope for the scoped page = %+v, want scoped with its facts kept across the resume", got.Scope)
+	}
+	if k := statusPage(s, pageA).Scope; k == nil || k.Kind != blueprint.ScopeWhole {
+		t.Errorf("summary scope for the whole page = %+v", k)
+	}
+}
+
+// TestOutlineOnlyChangeRendersTheChangeRead checks that a scoped page with no section ids still
+// gets the change read: the seat context carries the scope "page" and the request the block.
+func TestOutlineOnlyChangeRendersTheChangeRead(t *testing.T) {
+	h := newBlueprintHarness(t, withPages("a"))
+	o := h.options()
+	o.Since = h.head()
+	o.Scopes = map[string]blueprint.Scope{pageA: scopedFacts(nil)}
+	o.Changes = map[string]string{pageA: "=== outline entry change ===\nbefore:\nx\nafter:\ny\n=== end outline entry change ==="}
+	if _, err := Run(context.Background(), o); err != nil {
+		t.Fatal(err)
+	}
+	reqs := requestsFor(h, "s1", "blueprint")
+	if len(reqs) != 1 || !strings.Contains(userText(reqs[0]), "Scope: page") || !strings.Contains(userText(reqs[0]), "=== outline entry change ===") {
+		t.Errorf("requests = %d, want one with scope page and the entry change", len(reqs))
+	}
+}
+
+// TestScopedStateWithoutFactsReadsWhole covers a state recorded before Scope.Facts existed: nil
+// facts mean a whole read, so neither the scope line nor the block is sent and a conflict blocks.
+func TestScopedStateWithoutFactsReadsWhole(t *testing.T) {
+	h := newBlueprintHarness(t, withPages("a"))
+	h.api.script("s1", "consistency", okText(`{"conflicts":[{"facts":["lumen-key-ttl"],"with":"lumen-grace","conflict":"they disagree"}]}`))
+	o := h.options()
+	o.Since = h.head()
+	o.Scopes = map[string]blueprint.Scope{pageA: {Kind: blueprint.ScopeScoped, IDs: []string{"rotate"}}}
+	o.Changes = map[string]string{pageA: changeBlockA}
+	s, err := Run(context.Background(), o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reqs := requestsFor(h, "s1", "blueprint")
+	if len(reqs) != 1 || strings.Contains(userText(reqs[0]), "Scope:") || strings.Contains(userText(reqs[0]), "blueprint diff") {
+		t.Errorf("a scoped state with no facts sent the change read")
+	}
+	if statusOf(s, pageA) != StatusEscalated || h.record(s.RunID, pageA).Escalation.Seat != "consistency" {
+		t.Errorf("status %s, want escalated on consistency", statusOf(s, pageA))
+	}
+}
+
+func TestChangeReadConsistency(t *testing.T) {
+	const grace, ttl = "lumen-grace", "lumen-key-ttl"
+	conflict := func(facts []string, with string) string {
+		return jsonText(map[string]any{"conflicts": []any{map[string]any{"facts": facts, "with": with, "conflict": "they disagree"}}})
+	}
+	withLink := func(h *harness) {
+		h.commitBlueprint(bpA, func(s string) string {
+			return s + "      - id: l-keys\n        kind: link\n        target: ../reference/keys.md\n"
+		})
+	}
+	tests := []struct {
+		name     string
+		scope    blueprint.Scope
+		answer   string
+		blueprnt string
+		link     bool
+		want     string // "accepted", or the seat the page escalates on
+	}{
+		{"an untouched fact conflict is already present", scopedFacts(nil), conflict([]string{ttl}, grace), "ok", false, "accepted"},
+		{"a touched fact in facts blocks", scopedFacts(nil, ttl), conflict([]string{ttl}, grace), "ok", false, "consistency"},
+		{"a touched fact only in with blocks", scopedFacts(nil, grace), conflict([]string{ttl}, grace), "ok", false, "consistency"},
+		{"an empty facts list blocks", scopedFacts(nil), conflict(nil, grace), "ok", false, "consistency"},
+		{"an unknown fact id blocks", scopedFacts(nil), conflict([]string{"no-such-fact"}, grace), "ok", false, "consistency"},
+		{"a with that matches nothing blocks", scopedFacts(nil), conflict([]string{ttl}, "somewhere else"), "ok", false, "consistency"},
+		{"a whole read blocks on an untouched conflict", blueprint.Scope{Kind: blueprint.ScopeWhole, Why: "x"}, conflict([]string{ttl}, grace), "ok", false, "consistency"},
+		{"an untouched conflict with a blueprint fix blocks on the blueprint", scopedFacts(nil), conflict([]string{ttl}, grace), "fix", false, "blueprint"},
+		{"a scoped state from before Facts blocks", blueprint.Scope{Kind: blueprint.ScopeScoped}, conflict([]string{ttl}, grace), "ok", false, "consistency"},
+		{"an untouched conflict with a linked page and heading is already present", scopedFacts(nil), conflict([]string{ttl}, "docs/reference/keys.md#Key lifetime"), "ok", true, "accepted"},
+		{"a conflict with an unlinked page blocks", scopedFacts(nil), conflict([]string{ttl}, "docs/reference/anchors.md#Anchors"), "ok", true, "consistency"},
+		{"a conflict with a linked page whose fact was touched blocks", scopedFacts(nil, ttl), conflict([]string{ttl}, "docs/reference/keys.md#Key lifetime"), "ok", true, "consistency"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newBlueprintHarness(t, withPages("a"))
+			if tt.link {
+				withLink(h)
+			}
+			h.api.script("s1", "consistency", okText(tt.answer))
+			if tt.blueprnt == "fix" {
+				h.api.script("s1", "blueprint", okText(readText("fix", finding("rotate", "A step is missing."))))
+			}
+			o := h.options()
+			o.Since = h.head()
+			o.Scopes = map[string]blueprint.Scope{pageA: tt.scope}
+			s, err := Run(context.Background(), o)
+			if err != nil {
+				t.Fatalf("Run: %v\nstderr: %s", err, h.err.String())
+			}
+			rec := h.record(s.RunID, pageA)
+			if tt.want == "accepted" {
+				if statusOf(s, pageA) != StatusAccepted {
+					t.Fatalf("status %s (%s), want accepted", statusOf(s, pageA), ruleOf(s, pageA))
+				}
+				if got := statusPage(s, pageA).Demoted; got != 1 {
+					t.Errorf("demoted conflicts = %d, want 1", got)
+				}
+				var v string
+				for _, x := range rec.Verdicts {
+					if x.Seat == "consistency" {
+						v = x.Verdict
+					}
+				}
+				if v != "demoted" {
+					t.Errorf("consistency verdict = %q, want demoted", v)
+				}
+				if len(rec.Warnings) == 0 || !strings.HasPrefix(rec.Warnings[len(rec.Warnings)-1], "Already present: ") {
+					t.Errorf("warnings = %v, want the Already present: conflict", rec.Warnings)
+				}
+				return
+			}
+			if statusOf(s, pageA) != StatusEscalated || rec.Escalation == nil || rec.Escalation.Seat != tt.want {
+				t.Errorf("status %s, escalation %+v, want escalated on %s", statusOf(s, pageA), rec.Escalation, tt.want)
+			}
+			if got := statusPage(s, pageA).Demoted; got != 0 && tt.want != "blueprint" {
+				t.Errorf("demoted conflicts = %d on an escalated page", got)
+			}
+		})
+	}
+}
+
+func TestChangeReadKeepsAlreadyPresentFindingsOnAccept(t *testing.T) {
+	h := newBlueprintHarness(t, withPages("a"))
+	older := map[string]any{"location": "rotate", "finding": "Already present: the step has no timeout.", "rewrite": "add one", "blocking": false}
+	h.api.script("s1", "blueprint", okText(readText("ok", older)))
+	o := h.options()
+	o.Since = h.head()
+	o.Scopes = map[string]blueprint.Scope{pageA: scopedFacts([]string{"rotate"})}
+	s, err := Run(context.Background(), o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if statusOf(s, pageA) != StatusAccepted {
+		t.Fatalf("status %s, want accepted", statusOf(s, pageA))
+	}
+	rec := h.record(s.RunID, pageA)
+	if len(rec.Findings) != 1 || rec.Findings[0].Blocking || !strings.HasPrefix(rec.Findings[0].Text, "Already present:") {
+		t.Errorf("findings = %+v, want the non-blocking finding kept on an accepted page", rec.Findings)
+	}
+	if got := statusPage(s, pageA).AlreadyPresent; got != 1 {
+		t.Errorf("already present = %d, want 1", got)
+	}
+}

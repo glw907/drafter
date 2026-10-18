@@ -2256,9 +2256,10 @@ async function chain(p) {
  * plan, with the reads that stopped both real pilot pages (reader state, recovery, completeness)
  * and the reads a durable file adds. drafter appends the blueprint, its outline entry, and the
  * facts it places after this text, so the prompt names no file but the register and takes nothing
- * from the run's args. The bar is the chain's: any blocking finding means "fix". With `scope`, a
- * comma-separated list of the section ids that changed since a revision, one paragraph narrows
- * which findings may block; the blueprint is still read whole.
+ * from the run's args. The bar is the chain's: any blocking finding means "fix". With `scope`, the
+ * comma-separated section ids that changed since a revision, or "page" when no section's content
+ * did, one paragraph turns the read into a change read: the blueprint is still read whole, but a
+ * finding blocks only on what the change adds, alters, or causes.
  * @param {string} [scope]
  * @returns {string}
  */
@@ -2343,10 +2344,21 @@ A checklist item the blueprint fails is a blocking finding: its section id, and 
 applies, as location, the item it fails and how, and in rewrite a suggestion for how to address it.
 Verdict "fix" if any blocking finding exists; otherwise "ok".${scope ? `
 
-Scope. Only these sections changed since the earlier revision: ${scope}. Read the whole blueprint for context.
-Return a blocking finding only when its location is one of those sections, when one of those sections
-now fails another section's \`requires\`, or when a \`failure\` item elsewhere now names a step that no
-longer exists. Report anything else as non-blocking.` : ""}`;
+Change read. This read judges a change, as a code reviewer judges a pull request. The change block
+after the facts holds the diff of the blueprint since the earlier revision, the old and new text of
+each fact bullet that changed, and the outline entry before and after when it changed. ${scope === "page"
+    ? "No section's own content changed: the change is in the page-level fields, the order of the sections, a removed section, the outline entry, or a fact bullet cited only outside the sections."
+    : `These sections changed: ${scope}.`} Read the whole blueprint for context, as Google's code review
+standard asks ("Sometimes you have to look at the whole file to be sure that the change actually makes
+sense", https://google.github.io/eng-practices/review/reviewer/looking-for.html), and judge the change
+by the same standard: "favor approving a CL once it is in a state where it definitely improves the
+overall code health" (https://google.github.io/eng-practices/review/reviewer/standard.html). A
+finding blocks only for a defect in what the change adds or alters, or a defect the change causes
+elsewhere, such as a step whose \`requires\` the change leaves with no source, or a \`failure\` item
+whose step the change removes. Locate that second kind at the changed item that causes it. Every
+other defect is non-blocking: set blocking to false and start its finding with "Already present:".
+The standard sends an existing problem to a bug ("encourage the author to file a bug"), so report it
+and let it pass. A non-blocking finding never makes the verdict "fix".` : ""}`;
 }
 
 // The back-half seats drafter renders prompts from: one function of the seat context object per

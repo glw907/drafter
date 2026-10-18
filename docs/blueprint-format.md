@@ -361,5 +361,12 @@ completeness of steps and failures, what a reader can know at each step, recover
 after diagnosis, a `use` that restates its fact, durable fields that narrate planning history,
 and a human-origin item the blueprint would bury. A blocking finding sets the blueprint aside.
 When the run ends with every blueprint decided, the accepted blueprints' blob ids go into the
-`accepted` field of `drafted.lock`. With `--since <rev>`, a blueprint whose changes stay inside
-named sections blocks only on those sections, and its acceptance writes no `drafted.lock` entry.
+`accepted` field of `drafted.lock`.
+
+With `--since <rev>`, the read judges the change as a code reviewer judges a pull request. It
+still reads the whole blueprint, and it also receives the diff of the blueprint, the changed fact
+bullets, and the outline entry when it changed. A finding blocks only for a defect the change
+adds, alters, or causes. Every other defect is reported as non-blocking, with a finding that
+starts "Already present:". The consistency read blocks only on a conflict that touches a fact the
+change touched, and reports any other conflict as already present. A blueprint with no earlier
+version at `<rev>` is read whole. A change read writes no `drafted.lock` entry when it accepts.

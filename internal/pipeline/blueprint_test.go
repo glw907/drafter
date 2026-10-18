@@ -1,7 +1,6 @@
 package pipeline
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -9,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/glw907/drafter/internal/blueprint"
 	"github.com/glw907/drafter/internal/config"
 	"github.com/glw907/drafter/internal/handoff"
 	"github.com/glw907/drafter/internal/run"
@@ -340,52 +338,4 @@ func TestPageIgnoresTheBlueprintSeat(t *testing.T) {
 
 func defaultSeatsForTest() []string {
 	return []string{"draft", "structure", "editor", "fact", "reader", "coverage", "consistency"}
-}
-
-// TestScopeReachesTheBlueprintPrompt checks that a scoped page's ids reach the seat context, that
-// a whole page sends none, and that a resume with no scope in its options keeps what the run
-// recorded.
-func TestScopeReachesTheBlueprintPrompt(t *testing.T) {
-	h := newBlueprintHarness(t, withInFlight(1))
-	h.api.crash = func(call string, ids []string) string {
-		if call == "create" && h.api.creates == 2 {
-			return "before"
-		}
-		return ""
-	}
-	o := h.options()
-	o.Since = h.head()
-	o.Scopes = map[string]blueprint.Scope{
-		pageA: {Kind: blueprint.ScopeScoped, IDs: []string{"intro", "steps"}},
-		pageB: {Kind: blueprint.ScopeWhole, Why: "a section was removed"},
-	}
-	if !dies(func() { _, _ = Run(context.Background(), o) }) {
-		t.Fatal("the run did not die before the second page's batch")
-	}
-	h.api.crash = nil
-	s, err := h.resume(h.runID())
-	if err != nil {
-		t.Fatalf("resume: %v\nstderr: %s", err, h.err.String())
-	}
-	reqs := requestsFor(h, "s1", "blueprint")
-	withScope := 0
-	for _, r := range reqs {
-		if strings.Contains(userText(r), "Scope: intro,steps") {
-			withScope++
-		}
-	}
-	if len(reqs) != 2 || withScope != 1 {
-		t.Errorf("%d blueprint requests, %d with the scope line; want 2 and 1 (the scoped page's, kept across the resume)", len(reqs), withScope)
-	}
-	for pg, want := range map[string]string{pageA: blueprint.ScopeScoped, pageB: blueprint.ScopeWhole} {
-		var got string
-		for _, p := range s.Pages {
-			if p.Path == pg && p.Scope != nil {
-				got = p.Scope.Kind
-			}
-		}
-		if got != want {
-			t.Errorf("%s: summary scope = %q, want %q", pg, got, want)
-		}
-	}
 }
