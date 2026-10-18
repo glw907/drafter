@@ -90,8 +90,8 @@ type PageResult struct {
 	// Accepted is the git blob id of the blueprint a blueprint page's read accepted, set only when
 	// the page ended accepted.
 	Accepted string `json:"accepted,omitempty"`
-	// Demoted counts the consistency conflicts a change read reported as already present, and
-	// AlreadyPresent the non-blocking findings of the blueprint read that say so.
+	// Demoted counts the consistency conflicts a change read reported as a warning, already present
+	// or unplaced, and AlreadyPresent the non-blocking findings of the blueprint read that say so.
 	Demoted        int `json:"demoted,omitempty"`
 	AlreadyPresent int `json:"already_present,omitempty"`
 }

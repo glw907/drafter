@@ -99,6 +99,10 @@ func (r *record) warn(s string) { r.Warnings = append(r.Warnings, s) }
 // being read did not introduce.
 const alreadyPresentPrefix = "Already present:"
 
+// unplacedPrefix starts the warning for a change read's consistency conflict that names neither a
+// fact nor a with.
+const unplacedPrefix = "Unplaced:"
+
 // alreadyPresent counts the blueprint read's findings that report an older defect.
 func (r *record) alreadyPresent() int {
 	n := 0

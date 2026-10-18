@@ -186,7 +186,9 @@ func (p *page) untouched(in *bpInputs, ids []string, with string) bool {
 // records the blob id of the blueprint the read saw. When both fire, the escalation names the
 // consistency seat. The blueprint read's findings are in the record whatever its verdict. A change
 // read demotes a conflict that lies outside what the change touched to a warning, and the page
-// goes on to the blueprint verdict.
+// goes on to the blueprint verdict. A change read also sets aside an unplaced conflict, one with no
+// fact and an empty with, as an "Unplaced:" warning: it blocks nothing and counts as neither
+// touched nor untouched, but it is listed beside the others when another conflict does block.
 func (p *page) completeBlueprintRead() error {
 	a, err := parseRead(p.w.Got["blueprint"])
 	if err != nil {
@@ -206,20 +208,28 @@ func (p *page) completeBlueprintRead() error {
 			if err != nil {
 				return err
 			}
-			var parts []string
+			var parts, warns []string
 			touched := false
 			for _, x := range c.Conflicts {
 				parts = append(parts, fmt.Sprintf("%s conflicts with %s: %s", strings.Join(x.Facts, ", "), x.With, x.Conflict))
-				touched = touched || !p.untouched(in, x.Facts, x.With)
+				if p.changeRead() && len(x.Facts) == 0 && x.With == "" {
+					warns = append(warns, unplacedPrefix+" "+x.Conflict)
+					continue
+				}
+				if p.untouched(in, x.Facts, x.With) {
+					warns = append(warns, alreadyPresentPrefix+" "+parts[len(parts)-1])
+					continue
+				}
+				touched = true
 			}
 			if touched {
 				p.w.Rec.verdict(s1, "consistency", "conflicts")
 				return p.escalate("plan", "consistency", nil, strings.Join(parts, "; "))
 			}
 			p.w.Rec.verdict(s1, "consistency", "demoted")
-			p.w.Demoted = len(parts)
-			for _, part := range parts {
-				p.w.Rec.warn(alreadyPresentPrefix + " " + part)
+			p.w.Demoted = len(warns)
+			for _, w := range warns {
+				p.w.Rec.warn(w)
 			}
 		} else {
 			p.w.Rec.verdict(s1, "consistency", "ok")
