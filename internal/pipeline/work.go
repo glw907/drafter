@@ -127,7 +127,7 @@ type work struct {
 	Scope *blueprint.Scope `json:"scope,omitempty"`
 	// Change is the change block the page's read sends after the blueprint, built once at the start
 	// of the run so a resume sends the same bytes. Demoted counts the conflicts the consistency
-	// rule reported as already present.
+	// rule reported as a warning, already present or unplaced.
 	Change  string `json:"change,omitempty"`
 	Demoted int    `json:"demoted,omitempty"`
 }

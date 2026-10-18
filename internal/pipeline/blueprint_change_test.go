@@ -135,6 +135,13 @@ func TestChangeReadConsistency(t *testing.T) {
 	conflict := func(facts []string, with string) string {
 		return jsonText(map[string]any{"conflicts": []any{map[string]any{"facts": facts, "with": with, "conflict": "they disagree"}}})
 	}
+	two := func(a []string, aw, atext string, b []string, bw, btext string) string {
+		return jsonText(map[string]any{"conflicts": []any{
+			map[string]any{"facts": a, "with": aw, "conflict": atext},
+			map[string]any{"facts": b, "with": bw, "conflict": btext},
+		}})
+	}
+	const emptyFacts = `{"conflicts":[{"facts":[],"with":"","conflict":"scope difference, not reported"}]}`
 	withLink := func(h *harness) {
 		h.commitBlueprint(bpA, func(s string) string {
 			return s + "      - id: l-keys\n        kind: link\n        target: ../reference/keys.md\n"
@@ -146,20 +153,31 @@ func TestChangeReadConsistency(t *testing.T) {
 		answer   string
 		blueprnt string
 		link     bool
-		want     string // "accepted", or the seat the page escalates on
+		want     string   // "accepted", or the seat the page escalates on
+		demoted  int      // the summary's Demoted on an accepted page
+		warns    []string // the record's warning prefixes, in order, on an accepted page
+		detail   []string // texts the escalation detail holds
 	}{
-		{"an untouched fact conflict is already present", scopedFacts(nil), conflict([]string{ttl}, grace), "ok", false, "accepted"},
-		{"a touched fact in facts blocks", scopedFacts(nil, ttl), conflict([]string{ttl}, grace), "ok", false, "consistency"},
-		{"a touched fact only in with blocks", scopedFacts(nil, grace), conflict([]string{ttl}, grace), "ok", false, "consistency"},
-		{"an empty facts list blocks", scopedFacts(nil), conflict(nil, grace), "ok", false, "consistency"},
-		{"an unknown fact id blocks", scopedFacts(nil), conflict([]string{"no-such-fact"}, grace), "ok", false, "consistency"},
-		{"a with that matches nothing blocks", scopedFacts(nil), conflict([]string{ttl}, "somewhere else"), "ok", false, "consistency"},
-		{"a whole read blocks on an untouched conflict", blueprint.Scope{Kind: blueprint.ScopeWhole, Why: "x"}, conflict([]string{ttl}, grace), "ok", false, "consistency"},
-		{"an untouched conflict with a blueprint fix blocks on the blueprint", scopedFacts(nil), conflict([]string{ttl}, grace), "fix", false, "blueprint"},
-		{"a scoped state from before Facts blocks", blueprint.Scope{Kind: blueprint.ScopeScoped}, conflict([]string{ttl}, grace), "ok", false, "consistency"},
-		{"an untouched conflict with a linked page and heading is already present", scopedFacts(nil), conflict([]string{ttl}, "docs/reference/keys.md#Key lifetime"), "ok", true, "accepted"},
-		{"a conflict with an unlinked page blocks", scopedFacts(nil), conflict([]string{ttl}, "docs/reference/anchors.md#Anchors"), "ok", true, "consistency"},
-		{"a conflict with a linked page whose fact was touched blocks", scopedFacts(nil, ttl), conflict([]string{ttl}, "docs/reference/keys.md#Key lifetime"), "ok", true, "consistency"},
+		{"an untouched fact conflict is already present", scopedFacts(nil), conflict([]string{ttl}, grace), "ok", false, "accepted", 1, []string{"Already present: "}, nil},
+		{"a touched fact in facts blocks", scopedFacts(nil, ttl), conflict([]string{ttl}, grace), "ok", false, "consistency", 0, nil, nil},
+		{"a touched fact only in with blocks", scopedFacts(nil, grace), conflict([]string{ttl}, grace), "ok", false, "consistency", 0, nil, nil},
+		{"an empty facts list blocks", scopedFacts(nil), conflict(nil, grace), "ok", false, "consistency", 0, nil, nil},
+		{"an unknown fact id blocks", scopedFacts(nil), conflict([]string{"no-such-fact"}, grace), "ok", false, "consistency", 0, nil, nil},
+		{"a with that matches nothing blocks", scopedFacts(nil), conflict([]string{ttl}, "somewhere else"), "ok", false, "consistency", 0, nil, nil},
+		{"a whole read blocks on an untouched conflict", blueprint.Scope{Kind: blueprint.ScopeWhole, Why: "x"}, conflict([]string{ttl}, grace), "ok", false, "consistency", 0, nil, nil},
+		{"an untouched conflict with a blueprint fix blocks on the blueprint", scopedFacts(nil), conflict([]string{ttl}, grace), "fix", false, "blueprint", 0, nil, nil},
+		{"a scoped state from before Facts blocks", blueprint.Scope{Kind: blueprint.ScopeScoped}, conflict([]string{ttl}, grace), "ok", false, "consistency", 0, nil, nil},
+		{"an untouched conflict with a linked page and heading is already present", scopedFacts(nil), conflict([]string{ttl}, "docs/reference/keys.md#Key lifetime"), "ok", true, "accepted", 1, []string{"Already present: "}, nil},
+		{"a conflict with an unlinked page blocks", scopedFacts(nil), conflict([]string{ttl}, "docs/reference/anchors.md#Anchors"), "ok", true, "consistency", 0, nil, nil},
+		{"a conflict with a linked page whose fact was touched blocks", scopedFacts(nil, ttl), conflict([]string{ttl}, "docs/reference/keys.md#Key lifetime"), "ok", true, "consistency", 0, nil, nil},
+		{"an unplaced conflict is set aside as a warning", scopedFacts(nil), emptyFacts, "ok", false, "accepted", 1, []string{"Unplaced: scope difference, not reported"}, nil},
+		{"an unplaced conflict beside an untouched one is two warnings", scopedFacts(nil), two(nil, "", "no home", []string{ttl}, grace, "old overlap"), "ok", false, "accepted", 2, []string{"Unplaced: no home", "Already present: "}, nil},
+		{"an unplaced conflict beside a touched one blocks and is named", scopedFacts(nil, ttl), two(nil, "", "no home", []string{ttl}, grace, "live clash"), "ok", false, "consistency", 0, nil, []string{"no home", "live clash"}},
+		{"an unplaced conflict in a whole read blocks", blueprint.Scope{Kind: blueprint.ScopeWhole, Why: "x"}, emptyFacts, "ok", false, "consistency", 0, nil, nil},
+		{"an unplaced conflict in a scoped state from before Facts blocks", blueprint.Scope{Kind: blueprint.ScopeScoped}, emptyFacts, "ok", false, "consistency", 0, nil, nil},
+		{"a named fact with an empty with blocks", scopedFacts(nil), conflict([]string{ttl}, ""), "ok", false, "consistency", 0, nil, nil},
+		{"an empty facts list with a with blocks", scopedFacts(nil), conflict([]string{}, grace), "ok", false, "consistency", 0, nil, nil},
+		{"an unplaced conflict with a blueprint fix blocks on the blueprint", scopedFacts(nil), emptyFacts, "fix", false, "blueprint", 0, nil, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -183,8 +201,8 @@ func TestChangeReadConsistency(t *testing.T) {
 				if statusOf(s, pageA) != StatusAccepted {
 					t.Fatalf("status %s (%s), want accepted", statusOf(s, pageA), ruleOf(s, pageA))
 				}
-				if got := statusPage(s, pageA).Demoted; got != 1 {
-					t.Errorf("demoted conflicts = %d, want 1", got)
+				if got := statusPage(s, pageA).Demoted; got != tt.demoted {
+					t.Errorf("demoted conflicts = %d, want %d", got, tt.demoted)
 				}
 				var v string
 				for _, x := range rec.Verdicts {
@@ -195,13 +213,23 @@ func TestChangeReadConsistency(t *testing.T) {
 				if v != "demoted" {
 					t.Errorf("consistency verdict = %q, want demoted", v)
 				}
-				if len(rec.Warnings) == 0 || !strings.HasPrefix(rec.Warnings[len(rec.Warnings)-1], "Already present: ") {
-					t.Errorf("warnings = %v, want the Already present: conflict", rec.Warnings)
+				if len(rec.Warnings) != len(tt.warns) {
+					t.Fatalf("warnings = %v, want prefixes %v", rec.Warnings, tt.warns)
+				}
+				for i, w := range tt.warns {
+					if !strings.HasPrefix(rec.Warnings[i], w) {
+						t.Errorf("warning %d = %q, want prefix %q", i, rec.Warnings[i], w)
+					}
 				}
 				return
 			}
 			if statusOf(s, pageA) != StatusEscalated || rec.Escalation == nil || rec.Escalation.Seat != tt.want {
 				t.Errorf("status %s, escalation %+v, want escalated on %s", statusOf(s, pageA), rec.Escalation, tt.want)
+			}
+			for _, d := range tt.detail {
+				if !strings.Contains(rec.Escalation.Detail, d) {
+					t.Errorf("escalation detail %q lacks %q", rec.Escalation.Detail, d)
+				}
 			}
 			if got := statusPage(s, pageA).Demoted; got != 0 && tt.want != "blueprint" {
 				t.Errorf("demoted conflicts = %d on an escalated page", got)
