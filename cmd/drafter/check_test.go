@@ -67,6 +67,9 @@ func project(t *testing.T, files map[string]string) string {
 		"blueprints/outline.yaml":              read("outline.yaml"),
 		"blueprints/facts/facts.md":            read("facts/facts.md"),
 		"docs/guide.md":                        "# Rotate the widget key\n",
+		"src/rotate.go":                        "package src\n\nfunc Rotate() {}\n",
+		"src/sign.go":                          "package src\n\nfunc Sign() {}\n",
+		"src/keys.go":                          "package src\n\nconst KeyBytes = 32\n",
 	}
 	maps.Copy(tree, files)
 	for name, content := range tree {
@@ -87,8 +90,60 @@ func project(t *testing.T, files map[string]string) string {
 func TestCheckPassesTheCatalog(t *testing.T) {
 	root := project(t, nil)
 	out, errs, code := run(t, "check", "--root", root)
-	if code != 0 || out != "" || errs != "0 errors, 0 warnings\n" {
+	if code != 0 || out != "" || errs != "facts store: 4 pointers checked, 0 skipped\n0 errors, 0 warnings\n" {
 		t.Errorf("code %d, stdout %q, stderr %q", code, out, errs)
+	}
+}
+
+// verifyStoreRotateSource is the catalog's one rotate.go pointer, which the store rows rewrite.
+const verifyStoreRotateSource = "Source: `src/rotate.go`. [verified]"
+
+func TestCheckVerifiesTheStore(t *testing.T) {
+	farRotate := "package src\n" + strings.Repeat("// padding\n", 26) + "var farToken = 1\n"
+	dupe := "- `f:bbbbbb` A second bullet with the same id. Source: `src/sign.go`. [verified]\n"
+	tests := []struct {
+		name    string
+		replace string // replaces the rotate.go pointer in the facts file
+		append  string // added to the end of the facts file
+		rotate  string // replaces src/rotate.go
+		want    string
+	}{
+		{"a moved line", "Source: `src/rotate.go:3` (`farToken`). [verified]", "", farRotate, `names ["farToken"], not found within 10 lines`},
+		{"a missing anchor", "Source: `src/rotate.go:3` (`nowhereToken`). [verified]", "", "", `names ["nowhereToken"]`},
+		{"a duplicate id", "", dupe, "", `fact "f:bbbbbb" is on 2 bullets (blueprints/facts/facts.md:`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			facts := readCatalog(t, "facts/facts.md")
+			if tt.replace != "" {
+				facts = strings.Replace(facts, verifyStoreRotateSource, tt.replace, 1)
+			}
+			files := map[string]string{"blueprints/facts/facts.md": facts + tt.append}
+			if tt.rotate != "" {
+				files["src/rotate.go"] = tt.rotate
+			}
+			root := project(t, files)
+			out, errs, code := run(t, "check", "--root", root)
+			if code != 1 || !strings.Contains(out, ": error: store: ") || !strings.Contains(out, tt.want) {
+				t.Errorf("code %d, stdout %q, want exit 1 and a store error containing %q", code, out, tt.want)
+			}
+			if !strings.HasPrefix(errs, "facts store: ") {
+				t.Errorf("stderr %q", errs)
+			}
+		})
+	}
+}
+
+func TestCheckVerifiesTheStoreOnlyWithoutNamedBlueprints(t *testing.T) {
+	broken := strings.Replace(readCatalog(t, "facts/facts.md"), verifyStoreRotateSource, "Source: `src/gone.go:3`. [verified]", 1)
+	root := project(t, map[string]string{"blueprints/facts/facts.md": broken})
+	file := filepath.Join(root, "blueprints", "docs", "guide.blueprint.yaml")
+	out, errs, code := run(t, "check", "--root", root, file)
+	if code != 0 || out != "" || errs != "0 errors, 0 warnings\n" {
+		t.Errorf("named blueprint: code %d, stdout %q, stderr %q", code, out, errs)
+	}
+	if _, _, code := run(t, "check", "--root", root); code != 1 {
+		t.Errorf("whole store: code %d, want 1", code)
 	}
 }
 
@@ -102,7 +157,7 @@ func TestCheckReportsFindings(t *testing.T) {
 	if !strings.HasPrefix(out, "blueprints/docs/guide.blueprint.yaml:") || !strings.Contains(out, ": error: facts: fact \"f:zzzzzz\" is in no facts file (") {
 		t.Errorf("stdout %q", out)
 	}
-	if errs != "1 error, 0 warnings\n" {
+	if errs != "facts store: 4 pointers checked, 0 skipped\n1 error, 0 warnings\n" {
 		t.Errorf("stderr %q", errs)
 	}
 
