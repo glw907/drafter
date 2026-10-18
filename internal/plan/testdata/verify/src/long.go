@@ -1,0 +1,30 @@
+package long
+
+type WidgetFactory struct{}
+// filler 4
+// filler 5
+// filler 6
+// filler 7
+// filler 8
+// filler 9
+// filler 10
+// filler 11
+var nearWord = 1
+// filler 13
+// filler 14
+// filler 15
+// filler 16
+// filler 17
+// filler 18
+// filler 19
+// filler 20
+// filler 21
+// filler 22
+// filler 23
+// filler 24
+// filler 25
+// filler 26
+// filler 27
+var farWord = 2
+// filler 29
+var last = 3
