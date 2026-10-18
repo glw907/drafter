@@ -33,11 +33,15 @@ type page struct {
 	pl  *plan.Plan
 	// plan format: markdown plans carry no plan.Plan.
 	markdown bool
+	// blueprint marks a page whose plan is a blueprint, which stage 1 reads and stops at.
+	blueprint bool
+	bp        *bpInputs
 }
 
 func (r *runner) newPage(h handoff.Handoff) (*page, error) {
 	p := &page{r: r, h: h, key: run.PageKey(h.Page.Path)}
 	p.markdown = !strings.HasSuffix(h.Plan, ".yaml") && !strings.HasSuffix(h.Plan, ".yml")
+	p.blueprint = strings.HasSuffix(h.Plan, ".blueprint.yaml")
 	if !r.o.DryRun {
 		p.dir = filepath.Join(r.dir, p.key)
 		if err := os.MkdirAll(p.dir, 0o755); err != nil {
@@ -115,8 +119,11 @@ func (p *page) initRecord() {
 	rec.Page, rec.Brief, rec.Plan = p.h.Page.Path, p.h.Page.Brief, p.h.Plan
 	rec.Mode = p.r.cfg.Mode
 	rec.PlanFormat = "yaml"
-	if p.markdown {
+	switch {
+	case p.markdown:
 		rec.PlanFormat = "markdown"
+	case p.blueprint:
+		rec.PlanFormat = "blueprint"
 	}
 	rec.Facts = "store"
 	if p.r.cfg.Facts.Dir == "" {

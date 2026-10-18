@@ -26,7 +26,8 @@ func newConfig(home string) *Config {
 		PagesInFlight:   3,
 		Retries:         Retries{GateFix: 2, EditContract: 2},
 		Gate:            Gate{Protocol: "plain"},
-		Seats:           append([]string(nil), seatNames...),
+		Blueprints:      Blueprints{Root: "blueprints"},
+		Seats:           append([]string(nil), defaultSeats...),
 		Seat:            map[string]Seat{},
 		Register:        map[string][]string{},
 		src:             map[string]origin{},
@@ -45,6 +46,8 @@ func newConfig(home string) *Config {
 		"retries.gate_fix":      c.Retries.GateFix,
 		"retries.edit_contract": c.Retries.EditContract,
 		"gate.protocol":         c.Gate.Protocol,
+		"blueprints.root":       c.Blueprints.Root,
+		"blueprints.required":   c.Blueprints.Required,
 		"seats":                 c.Seats,
 	} {
 		c.record(key, "default", format(v))
@@ -146,6 +149,11 @@ func (c *Config) apply(l *layer) {
 	if d := f.Facts; d != nil {
 		putPath(c, l, "facts.dir", &c.Facts.Dir, d.Dir)
 		put(c, l, "facts.bullet_format", &c.Facts.BulletFormat, d.BulletFormat)
+	}
+	if b := f.Blueprints; b != nil {
+		put(c, l, "blueprints.root", &c.Blueprints.Root, b.Root)
+		put(c, l, "blueprints.required", &c.Blueprints.Required, b.Required)
+		put(c, l, "blueprints.outline", &c.Blueprints.Outline, b.Outline)
 	}
 	for track, sections := range f.Register {
 		c.Register[track] = sections

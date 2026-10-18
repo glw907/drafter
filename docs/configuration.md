@@ -242,10 +242,16 @@ the failing lines of a red log. drafter uses the two to attribute each failing s
 `prompts` is the path to the prompts module. [The prompts module](prompts-module.md) describes its
 contract.
 
-The seven seats are `draft`, `structure`, `editor`, `fact`, `reader`, `coverage`, and
-`consistency`. `seats` lists the ones that run. The list must include `draft`, which always runs.
-Leaving a review seat out removes its stages, and the run record notes each seat that didn't run.
-The `consistency` seat runs only when `facts.dir` is set.
+The eight seats are `draft`, `structure`, `editor`, `fact`, `reader`, `coverage`, `consistency`,
+and `blueprint`. `seats` lists the ones that run in `drafter page`, and by default it names the
+first seven. The list must include `draft`, which always runs. Leaving a review seat out removes
+its stages, and the run record notes each seat that didn't run. The `consistency` seat runs only
+when `facts.dir` is set.
+
+The `blueprint` seat reads a blueprint in `drafter read`. It stays out of the default `seats`
+list, so `drafter page` runs as it did before the seat existed. `drafter read` always runs the
+seat, and it refuses to start, with exit status 2, when `[seat.blueprint]` lacks a model, an
+effort, or `max_tokens`, or when the model has no entry under `prices.models`.
 
 Replace `<name>` with a seat name. A `seat.<name>` table for any other name is an error.
 
@@ -263,7 +269,7 @@ request. A template that names `{baseline}` runs only when the page has a baseli
 
 | Setting | Layers | Default | Environment variable |
 |---|---|---|---|
-| `facts.dir` | project, local | Unset. No facts store. | `DRAFTER_FACTS_DIR` |
+| `facts.dir` | project, local | `<blueprints.root>/facts` when that directory exists, otherwise unset. No facts store. | `DRAFTER_FACTS_DIR` |
 | `facts.bullet_format` | project, local | Unset. | `DRAFTER_FACTS_BULLET_FORMAT` |
 | `register.<track>` | project, local | Unset. | None. |
 
@@ -273,6 +279,22 @@ value is `v1`. [Plan format](plan-format.md) describes how a plan cites facts.
 
 `register.<track>` is a list of the register sections that a track reads. Replace `<track>` with
 the track's name. drafter records the list and `drafter config` prints it.
+
+### Blueprints
+
+| Setting | Layers | Default | Environment variable |
+|---|---|---|---|
+| `blueprints.root` | project, local | `blueprints` | None. |
+| `blueprints.required` | project, local | `false` | None. |
+| `blueprints.outline` | project, local | `<blueprints.root>/outline.yaml` | None. |
+
+`blueprints.root` is the directory that holds the project's blueprints, relative to the project
+root. `blueprints.outline` is the path of the outline file, also relative to the project root.
+Both must stay inside the project. When `blueprints.required` is `true`, `drafter check` reports
+a managed page with no blueprint as an error. When it is `false`, the report is a warning, which
+lets a project convert its pages one at a time. `drafter check` also warns when the root or the
+facts directory departs from the convention in [Blueprint format](blueprint-format.md). The
+blueprint settings have no environment variable.
 
 ## Example
 

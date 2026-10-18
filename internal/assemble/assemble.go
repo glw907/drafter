@@ -49,6 +49,9 @@ type Input struct {
 	FactIDs  []string
 	Declined []edits.DeclinedFinding
 	CustomID string
+	// Extra is a block drafter built itself, sent after the inlined files and never scanned for
+	// paths to inline.
+	Extra string
 }
 
 // note opens the first user turn of a request. The delimiters it states are the ones the block
@@ -85,6 +88,9 @@ func Build(ctx context.Context, in Input) (batch.Request, error) {
 		return batch.Request{}, err
 	}
 	parts = append(parts, blocks...)
+	if in.Extra != "" {
+		parts = append(parts, in.Extra)
+	}
 	if len(in.Declined) > 0 {
 		parts = append(parts, declinedBlock(in.Declined))
 	}

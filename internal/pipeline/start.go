@@ -266,6 +266,9 @@ func (r *runner) addPages() error {
 			return err
 		}
 		p.ps = &run.PageState{Status: StatusPending, Step: stPlan, Pre: map[string]string{}}
+		if p.blueprint {
+			p.ps.Step = stBpCheck
+		}
 		p.w = work{Rec: newRecord()}
 		r.state.Pages[p.key] = p.ps
 		r.pages = append(r.pages, p)

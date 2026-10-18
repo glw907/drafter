@@ -1,0 +1,15 @@
+version: 1
+types:
+  - name: task guide
+    anatomy: Task guide
+pages:
+  - path: docs/guide.md
+    slug: guide
+    title: Rotate the widget key
+    type: task guide
+    job: |
+      Replace the widget key without a gap in service.
+    covers:
+      - Generate and verify a new key.
+    outOfScope:
+      - Creating the first key.

@@ -60,6 +60,51 @@ The exit status is 0 when every page is accepted, 1 when any page is escalated, 
 couldn't start, and 3 when the run stopped and you can resume it. Status 3 outranks 1: a run that
 stopped with an escalated page exits 3.
 
+### check
+
+```sh
+drafter check [--root <dir>] [--json] [<blueprint>...]
+```
+
+The command validates every blueprint under the project's blueprint root, or the ones you name,
+offline. It decodes each blueprint, runs the plan checks on it, and adds the blueprint checks:
+each managed page has a blueprint, every `[[id]]` reference resolves, every section says why, and
+`drafted.lock` agrees with the disk. Findings print as `file:line: severity: check: message
+(fix)`, and the exit status follows `check-plan`'s. [Blueprint format](docs/blueprint-format.md)
+describes the format and each check.
+
+### refs
+
+```sh
+drafter refs [--root <dir>] [--json] <fact-id>
+```
+
+The command lists every blueprint item, on every page, that places or cites the fact, one
+`file:line: item-id (kind)` per line. It exits 1 when there are none.
+
+### convert
+
+```sh
+drafter convert outline [--out <file>] <outline.json>...
+drafter convert plan [--framing <file>] --outline <outline.json> [--root <dir>] <plan.yaml>
+```
+
+`convert outline` writes `outline.yaml` from the chain's JSON outlines. `convert plan` writes a
+page's blueprint from its v1 plan and framing record, never over an existing file, and seeds the
+page's `drafted.lock` entry. It leaves every section's `why` for a person to write.
+
+### read
+
+```sh
+drafter read [--resume <run-id>] [--dry-run] [--sync] [--json] <blueprint>...
+```
+
+The command runs stage 1 of the pipeline on each blueprint: the local check, then one batch
+holding the consistency read and the blueprint read. It needs a clean tree and `[seat.blueprint]`
+in the configuration, and it reads every input from the commit the run started at. When the run
+ends with every blueprint decided, it records each accepted blueprint's blob id in
+`drafted.lock`. The exit status is the same as `page`'s.
+
 ### check-plan
 
 ```sh
@@ -124,6 +169,10 @@ flag that set each one. A cap lists every source that set it. The command never 
 - [Plan format](docs/plan-format.md): every field and item kind of a page plan, each check, and the
   facts bullet format.
 - [Plan schema](schema/plan.schema.json): the JSON Schema for a plan file.
+- [Blueprint format](docs/blueprint-format.md): the durable page blueprint, `outline.yaml`,
+  `drafted.lock`, the path rule, and the edit catalog.
+- [Blueprint schema](schema/blueprint.schema.json) and [outline schema](schema/outline.schema.json):
+  the JSON Schemas for those files.
 
 ## Develop
 

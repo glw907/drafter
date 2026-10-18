@@ -9,8 +9,12 @@ import (
 	"strings"
 )
 
-// seatNames are the seven seats, in the order a default run lists them.
-var seatNames = []string{"draft", "structure", "editor", "fact", "reader", "coverage", "consistency"}
+// seatNames are the eight seats a configuration may name. A default run lists the first seven;
+// the blueprint seat runs only under drafter read, which validates it itself.
+var seatNames = []string{"draft", "structure", "editor", "fact", "reader", "coverage", "consistency", "blueprint"}
+
+// defaultSeats are the seats a run lists when no layer sets seats.
+var defaultSeats = seatNames[:7]
 
 // placeholders are the names a command template may use.
 var placeholders = []string{"page", "brief", "slug", "baseline"}
@@ -62,7 +66,29 @@ func (l *layer) checkValues() error {
 	if b := f.Facts; b != nil && b.BulletFormat != nil && *b.BulletFormat != "v1" {
 		return l.fail("facts.bullet_format", "must be v1, the only bullet format, not %q", *b.BulletFormat)
 	}
+	if err := l.checkBlueprints(); err != nil {
+		return err
+	}
 	return l.checkSeats()
+}
+
+// checkBlueprints refuses a blueprint path that is not a clean path inside the project. The
+// settings are project-relative, never resolved against the layer's directory, because the path
+// rule joins them to page paths.
+func (l *layer) checkBlueprints() error {
+	b := l.f.Blueprints
+	if b == nil {
+		return nil
+	}
+	for _, p := range []struct {
+		key string
+		v   *string
+	}{{"blueprints.root", b.Root}, {"blueprints.outline", b.Outline}} {
+		if p.v != nil && !filepath.IsLocal(*p.v) {
+			return l.fail(p.key, "must be a path inside the project, relative to its root, not %q", *p.v)
+		}
+	}
+	return nil
 }
 
 func (l *layer) checkGate() error {

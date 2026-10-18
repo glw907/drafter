@@ -314,8 +314,10 @@
 // Under `DRAFTER_HOST`, `resolvePages()` returns `DRAFTER_HOST.resolved` without a probe, and the
 // script returns `DRAFTER_SEATS` just before the slot pool, so no page runs.
 //
-// `DRAFTER_SEATS` maps `draft`, `structure`, `editor`, `fact`, and `reader` to functions of one
-// seat context object, each adapting it to the builder the chain itself calls:
+// `DRAFTER_SEATS` maps `draft`, `structure`, `editor`, `fact`, `reader`, and `blueprint` to
+// functions of one seat context object, each adapting it to the builder the chain itself calls
+// (`blueprint` has no chain counterpart and ignores the context; drafter loads the module for a
+// blueprint read with no chain args, so the args guard below runs only outside `DRAFTER_HOST`):
 //
 //   page            the page's resolved config (an entry of `resolved.pages`)
 //   inputs          the page-inputs record: job, pageType, factIds, claimInventory
@@ -603,7 +605,9 @@ const OPTION_MAP = a.optionMap || "docs/internal/option-map.json";
 const HAS_BUDGET = typeof budget !== "undefined" && budget !== null && typeof budget.spent === "function";
 const SPENT_AT_START = HAS_BUDGET ? budget.spent() : 0;
 
-if (!WT || !GATE || !PAGES_ARG.length) {
+// drafter loads the module with the handoff's args, and a blueprint handoff carries none, so the
+// guard runs only for the Workflow run.
+if (!HOST && (!WT || !GATE || !PAGES_ARG.length)) {
   throw new Error("docs-page-chain needs args.worktree, args.gate, and args.pages");
 }
 
@@ -2245,9 +2249,100 @@ async function chain(p) {
   return { ...record, status: "escalate", reason: "second fix verdict or red gate", findings: combined(r2.list) };
 }
 
+/**
+ * The blueprint read's prompt: the plan read's checklist, aimed at a durable blueprint instead of a
+ * plan, with the reads that stopped both real pilot pages (reader state, recovery, completeness)
+ * and the reads a durable file adds. drafter appends the blueprint, its outline entry, and the
+ * facts it places after this text, so the prompt names no file but the register and takes nothing
+ * from the run's args. The bar is the chain's: any blocking finding means "fix".
+ * @returns {string}
+ */
+function blueprintPrompt() {
+  return `Blueprint read. The blueprint below is a documentation page's durable plan, a YAML file with
+an \`id\` and a \`why\` on each section, items of several kinds, and a \`framing\` block. No prose exists
+yet: read the blueprint, never a page. The page's job, type, and what it covers sit in its outline
+entry, and the facts it places sit in the facts block, all inlined below. A finding's location is a
+section id and, when it applies, an item id.
+
+The blueprint is Google's outline, written down (Google Technical Writing Two, "Organizing large
+documents", ${GOOGLE_LARGE_DOCS}): "You might find it useful to think of an outline as the narrative for
+your document," and "Structure your outline so that your document introduces information when it's
+most relevant to your reader." Your stance is an editor's: the Editorial Freelancers Association says
+"Developmental editors (also called 'substantive,' 'structural,' or 'content' editors) deal with
+content, organization, and genre considerations." You read the whole blueprint against this checklist,
+return findings, and never edit.
+
+How the blueprint is read. A \`step\` item is an action; \`requires\` and \`produces\` name state tokens, and
+\`preconditions\` lists the state a reader brings. A \`failure\` item names the step it follows in \`from\`
+and the item that handles it in \`handledBy\`. A \`fact\` item places a fact, and its \`use\` says which
+part of the fact the placement carries. An \`example\` item is a worked example. A prose field names
+another section as [[section-id]]. An item with \`origin: human\` carries a person's edit. A
+section's \`why\` says why it is there and sits where it does; the page-level \`orderReason\` explains
+only the order as a whole. \`drafter check\` has already run: ids are unique, every step's \`requires\`
+is declared by an earlier step or by \`preconditions\`, every step marked \`canFail\` has a failure
+item, and every fact resolves. That proves the blueprint consistent, not complete. Judge the rest
+yourself.
+
+Read the section "## The page anatomies" of ${REGISTER}, by its exact heading. The introduction and
+the closing section it requires for this page's type are the second half of the same check as the
+introduction items below.
+
+Order, pace, and user goal. Block 1, the Red Hat peer review guide's "Structure Checklist"
+(https://redhat-documentation.github.io/peer-review/), the items that apply:
+- Information is presented in the most logical order and location.
+- Information is provided at the right pace.
+- The user goal is clear.
+- Tasks reflect the intended goal of the user.
+- Troubleshooting and error recognition steps are included where appropriate.
+Read the sections in order against the outline entry: its \`job\` is the page's purpose, its \`covers\`
+the list the page must deliver, and its \`outOfScope\` the page's "doesn't cover" list.
+
+The introduction. Block 2, Google Technical Writing Two, "Organizing large documents": "an introduction
+that includes the following information: What the document covers. What prior knowledge you expect
+readers to have. What the document doesn't cover." Compare the blueprint's introduction to the
+outline entry's \`job\`, \`covers\`, and \`outOfScope\`, and grade the framing block's introduction plan
+against what the sections deliver.
+
+Completeness of steps and failures. A page with no deploy step passes the check unless some step
+declares that it requires a deployment. Return a blocking finding for each step the page's job needs
+that the blueprint lacks, and for each failure a reader following the steps could meet that has no
+\`failure\` item, naming the missing step or failure and where in the blueprint it belongs.
+
+Reader state. Read each step's \`text\` as a reader would. Return a blocking finding for a step whose
+prerequisite a reader cannot hold at that point: the step relies on something that no earlier step
+produces and no precondition lists, even where \`requires\` does not declare it. A dependency stated
+only in prose, such as a step that assumes a deployed Worker, is the case this read exists for.
+
+Recovery. Return a blocking finding for a failure a reader following the steps can meet at a step
+but that has no \`from\`, or whose \`from\` names a step where it cannot occur, and for a recovery
+route that appears before the diagnosis that tells the reader which failure they have. A failure
+with no \`from\` is a free-standing symptom row, which the format allows for a symptom met in the
+site's ordinary use after the steps end, such as an editor's failed publish. Do not ask for a step
+the page does not contain.
+
+A \`use\` names scope only. Compare each \`use\` with its fact in the facts block. Return a blocking
+finding for each \`use\` that restates the fact's content instead of scoping it, since a corrected
+fact would leave that paraphrase stale. A \`use\` that starts with "Only" or "Omit" and names a part of
+the fact passes.
+
+Durable fields describe the page as it is. \`orderReason\`, each \`why\`, \`constraints\`, and the \`framing\`
+parts say what the page is and why. Return a blocking finding for each one that narrates the planning
+session instead: what was merged, moved, or cut against an older outline, or a departure from an
+anatomy. That history belongs in the commit message.
+
+Human-origin items. A person wrote each item marked \`origin: human\`, and the redraft must carry its
+point with real weight. Return a blocking finding for each such item the blueprint would bury: placed
+where the section's order or its \`opens\` line leaves it a clause, a parenthetical, or a footnote.
+
+A checklist item the blueprint fails is a blocking finding: its section id, and item id where one
+applies, as location, the item it fails and how, and in rewrite a suggestion for how to address it.
+Verdict "fix" if any blocking finding exists; otherwise "ok".`;
+}
+
 // The back-half seats drafter renders prompts from: one function of the seat context object per
 // seat, each adapting it to the builder the chain calls. The header comment documents the object.
 const DRAFTER_SEATS = {
+  blueprint: () => blueprintPrompt(),
   draft: (c) => draftPrompt(c.page, c.inputs, c.round === 1 ? 1 : 2, c.findings, c.afterFinalRead === true),
   structure: (c) => structurePrompt(c.page, "page", c.narrow || undefined),
   editor: (c) => editorPrompt(c.page, c.scope || undefined, c.where || undefined, c.narrow || undefined),

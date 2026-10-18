@@ -105,13 +105,18 @@ func (p *page) baselineFor(stage string) string {
 
 // build assembles one request and remembers its turns, which an answer extends into history.
 func (p *page) build(ctx context.Context, stage, seat string, a assemble.Answer, prompt string, hist []batch.Message, declined []edits.DeclinedFinding) (batch.Request, error) {
-	attempt := p.nextAttempt(stage, seat)
-	req, err := assemble.Build(ctx, assemble.Input{
-		Seat: seat, Answer: a, Config: p.r.cfg, Prompt: prompt, History: hist,
-		Page: p.h.Page.Path, Brief: p.h.Page.Brief, Slug: p.slug(), Baseline: p.baselineFor(stage),
-		Facts: p.r.facts, FactIDs: p.h.Inputs.FactIDs, Declined: declined,
-		CustomID: p.customID(stage, seat, attempt),
+	return p.buildInput(ctx, stage, seat, assemble.Input{
+		Answer: a, Prompt: prompt, History: hist, Facts: p.r.facts, FactIDs: p.h.Inputs.FactIDs, Declined: declined,
 	})
+}
+
+// buildInput completes in with the page's own fields and assembles it as build does.
+func (p *page) buildInput(ctx context.Context, stage, seat string, in assemble.Input) (batch.Request, error) {
+	attempt := p.nextAttempt(stage, seat)
+	in.Seat, in.Config = seat, p.r.cfg
+	in.Page, in.Brief, in.Slug, in.Baseline = p.h.Page.Path, p.h.Page.Brief, p.slug(), p.baselineFor(stage)
+	in.CustomID = p.customID(stage, seat, attempt)
+	req, err := assemble.Build(ctx, in)
 	if err != nil {
 		return batch.Request{}, fmt.Errorf("assemble the %s request for %s: %w", seat, p.h.Page.Path, err)
 	}
@@ -134,6 +139,10 @@ func (p *page) advance(ctx context.Context) (*stage, error) {
 		switch p.ps.Step {
 		case stPlan:
 			err = p.doPlan()
+		case stBpCheck:
+			err = p.doBlueprintCheck()
+		case stBpRead:
+			stg, err = p.stageBlueprintRead(ctx)
 		case stConsistency:
 			stg, err = p.stageConsistency(ctx)
 		case stDraft:

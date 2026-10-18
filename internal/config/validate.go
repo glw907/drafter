@@ -68,3 +68,10 @@ func (c *Config) validateSeat(name string) []error {
 	}
 	return problems
 }
+
+// ValidateSeat reports why the named seat cannot run: a missing model, effort, or max_tokens, or
+// a model with no price. It lets a command that runs a seat outside the seats list, such as
+// drafter read with the blueprint seat, refuse to start on an incomplete one.
+func (c *Config) ValidateSeat(name string) error {
+	return errors.Join(c.validateSeat(name)...)
+}

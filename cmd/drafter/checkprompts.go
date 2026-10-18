@@ -141,7 +141,7 @@ func runCheckPrompts(cmd *cobra.Command, f *checkPromptsFlags) error {
 		if err != nil {
 			r.Failures = append(r.Failures, promptFailure{"render", err.Error()})
 		} else {
-			r.Failures = append(r.Failures, containment(c.Context, out)...)
+			r.Failures = append(r.Failures, containment(c.Seat, c.Context, out)...)
 			if expect != nil {
 				want, ok := expect[c.Name]
 				switch {
@@ -210,14 +210,21 @@ func decodeStrict(data []byte, v any) error {
 	return nil
 }
 
-// containment checks that out names the context's page and carries its findings text.
-func containment(c prompts.Context, out string) []promptFailure {
+// containment checks that out names the context's page and carries its findings text. The
+// blueprint seat is the exception: its prompt must not name the page.
+func containment(seat string, c prompts.Context, out string) []promptFailure {
 	var fs []promptFailure
 	var page struct {
 		Path string `json:"path"`
 	}
 	if err := json.Unmarshal(c.Page, &page); err != nil || page.Path == "" {
 		fs = append(fs, promptFailure{"page", "the context's page.path is missing"})
+	} else if seat == "blueprint" {
+		// The blueprint seat's request inlines every repository path its prompt names, and the
+		// page is not yet written, so naming the page's path would pull in the wrong file.
+		if strings.Contains(out, page.Path) {
+			fs = append(fs, promptFailure{"page", fmt.Sprintf("the blueprint prompt names page.path %q, which the request would inline", page.Path)})
+		}
 	} else if !strings.Contains(out, page.Path) {
 		fs = append(fs, promptFailure{"page", fmt.Sprintf("prompt does not contain page.path %q", page.Path)})
 	}

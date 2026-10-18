@@ -1,0 +1,30 @@
+version: 1
+argument: |
+  Revoke a Lumen API key once its grace period has passed.
+introduction:
+  covers: |
+    How to revoke a key after a rotation.
+  priorKnowledge: |
+    You have rotated the key.
+  notCovered: |
+    Creating a key.
+  facts: [lumen-grace]
+orderReason: |
+  Revocation is one action, so the page has one section.
+sections:
+  - id: revoke
+    heading: Revoke the key
+    why: |
+      Revocation is the page's whole job.
+    opens: |
+      Wait out the grace period, then revoke the old key.
+    items:
+      - id: f-grace
+        kind: fact
+        fact: lumen-grace
+        use: |
+          Only the length of the grace period.
+      - id: s-revoke
+        kind: step
+        text: |
+          Revoke the old key in the console.

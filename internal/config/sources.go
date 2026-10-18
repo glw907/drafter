@@ -15,6 +15,7 @@ var settingKeys = []string{
 	"gate.command", "gate.index_link_command", "gate.protocol", "gate.lane",
 	"gate.section_pattern", "gate.failure_pattern",
 	"prompts", "seats", "facts.dir", "facts.bullet_format", "inline_files",
+	"blueprints.root", "blueprints.required", "blueprints.outline",
 }
 
 // Sources returns one row per setting with its value and the layer, variable, or flag that set
