@@ -10,6 +10,6 @@ func newRootCmd() *cobra.Command {
 		SilenceErrors: true,
 	}
 	cmd.AddCommand(newCheckPlanCmd(), newAnchorsCmd(), newConfigCmd(), newSpendCmd(), newCheckPromptsCmd(), newPageCmd(),
-		newCheckCmd(), newRefsCmd(), newConvertCmd(), newReadCmd(), newSeedCmd())
+		newCheckCmd(), newRefsCmd(), newConvertCmd(), newReadCmd(), newSeedCmd(), newGateCmd())
 	return cmd
 }

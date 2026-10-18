@@ -392,6 +392,76 @@ func TestPageRefusesAnUncleanWorktree(t *testing.T) {
 	})
 }
 
+// requestCount is how many requests the stub saw, free calls included.
+func (s *apiStub) requestCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.paths)
+}
+
+// gatePreflightEnv is a page project whose configuration leaves gate.command at its stock value.
+func gatePreflightEnv(t *testing.T, stub *apiStub) pageEnv {
+	t.Helper()
+	if _, err := exec.LookPath("vale"); err != nil {
+		t.Fatal("Vale is required to run these tests; install it (https://vale.sh/docs/install)")
+	}
+	p := newPageEnv(t, stub)
+	writeFile(t, filepath.Join(p.dir, "drafter.toml"), `prompts = "prompts.js"
+seats = ["draft"]
+
+[seat.draft]
+model = "model-a"
+effort = "high"
+max_tokens = 4000
+`)
+	gitRun(t, p.dir, "add", "-A")
+	gitRun(t, p.dir, "commit", "-q", "-m", "stock gate")
+	return p
+}
+
+func TestPageStockGateWithoutValeConfigExitsBeforeAnyRequest(t *testing.T) {
+	stub := newAPIStub(t)
+	p := gatePreflightEnv(t, stub)
+	r := p.page(t, "--dry-run", p.handoffFile(t))
+	if r.code != 2 || !strings.Contains(r.stderr, "vale") {
+		t.Errorf("exit %d, stderr %q; want 2 naming Vale", r.code, r.stderr)
+	}
+	if n := stub.requestCount(); n != 0 {
+		t.Errorf("the API stub saw %d requests, want none", n)
+	}
+}
+
+func TestPageStockGateWithoutDrafterOnPathExitsBeforeAnyRequest(t *testing.T) {
+	stub := newAPIStub(t)
+	p := gatePreflightEnv(t, stub)
+	writeFile(t, filepath.Join(p.dir, ".vale.ini"), "StylesPath = .vale/styles\nPackages = Google\n\n[*.md]\nBasedOnStyles = Vale, Google\n")
+	if err := os.MkdirAll(filepath.Join(p.dir, ".vale", "styles", "Google"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(p.dir, ".vale", "styles", "Google", "Foo.yml"),
+		"extends: existence\nmessage: \"Avoid '%s'.\"\nlevel: error\ntokens:\n  - foo\n")
+	gitRun(t, p.dir, "add", "-A")
+	gitRun(t, p.dir, "commit", "-q", "-m", "vale setup")
+	bin := t.TempDir()
+	for _, name := range []string{"vale", "git"} {
+		found, err := exec.LookPath(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(found, filepath.Join(bin, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p.env = append(p.env, "PATH="+bin)
+	r := p.page(t, "--dry-run", p.handoffFile(t))
+	if r.code != 2 || !strings.Contains(r.stderr, "drafter is not on PATH") {
+		t.Errorf("exit %d, stderr %q; want 2 naming drafter", r.code, r.stderr)
+	}
+	if n := stub.requestCount(); n != 0 {
+		t.Errorf("the API stub saw %d requests, want none", n)
+	}
+}
+
 func TestPageUsage(t *testing.T) {
 	stub := newAPIStub(t)
 	p := newPageEnv(t, stub)
