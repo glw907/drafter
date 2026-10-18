@@ -2,6 +2,7 @@ package blueprint
 
 import (
 	"bytes"
+	"maps"
 	"slices"
 
 	"github.com/glw907/drafter/internal/plan"
@@ -12,18 +13,22 @@ import (
 const (
 	// ScopeUnchanged means nothing a read sees differs from the earlier revision.
 	ScopeUnchanged = "unchanged"
-	// ScopeScoped means the sections in Scope.IDs changed and nothing else did.
+	// ScopeScoped means the page has an earlier blueprint to diff against and something in it differs.
 	ScopeScoped = "scoped"
-	// ScopeWhole means the change reaches beyond named sections, or cannot be bounded.
+	// ScopeWhole means the page cannot be diffed, so a read judges all of it.
 	ScopeWhole = "whole"
 )
 
 // Scope is what changed in one page's blueprint between two revisions. IDs holds the changed
-// section ids, in blueprint order, for a scoped page, and Why says what made a page whole.
+// section ids, in blueprint order, and may be empty for a scoped page: a removed section, a
+// reorder, a field outside sections, and an outline-entry change name no section. Facts holds the
+// ids of the facts the change touched and is never nil on a scoped page, so a nil Facts marks a
+// state recorded before the field existed. Why says what made a page whole.
 type Scope struct {
-	Kind string   `json:"kind"`
-	IDs  []string `json:"ids,omitempty"`
-	Why  string   `json:"why,omitempty"`
+	Kind  string   `json:"kind"`
+	IDs   []string `json:"ids,omitempty"`
+	Facts []string `json:"facts"`
+	Why   string   `json:"why,omitempty"`
 }
 
 // Revision is one version of a page's inputs: its blueprint file, its outline entry (nil when the
@@ -36,11 +41,16 @@ type Revision struct {
 
 // Compare says what changed from old to cur for the blueprint at file. A section is changed when
 // its id is new, its decoded content differs, or it places or cites a fact whose bullet changed;
-// formatting alone changes nothing. The page is whole when a section was removed, the shared
-// sections changed order or level, anything outside sections changed (a fact cited from the
-// framing, the introduction, or the dispositions included), the outline entry changed, or the
-// earlier blueprint or entry is missing or does not decode. An undecodable current blueprint is
-// whole too, which leaves its fault to the blueprint check.
+// formatting alone changes nothing. The page is whole only where no diff can be built: the
+// blueprint is absent or does not decode at the earlier revision, the current blueprint does not
+// decode (which leaves its fault to the blueprint check), or the outline lists the page at neither
+// revision. Every other difference makes the page scoped, a removed section, an order change, a
+// field outside sections, and an outline-entry change among them.
+//
+// Scope.Facts is the union, over the old and new versions of every new, removed, or differing item
+// (matched by id, which is unique across sections and items) and of the fields outside sections
+// when they differ, of the facts each places or cites, plus every fact the page places or cites at
+// either revision whose bullet changed.
 func Compare(file string, old, cur Revision) Scope {
 	whole := func(why string) Scope { return Scope{Kind: ScopeWhole, Why: why} }
 	ob, ofs := Decode(file, old.Blueprint)
@@ -51,60 +61,91 @@ func Compare(file string, old, cur Revision) Scope {
 	if cb == nil || plan.HasError(cfs) {
 		return whole("the blueprint does not decode")
 	}
-	if old.Entry == nil || cur.Entry == nil || !sameYAML(old.Entry, cur.Entry) {
-		return whole("the outline entry changed")
+	if old.Entry == nil || cur.Entry == nil {
+		return whole("the outline does not list the page at both revisions")
 	}
+
+	facts := map[string]bool{}
+	addFacts := func(ids []string) {
+		for _, id := range ids {
+			if id != "" {
+				facts[id] = true
+			}
+		}
+	}
+	differs := !sameYAML(old.Entry, cur.Entry)
+
 	if !sameYAML(withoutSections(ob), withoutSections(cb)) {
-		return whole("a field outside sections changed")
+		differs = true
+		addFacts(pageFacts(ob, old.Facts))
+		addFacts(pageFacts(cb, cur.Facts))
 	}
-	oldAt := map[string]*Section{}
+
+	oldSec, curSec := map[string]*Section{}, map[string]*Section{}
+	oldItems, curItems := map[string]*Item{}, map[string]*Item{}
 	for i := range ob.Sections {
-		oldAt[ob.Sections[i].ID] = &ob.Sections[i]
+		oldSec[ob.Sections[i].ID] = &ob.Sections[i]
+		for j := range ob.Sections[i].Items {
+			oldItems[ob.Sections[i].Items[j].ID] = &ob.Sections[i].Items[j]
+		}
 	}
-	curIDs := make([]string, len(cb.Sections))
-	for i, s := range cb.Sections {
-		curIDs[i] = s.ID
+	var sharedOld, sharedCur []string
+	for i := range cb.Sections {
+		curSec[cb.Sections[i].ID] = &cb.Sections[i]
+		for j := range cb.Sections[i].Items {
+			curItems[cb.Sections[i].Items[j].ID] = &cb.Sections[i].Items[j]
+		}
+		if _, ok := oldSec[cb.Sections[i].ID]; ok {
+			sharedCur = append(sharedCur, cb.Sections[i].ID)
+		}
 	}
-	var shared []string
 	for _, s := range ob.Sections {
-		if !slices.Contains(curIDs, s.ID) {
-			return whole("section " + s.ID + " was removed")
-		}
-		shared = append(shared, s.ID)
-	}
-	var sharedCur []string
-	for _, id := range curIDs {
-		if _, ok := oldAt[id]; ok {
-			sharedCur = append(sharedCur, id)
+		if _, ok := curSec[s.ID]; ok {
+			sharedOld = append(sharedOld, s.ID)
+		} else {
+			differs = true
 		}
 	}
-	if !slices.Equal(shared, sharedCur) {
-		return whole("the order of the sections changed")
+	if !slices.Equal(sharedOld, sharedCur) {
+		differs = true
 	}
-	if cites(cb, cur.Facts, func(id string) bool { return factChanged(old.Facts, cur.Facts, id) }) {
-		return whole("a fact cited outside the sections changed")
+
+	for id, it := range oldItems {
+		if n, ok := curItems[id]; !ok || !sameYAML(it, n) {
+			addFacts(itemFacts(it))
+		}
 	}
+	for id, it := range curItems {
+		if o, ok := oldItems[id]; !ok || !sameYAML(o, it) {
+			addFacts(itemFacts(it))
+		}
+	}
+
+	bulletChanged := func(id string) bool { return FactChanged(old.Facts, cur.Facts, id) }
+	for _, ids := range [][]string{citedFacts(ob, old.Facts), citedFacts(cb, cur.Facts)} {
+		for _, id := range ids {
+			if bulletChanged(id) {
+				facts[id] = true
+				differs = true
+			}
+		}
+	}
+
 	var changed []string
 	for i := range cb.Sections {
 		s := &cb.Sections[i]
-		o, ok := oldAt[s.ID]
-		switch {
-		case !ok:
-		case o.Level != s.Level:
-			return whole("section " + s.ID + " changed level")
-		case !sameYAML(o, s) || sectionCites(s, func(id string) bool { return factChanged(old.Facts, cur.Facts, id) }):
-		default:
+		if o, ok := oldSec[s.ID]; ok && sameYAML(o, s) && !sectionCites(s, bulletChanged) {
 			continue
 		}
 		changed = append(changed, s.ID)
 	}
-	if len(changed) == 0 {
+	if len(changed) == 0 && !differs {
 		return Scope{Kind: ScopeUnchanged}
 	}
-	return Scope{Kind: ScopeScoped, IDs: changed}
+	return Scope{Kind: ScopeScoped, IDs: changed, Facts: append([]string{}, slices.Sorted(maps.Keys(facts))...)}
 }
 
-// withoutSections is the blueprint with its sections dropped, the fields Compare holds to whole.
+// withoutSections is the blueprint with its sections dropped, the fields Compare holds apart.
 func withoutSections(b *Blueprint) *Blueprint {
 	c := *b
 	c.Sections = nil
@@ -119,9 +160,9 @@ func sameYAML(a, b any) bool {
 	return errA == nil && errB == nil && bytes.Equal(x, y)
 }
 
-// factChanged reports whether the bullet that holds id differs between the two stores. A project
+// FactChanged reports whether the bullet that holds id differs between the two stores. A project
 // with no store has no citations to go stale.
-func factChanged(old, cur *plan.Facts, id string) bool {
+func FactChanged(old, cur *plan.Facts, id string) bool {
 	if old == nil || cur == nil {
 		return false
 	}
@@ -136,36 +177,52 @@ func factChanged(old, cur *plan.Facts, id string) bool {
 	return o.Tag != c.Tag || o.Problem != c.Problem || o.Text != c.Text || !slices.Equal(o.Sources, c.Sources)
 }
 
-// sectionCites reports whether any item of s places or cites a fact that changed reports as changed.
+// sectionCites reports whether any item of s places or cites a fact that reports as changed.
 func sectionCites(s *Section, changed func(id string) bool) bool {
-	for _, it := range s.Items {
-		if (it.Kind == "fact" && changed(it.Fact)) || slices.ContainsFunc(it.Facts, changed) {
+	for i := range s.Items {
+		if slices.ContainsFunc(itemFacts(&s.Items[i]), changed) {
 			return true
 		}
 	}
 	return false
 }
 
-// cites reports whether the framing, the introduction, or the dispositions place or cite a fact
-// that changed reports as changed.
-func cites(b *Blueprint, facts *plan.Facts, changed func(id string) bool) bool {
-	if slices.ContainsFunc(b.Introduction.Facts, changed) {
-		return true
+// itemFacts lists the facts an item places or cites.
+func itemFacts(it *Item) []string {
+	ids := slices.Clone(it.Facts)
+	if it.Kind == "fact" {
+		ids = append(ids, it.Fact)
 	}
+	return ids
+}
+
+// pageFacts lists the facts the framing, the introduction, and the dispositions place or cite.
+// The framing cites a fact as a backticked id, which counts only against a store to recognise it.
+func pageFacts(b *Blueprint, facts *plan.Facts) []string {
+	ids := slices.Clone(b.Introduction.Facts)
 	for _, d := range b.Dispositions {
-		if changed(d.Fact) {
-			return true
-		}
+		ids = append(ids, d.Fact)
 	}
 	if facts == nil {
-		return false
+		return ids
 	}
 	for _, part := range framingParts(&b.Framing) {
 		for _, m := range codeSpan.FindAllStringSubmatch(part.text, -1) {
-			if facts.Cites(m[1]) && changed(m[1]) {
-				return true
+			if facts.Cites(m[1]) {
+				ids = append(ids, m[1])
 			}
 		}
 	}
-	return false
+	return ids
+}
+
+// citedFacts lists every fact the page places or cites, wherever it does.
+func citedFacts(b *Blueprint, facts *plan.Facts) []string {
+	ids := pageFacts(b, facts)
+	for i := range b.Sections {
+		for j := range b.Sections[i].Items {
+			ids = append(ids, itemFacts(&b.Sections[i].Items[j])...)
+		}
+	}
+	return ids
 }

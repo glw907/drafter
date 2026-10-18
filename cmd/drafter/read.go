@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/glw907/drafter/internal/assemble"
 	"github.com/glw907/drafter/internal/batch"
 	"github.com/glw907/drafter/internal/blueprint"
 	"github.com/glw907/drafter/internal/config"
@@ -46,10 +48,13 @@ drafter page, gate.command included, though it never runs the gate. --dry-run co
 stage's requests and submits nothing. --resume continues a stopped run; give the same
 blueprints again.
 
---since <rev> reads only what changed since that revision. A page with no change is not read. A
-page whose changes stay inside named sections is read whole but may be blocked only on those
-sections; any other change makes the page read as a whole. A read limited to named sections
-writes no drafted.lock entry. A resume takes no --since: the run recorded each page's scope.
+--since <rev> reads the change since that revision. A page with no change is not read. A page
+that changed is read whole, with the diff of its blueprint, the changed fact bullets, and its
+outline entry alongside, and it is blocked only on a defect the change adds, alters, or causes;
+an older defect is reported as already present and does not block. The consistency read blocks
+only on a conflict that touches a fact the change touched. A page with no earlier blueprint to
+diff against is read as a whole. A change read writes no drafted.lock entry. A resume takes no
+--since: the run recorded each page's scope.
 
 The exit status is 0 when every blueprint was accepted, 1 when any was set aside, 2 when the run
 could not start or hit an error, and 3 when the run stopped and can be resumed, which outranks 1.`,
@@ -68,7 +73,7 @@ could not start or hit an error, and 3 when the run stopped and can be resumed, 
 	}
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error { return usageError(cmd, err.Error()) })
 	cmd.Flags().StringVar(&f.resume, "resume", "", "continue the stopped run with this ID")
-	cmd.Flags().StringVar(&f.since, "since", "", "read only what changed in each blueprint since this revision")
+	cmd.Flags().StringVar(&f.since, "since", "", "read the change in each blueprint since this revision")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "estimate the stage and submit nothing")
 	cmd.Flags().BoolVar(&f.sync, "sync", false, "send ordinary Messages calls instead of a batch")
 	cmd.Flags().BoolVar(&f.json, "json", false, "print the result as one JSON object")
@@ -106,6 +111,7 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 	var skipped []pipeline.PageResult
 	var since string
 	scopes := map[string]blueprint.Scope{}
+	changes := map[string]string{}
 	switch {
 	case st != nil:
 		handoffs, skipped = inRun(handoffs, st)
@@ -113,7 +119,7 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 		if since, err = gitText(root, "rev-parse", "--verify", f.since+"^{commit}"); err != nil {
 			return cannot(fmt.Errorf("cannot resolve --since %s: %w", f.since, err))
 		}
-		handoffs, skipped = scopePages(c, root, since, head, f.since, handoffs, scopes)
+		handoffs, skipped = scopePages(c, root, since, head, f.since, handoffs, scopes, changes)
 	}
 	out := cmd.OutOrStdout()
 	if len(handoffs) == 0 {
@@ -128,7 +134,7 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 	}
 	client := batch.New(batch.Options{Key: k, BaseURL: c.APIBaseURL, WorkspaceID: c.WorkspaceID})
 	s, err := pipeline.Run(cmd.Context(), pipeline.Options{
-		Config: c, Handoffs: handoffs, API: client, Resume: f.resume, DryRun: f.dryRun, Since: since, Scopes: scopes,
+		Config: c, Handoffs: handoffs, API: client, Resume: f.resume, DryRun: f.dryRun, Since: since, Scopes: scopes, Changes: changes,
 		Version: version(), Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr(), Command: "drafter read",
 	})
 	if err != nil {
@@ -208,18 +214,66 @@ func unchangedPage(path, line string) pipeline.PageResult {
 }
 
 // scopePages compares each page's blueprint at since with the run's start commit. It records a
-// scope in scopes for every page that will be read, and returns the pages with nothing to read.
-func scopePages(c *config.Config, root, since, head, rev string, handoffs []handoff.Handoff, scopes map[string]blueprint.Scope) (kept []handoff.Handoff, skipped []pipeline.PageResult) {
+// scope in scopes for every page that will be read, and the change block of each scoped page in
+// changes, and returns the pages with nothing to read. A scoped page whose diff cannot be built
+// reads whole.
+func scopePages(c *config.Config, root, since, head, rev string, handoffs []handoff.Handoff, scopes map[string]blueprint.Scope, changes map[string]string) (kept []handoff.Handoff, skipped []pipeline.PageResult) {
 	for _, h := range handoffs {
-		sc := blueprint.Compare(h.Plan, revisionAt(c, root, since, h), revisionAt(c, root, head, h))
+		old, cur := revisionAt(c, root, since, h), revisionAt(c, root, head, h)
+		sc := blueprint.Compare(h.Plan, old, cur)
 		if sc.Kind == blueprint.ScopeUnchanged {
 			skipped = append(skipped, unchangedPage(h.Page.Path, "nothing changed since "+rev))
 			continue
+		}
+		if sc.Kind == blueprint.ScopeScoped {
+			block, err := changeBlock(root, since, head, h.Plan, sc, old, cur)
+			if err != nil {
+				sc = blueprint.Scope{Kind: blueprint.ScopeWhole, Why: "the change could not be built: " + err.Error()}
+			} else {
+				changes[h.Page.Path] = block
+			}
 		}
 		scopes[h.Page.Path] = sc
 		kept = append(kept, h)
 	}
 	return kept, skipped
+}
+
+// changeBlock builds the block a scoped read judges: the blueprint's diff between the two
+// commits, each touched fact whose bullet changed, and the outline entry when it changed. The diff
+// flags keep a user's git configuration out of the bytes.
+func changeBlock(root, since, head, file string, sc blueprint.Scope, old, cur blueprint.Revision) (string, error) {
+	diff, err := exec.Command("git", "-C", root, "diff", "--no-color", "--no-ext-diff", "--no-textconv", since, head, "--", file).Output()
+	if err != nil {
+		return "", fmt.Errorf("git diff: %w", err)
+	}
+	var facts []assemble.FactChange
+	for _, id := range sc.Facts {
+		if !blueprint.FactChanged(old.Facts, cur.Facts, id) {
+			continue
+		}
+		fc := assemble.FactChange{ID: id}
+		if f, ok := old.Facts.Get(id); ok {
+			fc.Old = &f
+		}
+		if f, ok := cur.Facts.Get(id); ok {
+			fc.New = &f
+		}
+		facts = append(facts, fc)
+	}
+	var oldEntry, newEntry []byte
+	if old.Entry != nil && cur.Entry != nil {
+		if oldEntry, err = pipeline.EntryJSON(*old.Entry); err != nil {
+			return "", err
+		}
+		if newEntry, err = pipeline.EntryJSON(*cur.Entry); err != nil {
+			return "", err
+		}
+		if bytes.Equal(oldEntry, newEntry) {
+			oldEntry, newEntry = nil, nil
+		}
+	}
+	return assemble.ChangeBlock(string(diff), facts, oldEntry, newEntry), nil
 }
 
 // revisionAt gathers a page's blueprint, outline entry, and facts store as committed at rev. What
@@ -270,7 +324,8 @@ func revisionAt(c *config.Config, root, rev string, h handoff.Handoff) blueprint
 	return r
 }
 
-// scopedAccept reports whether the page was accepted on a read limited to named sections.
+// scopedAccept reports whether the page was accepted on a change read, which judged the diff and
+// so says nothing of the rest of the blueprint.
 func scopedAccept(r pipeline.PageResult) bool {
 	return r.Status == pipeline.StatusAccepted && r.Accepted != "" && r.Scope != nil && r.Scope.Kind == blueprint.ScopeScoped
 }

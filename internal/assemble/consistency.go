@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/glw907/drafter/internal/plan"
@@ -39,34 +40,40 @@ func ConsistencyPrompt(p *plan.Plan, facts *plan.Facts, root string) (string, er
 	if err != nil {
 		return "", fmt.Errorf("assemble: resolve project root: %w", err)
 	}
+	for _, rel := range LinkedPages(p) {
+		heads, err := headings(realRoot, rel)
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			fmt.Fprintf(&b, "\n- missing: %s\n", rel)
+		case err != nil:
+			return "", err
+		default:
+			fmt.Fprintf(&b, "\n- %s\n", rel)
+			for _, h := range heads {
+				fmt.Fprintf(&b, "  %s\n", h)
+			}
+		}
+	}
+	return b.String(), nil
+}
+
+// LinkedPages returns the repo-relative path of each page the plan links, once each, in order of
+// first appearance. A link to a URL or to the page itself is not one.
+func LinkedPages(p *plan.Plan) []string {
+	var out []string
 	dir := path.Dir(p.Page.Path)
-	seen := map[string]bool{}
 	for _, s := range p.Sections {
 		for _, it := range s.Items {
 			if it.Kind != "link" || strings.Contains(it.Target, "://") || strings.HasPrefix(it.Target, "#") {
 				continue
 			}
 			file, _, _ := strings.Cut(it.Target, "#")
-			rel := path.Join(dir, file)
-			if seen[rel] {
-				continue
-			}
-			seen[rel] = true
-			heads, err := headings(realRoot, rel)
-			switch {
-			case errors.Is(err, fs.ErrNotExist):
-				fmt.Fprintf(&b, "\n- missing: %s\n", rel)
-			case err != nil:
-				return "", err
-			default:
-				fmt.Fprintf(&b, "\n- %s\n", rel)
-				for _, h := range heads {
-					fmt.Fprintf(&b, "  %s\n", h)
-				}
+			if rel := path.Join(dir, file); !slices.Contains(out, rel) {
+				out = append(out, rel)
 			}
 		}
 	}
-	return b.String(), nil
+	return out
 }
 
 // placedFacts returns the ids of the plan's fact items and every facts list, in order of first

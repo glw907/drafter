@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -228,8 +229,8 @@ func TestRealModuleRendersTheBlueprintSeat(t *testing.T) {
 	if out != string(golden) {
 		t.Error("the unscoped prompt differs from testdata/blueprint-prompt.golden.txt, the prompt as it was before scoped reads")
 	}
-	if strings.Contains(out, "Scope.") {
-		t.Error("the unscoped prompt carries the scope paragraph")
+	if strings.Contains(out, "Change read.") {
+		t.Error("the unscoped prompt carries the change-read paragraph")
 	}
 
 	scoped, err := mod.Render("blueprint", prompts.Context{Page: page, Inputs: json.RawMessage("{}"), Round: prompts.Round1, Scope: "intro,steps"})
@@ -239,10 +240,26 @@ func TestRealModuleRendersTheBlueprintSeat(t *testing.T) {
 	if !strings.HasPrefix(scoped, out) {
 		t.Error("the scoped prompt does not start with the unscoped one")
 	}
-	for _, want := range []string{"Scope. Only these sections changed since the earlier revision: intro,steps.", "Read the whole blueprint for context.", "Report anything else as non-blocking."} {
-		if !strings.Contains(scoped, want) {
+	for _, want := range []string{
+		"Change read.", "These sections changed: intro,steps.", "Already present:", `Verdict "fix" if any blocking finding exists`,
+		"Sometimes you have to look at the whole file to be sure that the change actually makes sense",
+		"favor approving a CL once it is in a state where it definitely improves the overall code health",
+		"encourage the author to file a bug", "google.github.io/eng-practices/review/reviewer/standard.html",
+	} {
+		if !strings.Contains(strings.Join(strings.Fields(scoped), " "), want) {
 			t.Errorf("the scoped prompt lacks %q", want)
 		}
+	}
+	if strings.Contains(scoped, "Scope. Only these sections") {
+		t.Error("the scoped prompt still narrows the read to sections")
+	}
+
+	pageOnly, err := mod.Render("blueprint", prompts.Context{Page: page, Inputs: json.RawMessage("{}"), Round: prompts.Round1, Scope: "page"})
+	if err != nil {
+		t.Fatalf("render with the page scope: %v", err)
+	}
+	if !strings.Contains(pageOnly, "Change read.") || !strings.Contains(pageOnly, "No section's own content changed") || strings.Contains(pageOnly, "These sections changed") {
+		t.Error("the page scope does not render the change read without section ids")
 	}
 }
 
@@ -561,19 +578,86 @@ func TestReadSince(t *testing.T) {
 
 	t.Run("a whole accept under --since writes the lock", func(t *testing.T) {
 		p := newSinceProject(t)
-		p.commit(func(s string) string {
-			return strings.Replace(s, "The steps run in order.", "The steps run in a new order.", 1)
-		})
+		rel := "blueprints/docs/a.blueprint.yaml"
+		p.git("rm", "-q", rel)
+		p.git("commit", "-q", "-m", "remove a")
+		p.write(rel, sinceBlueprint)
+		p.git("add", rel)
+		p.git("commit", "-q", "-m", "restore a")
 		code, out, errOut := p.read("--since", "HEAD~1", p.bp("a"))
-		if code != 0 || !strings.Contains(out, "[whole: a field outside sections changed]") {
+		if code != 0 || !strings.Contains(out, "[whole: the blueprint is absent or undecodable at the earlier revision]") {
 			t.Fatalf("exit %d, stdout %q, stderr %q, want 0 and a whole scope", code, out, errOut)
 		}
-		if reqs := p.stub.requests(); len(reqs) != 1 || strings.Contains(reqs[0], "Scope:") {
-			t.Errorf("a whole read sent a scope line")
+		if reqs := p.stub.requests(); len(reqs) != 1 || strings.Contains(reqs[0], "Scope:") || strings.Contains(requestText(reqs[0]), "blueprint diff") {
+			t.Errorf("a whole read sent a scope line or a change block")
 		}
 		l, err := blueprint.ReadLock(filepath.Join(p.root, "blueprints/drafted.lock"))
 		if err != nil || l.Pages["docs/a.md"].Accepted == "" {
 			t.Errorf("lock pages = %+v, %v, want docs/a.md accepted", l.Pages, err)
+		}
+	})
+
+	t.Run("a removed section is a change read that writes no lock", func(t *testing.T) {
+		p := newSinceProject(t)
+		p.commit(func(s string) string { return s[:strings.Index(s, "  - id: two")] })
+		code, out, errOut := p.read("--since", "HEAD~1", p.bp("a"))
+		if code != 0 || !strings.Contains(out, "docs/a.md: accepted [scoped: page]") {
+			t.Fatalf("exit %d, stdout %q, stderr %q, want an accepted page scoped to the page", code, out, errOut)
+		}
+		if got := lockBytes(t, p.root); got != "" {
+			t.Errorf("lock = %q, want none after a removed-section accept", got)
+		}
+	})
+
+	t.Run("the change block holds the diff, the changed fact, and the entry change", func(t *testing.T) {
+		p := newSinceProject(t)
+		p.write("blueprints/facts/keys.md", "## Facts\n\n- `f:one` One is old. [verified]\n- `f:other` Other. [verified]\n")
+		p.write("blueprints/docs/a.blueprint.yaml", strings.Replace(sinceBlueprint, "        text: |\n          Begin.\n", "        text: |\n          Begin.\n      - id: one-fact\n        kind: fact\n        fact: f:one\n        use: |\n          Only the age.\n", 1))
+		p.git("add", "-A")
+		p.git("commit", "-q", "-m", "facts and a fact item")
+		p.write("blueprints/facts/keys.md", "## Facts\n\n- `f:one` One is new. [verified]\n- `f:other` Other, revised. [verified]\n")
+		p.write("blueprints/outline.yaml", strings.Replace(sinceOutline, "Do A.", "Do A well.", 1))
+		p.commit(editItem)
+		p.git("add", "-A")
+		p.git("commit", "-q", "-m", "change everything", "--amend", "--no-edit")
+		code, out, errOut := p.read("--since", "HEAD~1", p.bp("a"))
+		if code != 0 {
+			t.Fatalf("exit %d\nstdout %s\nstderr %s", code, out, errOut)
+		}
+		reqs := p.stub.requests()
+		if len(reqs) != 1 {
+			t.Fatalf("%d requests, want 1", len(reqs))
+		}
+		text := requestText(reqs[0])
+		for _, want := range []string{
+			"=== blueprint diff ===", "-          Continue.", "+          Continue, carefully.",
+			"=== changed facts ===", "- f:one", "was: [verified] One is old.", "now: [verified] One is new.",
+			"=== outline entry change ===", `"job": "Do A.\n"`, `"job": "Do A well.\n"`,
+		} {
+			if !strings.Contains(text, want) {
+				t.Errorf("the request lacks %q\n%s", want, text)
+			}
+		}
+		if strings.Contains(text, "f:other") && strings.Contains(text[strings.Index(text, "=== changed facts ==="):], "f:other") {
+			t.Error("the change block lists a fact bullet the page never cites")
+		}
+		if strings.Index(text, "=== end facts ===") > strings.Index(text, "=== blueprint diff ===") {
+			t.Error("the change block comes before the facts block")
+		}
+	})
+
+	t.Run("an outline-only change reads as the page, with its entry change", func(t *testing.T) {
+		p := newSinceProject(t)
+		p.write("blueprints/outline.yaml", strings.Replace(sinceOutline, "Do A.", "Do A well.", 1))
+		p.git("add", "-A")
+		p.git("commit", "-q", "-m", "reword the job")
+		code, out, errOut := p.read("--since", "HEAD~1", p.bp("a"))
+		if code != 0 || !strings.Contains(out, "[scoped: page]") {
+			t.Fatalf("exit %d, stdout %q, stderr %q, want a page scope", code, out, errOut)
+		}
+		reqs := p.stub.requests()
+		if len(reqs) != 1 || !strings.Contains(reqs[0], "Scope: page") || strings.Contains(requestText(reqs[0]), "=== blueprint diff ===") || !strings.Contains(requestText(reqs[0]), "=== outline entry change ===") {
+			t.Errorf("requests = %d, want one with scope page, the entry change, and no blueprint diff", len(reqs))
 		}
 	})
 
@@ -605,4 +689,53 @@ func TestReadSince(t *testing.T) {
 			t.Errorf("lock = %q, want none after a resumed scoped accept", got)
 		}
 	})
+}
+
+func TestSummaryCountsDemotedAndAlreadyPresent(t *testing.T) {
+	s := pipeline.Summary{Pages: []pipeline.PageResult{{
+		Path: "docs/a.md", Status: pipeline.StatusAccepted, Cost: 0.5, Demoted: 1, AlreadyPresent: 2,
+		Scope: &blueprint.Scope{Kind: blueprint.ScopeScoped, Facts: []string{}},
+	}}}
+	var text, js bytes.Buffer
+	if err := writeSummaryText(&text, s, false); err != nil {
+		t.Fatal(err)
+	}
+	if want := "docs/a.md: accepted [scoped: page] already present: 2 demoted conflicts: 1 $0.5000\n"; text.String() != want {
+		t.Errorf("text summary = %q, want %q", text.String(), want)
+	}
+	if err := writeSummaryJSON(&js, s); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"demoted": 1`, `"already_present": 2`, `"facts": []`} {
+		if !strings.Contains(js.String(), want) {
+			t.Errorf("JSON summary lacks %q\n%s", want, js.String())
+		}
+	}
+}
+
+// requestText is the text of every string in a request body, which is how the model reads it.
+func requestText(body string) string {
+	var v any
+	if err := json.Unmarshal([]byte(body), &v); err != nil {
+		return body
+	}
+	var b strings.Builder
+	var walk func(any)
+	walk = func(v any) {
+		switch x := v.(type) {
+		case string:
+			b.WriteString(x)
+			b.WriteByte('\n')
+		case []any:
+			for _, e := range x {
+				walk(e)
+			}
+		case map[string]any:
+			for _, k := range slices.Sorted(maps.Keys(x)) {
+				walk(x[k])
+			}
+		}
+	}
+	walk(v)
+	return b.String()
 }

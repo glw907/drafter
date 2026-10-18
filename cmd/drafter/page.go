@@ -177,6 +177,12 @@ func writeSummaryText(w io.Writer, s pipeline.Summary, dry bool) error {
 		if p.Rule != "" {
 			fmt.Fprintf(&b, " (%s)", p.Rule)
 		}
+		if p.AlreadyPresent > 0 {
+			fmt.Fprintf(&b, " already present: %d", p.AlreadyPresent)
+		}
+		if p.Demoted > 0 {
+			fmt.Fprintf(&b, " demoted conflicts: %d", p.Demoted)
+		}
 		if !dry {
 			fmt.Fprintf(&b, " $%.4f", p.Cost)
 		}
@@ -192,6 +198,9 @@ func writeSummaryText(w io.Writer, s pipeline.Summary, dry bool) error {
 // scopeText describes what a read of a page was limited to.
 func scopeText(sc blueprint.Scope) string {
 	if sc.Kind == blueprint.ScopeScoped {
+		if len(sc.IDs) == 0 {
+			return "scoped: page"
+		}
 		return "scoped: " + strings.Join(sc.IDs, ", ")
 	}
 	return sc.Kind + ": " + sc.Why

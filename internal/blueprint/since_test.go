@@ -80,7 +80,10 @@ func TestCompare(t *testing.T) {
 	edit := func(old, new string) string { return strings.Replace(sinceBase, old, new, 1) }
 	changedEntry := sinceEntry
 	changedEntry.Job = "Do A differently."
+	iFirst, iSecond, iThird := strings.Index(sinceBase, "  - id: first"), strings.Index(sinceBase, "  - id: second"), strings.Index(sinceBase, "  - id: third")
+	swapped := sinceBase[:iFirst] + sinceBase[iSecond:iThird] + sinceBase[iFirst:iSecond] + sinceBase[iThird:]
 
+	none := []string{}
 	tests := []struct {
 		name  string
 		bp    string
@@ -88,35 +91,56 @@ func TestCompare(t *testing.T) {
 		entry *Page
 		// oldBP is the earlier blueprint; sinceBase when empty.
 		oldBP string
-		want  Scope
+		// oldEntry is the earlier outline entry; sinceEntry when nil.
+		oldEntry *Page
+		noEntry  bool
+		want     Scope
 	}{
-		{"unchanged", sinceBase, sinceFacts, &sinceEntry, "", Scope{Kind: ScopeUnchanged}},
-		{"reformatted", strings.Replace(sinceBase, "    heading: First\n", "    heading:   \"First\"\n", 1), sinceFacts, &sinceEntry, "", Scope{Kind: ScopeUnchanged}},
-		{"an item edit", edit("Do the first thing.", "Do the first thing, carefully."), sinceFacts, &sinceEntry, "", Scope{Kind: ScopeScoped, IDs: []string{"first"}}},
-		{"a new section", sinceBase + "  - id: fourth\n    heading: Fourth\n    why: |\n      More.\n    opens: |\n      Also.\n    items:\n      - id: fourth-step\n        kind: step\n        text: |\n          Extra.\n", sinceFacts, &sinceEntry, "", Scope{Kind: ScopeScoped, IDs: []string{"fourth"}}},
-		{"a removed section", sinceBase[:strings.Index(sinceBase, "  - id: third")], sinceFacts, &sinceEntry, "", Scope{Kind: ScopeWhole, Why: "removed"}},
-		{"a reorder", strings.Replace(strings.Replace(strings.Replace(sinceBase, "id: first\n", "id: TMP\n", 1), "id: second\n", "id: first\n", 1), "id: TMP\n", "id: second\n", 1), sinceFacts, &sinceEntry, "", Scope{Kind: ScopeWhole, Why: "order"}},
-		{"a level change", edit("    heading: Second\n", "    heading: Second\n    level: 3\n"), sinceFacts, &sinceEntry, "", Scope{Kind: ScopeWhole, Why: "level"}},
-		{"a field outside sections", edit("Steps run in order.", "Steps run in a new order."), sinceFacts, &sinceEntry, "", Scope{Kind: ScopeWhole, Why: "outside sections"}},
-		{"an outline entry change", sinceBase, sinceFacts, &changedEntry, "", Scope{Kind: ScopeWhole, Why: "outline entry"}},
-		{"undecodable at the earlier revision", sinceBase, sinceFacts, &sinceEntry, "sections: [", Scope{Kind: ScopeWhole, Why: "undecodable"}},
-		{"a fact bullet change marks each section that cites it", sinceBase, strings.Replace(sinceFacts, "One.", "One, revised.", 1), &sinceEntry, "", Scope{Kind: ScopeScoped, IDs: []string{"first"}}},
-		{"a changed fact in a facts list", sinceBase, strings.Replace(sinceFacts, "Three.", "Three, revised.", 1), &sinceEntry, "", Scope{Kind: ScopeScoped, IDs: []string{"third"}}},
-		{"a changed fact cited from the framing", sinceBase, strings.Replace(sinceFacts, "The framing fact.", "A new framing fact.", 1), &sinceEntry, "", Scope{Kind: ScopeWhole, Why: "cited outside"}},
-		{"a changed fact cited from the introduction", sinceBase, strings.Replace(sinceFacts, "The intro fact.", "A new intro fact.", 1), &sinceEntry, "", Scope{Kind: ScopeWhole, Why: "cited outside"}},
+		{name: "unchanged", bp: sinceBase, facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeUnchanged}},
+		{name: "reformatted", bp: strings.Replace(sinceBase, "    heading: First\n", "    heading:   \"First\"\n", 1), facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeUnchanged}},
+		{name: "an item edit", bp: edit("Do the first thing.", "Do the first thing, carefully."), facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeScoped, IDs: []string{"first"}, Facts: none}},
+		{name: "an item edited from fact A to fact B", bp: edit("fact: f:one", "fact: f:two"), facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeScoped, IDs: []string{"first"}, Facts: []string{"f:one", "f:two"}}},
+		{name: "a new section", bp: sinceBase + "  - id: fourth\n    heading: Fourth\n    why: |\n      More.\n    opens: |\n      Also.\n    items:\n      - id: fourth-step\n        kind: step\n        text: |\n          Extra.\n", facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeScoped, IDs: []string{"fourth"}, Facts: none}},
+		{name: "a removed section", bp: sinceBase[:strings.Index(sinceBase, "  - id: third")], facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeScoped, Facts: []string{"f:three"}}},
+		{name: "a reorder", bp: swapped, facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeScoped, Facts: none}},
+		{name: "a level change", bp: edit("    heading: Second\n", "    heading: Second\n    level: 3\n"), facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeScoped, IDs: []string{"second"}, Facts: none}},
+		{name: "a field outside sections", bp: edit("Steps run in order.", "Steps run in a new order."), facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeScoped, Facts: []string{"f:frame", "f:intro"}}},
+		{name: "an outline entry change", bp: sinceBase, facts: sinceFacts, entry: &changedEntry, want: Scope{Kind: ScopeScoped, Facts: none}},
+		{name: "absent at the earlier revision", bp: sinceBase, facts: sinceFacts, entry: &sinceEntry, oldBP: "-", want: Scope{Kind: ScopeWhole, Why: "absent or undecodable"}},
+		{name: "undecodable at the earlier revision", bp: sinceBase, facts: sinceFacts, entry: &sinceEntry, oldBP: "sections: [", want: Scope{Kind: ScopeWhole, Why: "absent or undecodable"}},
+		{name: "undecodable now", bp: "sections: [", facts: sinceFacts, entry: &sinceEntry, want: Scope{Kind: ScopeWhole, Why: "does not decode"}},
+		{name: "the page missing from the outline at the earlier revision", bp: sinceBase, facts: sinceFacts, entry: &sinceEntry, noEntry: true, want: Scope{Kind: ScopeWhole, Why: "does not list"}},
+		{name: "a fact bullet change marks each section that cites it", bp: sinceBase, facts: strings.Replace(sinceFacts, "One.", "One, revised.", 1), entry: &sinceEntry, want: Scope{Kind: ScopeScoped, IDs: []string{"first"}, Facts: []string{"f:one"}}},
+		{name: "a changed fact in a facts list", bp: sinceBase, facts: strings.Replace(sinceFacts, "Three.", "Three, revised.", 1), entry: &sinceEntry, want: Scope{Kind: ScopeScoped, IDs: []string{"third"}, Facts: []string{"f:three"}}},
+		{name: "a changed fact cited from the framing", bp: sinceBase, facts: strings.Replace(sinceFacts, "The framing fact.", "A new framing fact.", 1), entry: &sinceEntry, want: Scope{Kind: ScopeScoped, Facts: []string{"f:frame"}}},
+		{name: "a changed fact cited from the introduction", bp: sinceBase, facts: strings.Replace(sinceFacts, "The intro fact.", "A new intro fact.", 1), entry: &sinceEntry, want: Scope{Kind: ScopeScoped, Facts: []string{"f:intro"}}},
+		{name: "a changed fact the page never cites", bp: sinceBase, facts: strings.Replace(sinceFacts, "Other.", "Other, revised.", 1), entry: &sinceEntry, want: Scope{Kind: ScopeUnchanged}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			oldBP := tt.oldBP
-			if oldBP == "" {
+			switch oldBP {
+			case "":
 				oldBP = sinceBase
+			case "-":
+				oldBP = ""
 			}
-			got := Compare("a.blueprint.yaml", sinceRev(oldBP, sinceFacts, &sinceEntry), sinceRev(tt.bp, tt.facts, tt.entry))
+			oldEntry := &sinceEntry
+			if tt.noEntry {
+				oldEntry = nil
+			}
+			got := Compare("a.blueprint.yaml", sinceRev(oldBP, sinceFacts, oldEntry), sinceRev(tt.bp, tt.facts, tt.entry))
 			if got.Kind != tt.want.Kind || !slices.Equal(got.IDs, tt.want.IDs) {
 				t.Errorf("Compare = %+v, want kind %s ids %v", got, tt.want.Kind, tt.want.IDs)
 			}
 			if !strings.Contains(got.Why, tt.want.Why) {
 				t.Errorf("Why = %q, want it to mention %q", got.Why, tt.want.Why)
+			}
+			if tt.want.Kind != ScopeScoped {
+				return
+			}
+			if got.Facts == nil || !slices.Equal(got.Facts, tt.want.Facts) {
+				t.Errorf("Facts = %#v, want %#v (non-nil)", got.Facts, tt.want.Facts)
 			}
 		})
 	}

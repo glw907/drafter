@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/glw907/drafter/internal/atomicfile"
 	"github.com/glw907/drafter/internal/edits"
@@ -93,6 +94,21 @@ func (r *record) fault(format string, a ...any) {
 }
 
 func (r *record) warn(s string) { r.Warnings = append(r.Warnings, s) }
+
+// alreadyPresentPrefix starts a finding, or a warning for a conflict, about a defect the change
+// being read did not introduce.
+const alreadyPresentPrefix = "Already present:"
+
+// alreadyPresent counts the blueprint read's findings that report an older defect.
+func (r *record) alreadyPresent() int {
+	n := 0
+	for _, f := range r.Findings {
+		if f.Seat == "blueprint" && strings.HasPrefix(strings.TrimSpace(f.Text), alreadyPresentPrefix) {
+			n++
+		}
+	}
+	return n
+}
 
 func (r *record) verdict(stage, seat, v string) {
 	r.Verdicts = append(r.Verdicts, verdictRecord{Stage: stage, Seat: seat, Verdict: v})

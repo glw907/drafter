@@ -125,6 +125,11 @@ type work struct {
 	// ordinary read, which is how a state from before they existed resumes: as a whole read.
 	Since string           `json:"since,omitempty"`
 	Scope *blueprint.Scope `json:"scope,omitempty"`
+	// Change is the change block the page's read sends after the blueprint, built once at the start
+	// of the run so a resume sends the same bytes. Demoted counts the conflicts the consistency
+	// rule reported as already present.
+	Change  string `json:"change,omitempty"`
+	Demoted int    `json:"demoted,omitempty"`
 }
 
 // readerState is the final reader's two-turn conversation.
