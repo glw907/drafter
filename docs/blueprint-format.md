@@ -269,6 +269,13 @@ An entry with only `accepted` set belongs to a page that isn't drafted yet. A mi
 blueprint it wrote. The reshape that follows is a blueprint change, so a converted page gets
 redrafted once, the first time drafting runs on it.
 
+`drafter seed <blueprint>...` gives an existing page the same entry without a conversion, so the
+page's first run keeps its prose. Run `drafter read` on the blueprint first and commit the page and
+the blueprint. A blueprint qualifies when its entry holds an `accepted` id equal to the blueprint as
+committed at `HEAD`, holds no `page` id, and neither file has uncommitted changes. Seed checks every
+named blueprint before it writes anything, and the first one that doesn't qualify stops the call with
+the page and the fix. The entry it writes keeps `accepted`.
+
 ## What `drafter check` checks
 
 `drafter check [--root dir] [--json] [<blueprint>...]` validates every blueprint under the
