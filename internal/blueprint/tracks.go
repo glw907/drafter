@@ -271,3 +271,24 @@ func (c *projectCheck) unknownAnatomy(decl Type, registers map[string]registerFi
 	}
 	return "; " + why
 }
+
+// TrackFor returns the one track whose globs match the page path. It reports false when no
+// track matches or more than one does, which drafter check reports as an error.
+func (o *Outline) TrackFor(pagePath string) (Track, bool) {
+	hit := matches(o.Tracks, path.Clean(pagePath))
+	if len(hit) != 1 {
+		return Track{}, false
+	}
+	return o.Tracks[hit[0]], true
+}
+
+// AnatomyOf returns the anatomy the declared type follows, or "" for a type with none or one the
+// outline doesn't declare.
+func (o *Outline) AnatomyOf(typeName string) string {
+	for _, t := range o.Types {
+		if t.Name == typeName {
+			return t.Anatomy
+		}
+	}
+	return ""
+}

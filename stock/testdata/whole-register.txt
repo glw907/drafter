@@ -1,0 +1,81 @@
+Blueprint read. The blueprint below is a documentation page's durable plan, a YAML file with
+an `id` and a `why` on each section, items of several kinds, and a `framing` block. No prose exists
+yet: read the blueprint, never a page. The page's job, type, and what it covers sit in its outline
+entry, and the facts it places sit in the facts block, all inlined below. A finding's location is a
+section id and, when it applies, an item id.
+
+The blueprint is Google's outline, written down (Google Technical Writing Two, "Organizing large
+documents", https://developers.google.com/tech-writing/two/large-docs): "You might find it useful to think of an outline as the narrative for
+your document," and "Structure your outline so that your document introduces information when it's
+most relevant to your reader." Your stance is an editor's: the Editorial Freelancers Association says
+"Developmental editors (also called 'substantive,' 'structural,' or 'content' editors) deal with
+content, organization, and genre considerations." You read the whole blueprint against this checklist,
+return findings, and never edit.
+
+How the blueprint is read. A `step` item is an action; `requires` and `produces` name state tokens, and
+`preconditions` lists the state a reader brings. A `failure` item names the step it follows in `from`
+and the item that handles it in `handledBy`. A `fact` item places a fact, and its `use` says which
+part of the fact the placement carries. An `example` item is a worked example. A prose field names
+another section as [[section-id]]. An item with `origin: human` carries a person's edit. A
+section's `why` says why it is there and sits where it does; the page-level `orderReason` explains
+only the order as a whole. `drafter check` has already run: ids are unique, every step's `requires`
+is declared by an earlier step or by `preconditions`, every step marked `canFail` has a failure
+item, and every fact resolves. That proves the blueprint consistent, not complete. Judge the rest
+yourself.
+
+Read the entry for the anatomy "Symptom row" in `docs/house-style.md#the-page-anatomies`, inlined below, by its exact name.
+Read it only for the introduction and the closing section it requires for this page's type: they
+are the second half of the same check as the introduction items below. No other rule in it is
+graded here. Its heading forms and other rules govern prose, and the editor seat applies them;
+neither blueprint read returns a finding under one.
+
+Order, pace, and user goal. Block 1, the Red Hat peer review guide's "Structure Checklist"
+(https://redhat-documentation.github.io/peer-review/), the items that apply:
+- Information is presented in the most logical order and location.
+- Information is provided at the right pace.
+- The user goal is clear.
+- Tasks reflect the intended goal of the user.
+- Troubleshooting and error recognition steps are included where appropriate.
+Read the sections in order against the outline entry: its `job` is the page's purpose, its `covers`
+the list the page must deliver, and its `outOfScope` the page's "doesn't cover" list.
+
+The introduction. Block 2, Google Technical Writing Two, "Organizing large documents": "an introduction
+that includes the following information: What the document covers. What prior knowledge you expect
+readers to have. What the document doesn't cover." Compare the blueprint's introduction to the
+outline entry's `job`, `covers`, and `outOfScope`, and grade the framing block's introduction plan
+against what the sections deliver.
+
+Completeness of steps and failures. A page with no deploy step passes the check unless some step
+declares that it requires a deployment. Return a blocking finding for each step the page's job needs
+that the blueprint lacks, and for each failure a reader following the steps could meet that has no
+`failure` item, naming the missing step or failure and where in the blueprint it belongs.
+
+Reader state. Read each step's `text` as a reader would. Return a blocking finding for a step whose
+prerequisite a reader cannot hold at that point: the step relies on something that no earlier step
+produces and no precondition lists, even where `requires` does not declare it. A dependency stated
+only in prose, such as a step that assumes a deployed Worker, is the case this read exists for.
+
+Recovery. Return a blocking finding for a failure a reader following the steps can meet at a step
+but that has no `from`, or whose `from` names a step where it cannot occur, and for a recovery
+route that appears before the diagnosis that tells the reader which failure they have. A failure
+with no `from` is a free-standing symptom row, which the format allows for a symptom met in the
+site's ordinary use after the steps end, such as an editor's failed publish. Do not ask for a step
+the page does not contain.
+
+A `use` names scope only. Compare each `use` with its fact in the facts block. Return a blocking
+finding for each `use` that restates the fact's content instead of scoping it, since a corrected
+fact would leave that paraphrase stale. A `use` that starts with "Only" or "Omit" and names a part of
+the fact passes.
+
+Durable fields describe the page as it is. `orderReason`, each `why`, `constraints`, and the `framing`
+parts say what the page is and why. Return a blocking finding for each one that narrates the planning
+session instead: what was merged, moved, or cut against an older outline, or a departure from an
+anatomy. That history belongs in the commit message.
+
+Human-origin items. A person wrote each item marked `origin: human`, and the redraft must carry its
+point with real weight. Return a blocking finding for each such item the blueprint would bury: placed
+where the section's order or its `opens` line leaves it a clause, a parenthetical, or a footnote.
+
+A checklist item the blueprint fails is a blocking finding: its section id, and item id where one
+applies, as location, the item it fails and how, and in rewrite a suggestion for how to address it.
+Verdict "fix" if any blocking finding exists; otherwise "ok".
