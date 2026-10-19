@@ -8,8 +8,15 @@
   The scoped read blocks per section, so a tweak anywhere in a section meets that section's older findings. In the B2 format test, 0 of 5 tweaks passed and every miss but two carried only findings on untouched items. The same defects also change severity between reads. Evidence is in the B2 PR and on #43.
   The change-read pass (2026-10-18) fixed the cause: the rerun scored 1 of 5, and no blocking finding sat on an untouched item. The four misses were blocking findings on the tweak's own added content, so the bar now measures the skill's output. Left open for Geoff's ruling on what comes next.
   The skill-rules pass (2026-10-18) measured the rate with "Check what you add" in the skill: 12 of 21 first-try accepts against the bar of 17. Prompts 6 and 7 passed 6 of 6, prompts 1 to 3 passed 2 of 3 each, and prompts 4 and 5 passed 0 of 3. Still open.
+  The edit-quality pass (2026-10-18) added the read loop, the "Nit:" bar, and a fixed base, and reran the 21: `drafter check` green on the first commit 21 of 21, first-try acceptance 13 of 21, accepted within two reads 15 of 21 (bar 19), within three 17 of 21 (bar 20), one commit carrying a change no read saw (bar 0). Both controls bit and both positive controls accepted. The four misses were prompt 4 stopping at two reads with a block open, prompt 5 stopping on a consistency escalation twice, and an "Already present:" label on content the change introduced. Still open; Geoff rules on what comes next.
 
 ## Medium
+
+- [ ] **#12** Stop a base-only fact conflict from escalating a change read `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
+  In the edit-quality rerun, prompt 5 runs t5a and t5b ended on a consistency escalation (exit 1, no blocking finding) over conflicts between facts the change did not touch, so the loop had nothing to fix. #6 closed only the empty-`facts` shape. `internal/pipeline/blueprint.go`
+
+- [ ] **#13** Give a whole read a stable bar on a base that reads clean `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
+  Four whole reads of the edit-quality test base each blocked on a different finding after the previous one was fixed, so a base can't be driven to an accept. The change read is unaffected because it labels base defects "Already present:". `claude/.claude/workflows/docs-page-chain.js`
 
 - [ ] **#6** Stop an unplaceable consistency answer from blocking a change read `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
   A base conflict between two recurring facts escalates whenever a tweak re-cites one of them (the rerun's tweak 5). `internal/pipeline/blueprint.go`
@@ -20,8 +27,12 @@
 
 - [ ] **#8** Teach the skill the two shapes the rate left at 0 of 3: a failure with no way out and a section that interrupts the steps `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
   In the skill-rules format test, prompt 4 (a caution) and prompt 5 (a new section) missed every run. Prompt 4's blocking findings were a handler that loops back to the failing step and a case added to one section with no row in the other; prompt 5's were a teaser heading, an explanation placed between the push and the checks, and a claim wider than the fact. The agents that read "Check what you add" missed these as often as those that did not (12 of 21 sessions read it). Two lines of the section also dropped words from the design: the heading line lost "never a teaser", and the example line lost "cites that fact". Evidence is in the pass's PR. `claude/.claude/skills/blueprint/SKILL.md`, `docs/blueprint-format.md`
+  The edit-quality pass (2026-10-18) sent a caution with no fact-supplied handler to the "Add a caveat" row and made the smaller edit on a conflicting request. Prompt 4 then made the caveat in 3 of 3 runs and 2 of 3 were accepted; prompt 5 passed 1 of 3. The prompt 5 misses were consistency escalations (#12), so the shape that remains is a new section placed between the push and the checks, which the read now returns as a Nit. Left open for prompt 5.
 
 ## Low
+
+- [ ] **#14** Make `drafter read`'s error hint print a resume command drafter accepts `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
+  The stopped-run line now carries `--sync` and the blueprint, but the error message `read.go` builds still says `drafter read --resume <id>`, which a sync run refuses. `cmd/drafter/read.go`
 
 - [ ] **#9** Resolve every name on a multi-name Go declaration line in a fact pointer `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
   A grouped `const` or `var` line such as `A, B = 1, 2` resolves neither name, so a pointer to either gets a false "no declaration" error. `internal/plan/verify.go`
