@@ -140,6 +140,60 @@ func TestStockRenderingContent(t *testing.T) {
 	}
 }
 
+// TestStockBarRenderings compares each change read with a bar, from testdata/bar-matrix.json,
+// with its golden file, and checks what the bar paragraph must carry: every finding, the rule
+// that an unfixed listed finding blocks whatever its class, and nothing else changed, since the
+// rendering is the same change read without findings with the paragraph after it. Run with -update
+// to rewrite the goldens after a deliberate prompt change.
+func TestStockBarRenderings(t *testing.T) {
+	m, mod := loadMatrix(t, filepath.Join("testdata", "bar-matrix.json"))
+	if len(m.Cases) != 2 {
+		t.Fatalf("bar matrix has %d cases, want 2", len(m.Cases))
+	}
+	for _, c := range m.Cases {
+		t.Run(c.Name, func(t *testing.T) {
+			got, err := mod.Render(c.Seat, c.Context)
+			if err != nil {
+				t.Fatal(err)
+			}
+			golden := filepath.Join("testdata", c.Name+".txt")
+			if *update {
+				if err := os.WriteFile(golden, []byte(got), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			want, err := os.ReadFile(golden)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != string(want) {
+				t.Errorf("rendering differs from %s; rerun with -update if the change is deliberate\n got: %s", golden, got)
+			}
+			bare := c.Context
+			bare.Findings = ""
+			plain, err := mod.Render(c.Seat, bare)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.HasPrefix(got, plain+"\n\nEarlier findings.") {
+				t.Errorf("the bar paragraph does not follow the change read unchanged")
+			}
+			flat := strings.Join(strings.Fields(got), " ")
+			for _, s := range []string{
+				"The earlier findings:\n" + c.Context.Findings, `its text starts "Still open:"`, "It blocks whatever its class",
+				"A defect the change adds or causes blocks", `its text starts "Already present:"`,
+			} {
+				if !strings.Contains(got, s) && !strings.Contains(flat, s) {
+					t.Errorf("rendering lacks %q", s)
+				}
+			}
+			if !strings.HasSuffix(got, c.Context.Findings) {
+				t.Error("the findings are not quoted whole at the end")
+			}
+		})
+	}
+}
+
 // TestStockAnatomySlugs proves the module's anatomy token names the heading drafter's slugger
 // gives each stock anatomy, so the excerpt the token asks for exists.
 func TestStockAnatomySlugs(t *testing.T) {

@@ -63,12 +63,15 @@ neither blueprint read returns a finding under one.`;
  * that turns the read into a change read: the blueprint is still read whole, but a finding blocks
  * only when the change makes the page wrong or leaves a reader stuck. The scope's value never
  * reaches the text, since drafter's change block names the sections, so every scoped render of a
- * page is byte-identical and shares one prompt cache entry.
+ * page is byte-identical and shares one prompt cache entry. Non-empty `findings` are the read bar:
+ * the blocking findings of the earlier whole read the change answers, one per line, which a
+ * further paragraph quotes in full and holds the read to. With no findings the text is as before.
  * @param {string} [scope]
  * @param {{token: string, name: string, register: boolean}} anatomy
+ * @param {string} [findings]
  * @returns {string}
  */
-function blueprintPrompt(scope, anatomy) {
+function blueprintPrompt(scope, anatomy, findings) {
   return `Blueprint read. The blueprint below is a documentation page's durable plan, a YAML file with
 an \`id\` and a \`why\` on each section, items of several kinds, and a \`framing\` block. No prose exists
 yet: read the blueprint, never a page. The page's job, type, and what it covers sit in its outline
@@ -168,7 +171,19 @@ read, this rule replaces the blocking rule above for order, pace, heading form, 
 restating \`use\`: return each as a non-blocking finding starting "Nit:". A Nit never makes the
 verdict "fix". Every other defect is non-blocking: set blocking to false and start its finding with
 "Already present:". The standard sends an existing problem to a bug ("encourage the author to file a
-bug"), so report it and let it pass. A non-blocking finding never makes the verdict "fix".` : ""}`;
+bug"), so report it and let it pass. A non-blocking finding never makes the verdict "fix".` : ""}${findings ? `
+
+Earlier findings. An earlier read of the whole blueprint blocked it on the findings below, quoted in
+full, and the change answers them. For each one, judge whether the change fixed it. A listed finding
+the change didn't fix is a blocking finding at its location, and its text starts "Still open:". It
+blocks whatever its class: for a listed finding, this rule replaces the change read's rule that makes
+order, pace, heading form, field placement, and a restating \`use\` non-blocking, since the earlier read
+already judged it worth blocking. A defect the change adds or causes blocks, as the change read's rule
+says. Any other defect stays non-blocking, and its text starts "Already present:". Verdict "fix" if any
+blocking finding exists; otherwise "ok".
+
+The earlier findings:
+${findings}` : ""}`;
 
 }
 
@@ -638,7 +653,7 @@ return {
   blueprint: (c) => {
     const path = c.page && c.page.path;
     const entry = PAGES.find((p) => p.path === path) || {};
-    return blueprintPrompt(c.scope || undefined, anatomyFor(entry));
+    return blueprintPrompt(c.scope || undefined, anatomyFor(entry), c.findings || undefined);
   },
   draft: draftPrompt,
   structure: structurePrompt,
