@@ -5,8 +5,6 @@
     {"text": "Run every tally command in the directory that holds the count file.", "id": "tally-state-file"},
     {"text": "Run `tally count` with the items you want to add.", "id": "tally-count-cmd"},
     {"text": "The command `tally count` adds each item you name on the command line to the total.", "id": "tally-count-cmd"},
-    {"text": "The flag `--by` sets the amount each item adds, and the default is 1.", "id": "tally-by-flag"},
-    {"text": "The flag `--by` takes a whole number.", "id": "tally-by-int"},
     {"text": "The command `tally count` counts the arguments after it and never reads their names.", "id": "tally-count-args"},
     {"text": "The command `tally count` creates the .tally file the first time it runs.", "id": "tally-count-creates"},
     {"text": "The command `tally count` prints nothing.", "id": "tally-count-quiet"},

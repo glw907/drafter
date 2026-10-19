@@ -16,10 +16,6 @@ Run `tally count` with the items you want to add.
 
 The command `tally count` adds each item you name on the command line to the total.
 
-The flag `--by` sets the amount each item adds, and the default is 1.
-
-The flag `--by` takes a whole number.
-
 The command `tally count` counts the arguments after it and never reads their names.
 
 The command `tally count` creates the .tally file the first time it runs.

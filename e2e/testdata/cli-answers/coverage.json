@@ -4,8 +4,6 @@
     {"id": "c-dir", "quote": "Run every tally command in the directory that holds the count file."},
     {"id": "s-count", "quote": "Run `tally count` with the items you want to add."},
     {"id": "f-count", "quote": "The command `tally count` adds each item you name on the command line to the total."},
-    {"id": "f-by", "quote": "The flag `--by` sets the amount each item adds, and the default is 1."},
-    {"id": "f-by-int", "quote": "The flag `--by` takes a whole number."},
     {"id": "f-args", "quote": "The command `tally count` counts the arguments after it and never reads their names."},
     {"id": "f-creates", "quote": "The command `tally count` creates the .tally file the first time it runs."},
     {"id": "f-quiet", "quote": "The command `tally count` prints nothing."},

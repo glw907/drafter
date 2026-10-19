@@ -56,12 +56,6 @@ sections:
       - id: f-count
         kind: fact
         fact: tally-count-cmd
-      - id: f-by
-        kind: fact
-        fact: tally-by-flag
-      - id: f-by-int
-        kind: fact
-        fact: tally-by-int
       - id: f-args
         kind: fact
         fact: tally-count-args

@@ -204,7 +204,7 @@ func TestBlueprintHandoffsCarryTheDraftingInputs(t *testing.T) {
 	if in.PageType != "task guide" {
 		t.Errorf("PageType = %q", in.PageType)
 	}
-	want := []string{"tally-by-flag", "tally-by-int", "tally-count-args", "tally-count-cmd", "tally-count-creates", "tally-count-quiet", "tally-state-file", "tally-total-cmd", "tally-total-empty"}
+	want := []string{"tally-count-args", "tally-count-cmd", "tally-count-creates", "tally-count-quiet", "tally-state-file", "tally-total-cmd", "tally-total-empty"}
 	if !slices.Equal(in.FactIDs, want) {
 		t.Errorf("FactIDs = %v, want %v from the start commit's bytes", in.FactIDs, want)
 	}
