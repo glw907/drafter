@@ -41,7 +41,7 @@ Every command prints for a person by default and takes `--json` for scripts. Run
 ### page
 
 ```sh
-drafter page [--workflow-run <run-file>] [--resume <run-id>] [--dry-run] [--sync] [--json] [<handoff-file>...]
+drafter page [--workflow-run <run-file>] [--resume <run-id>] [--whole] [--dry-run] [--sync] [--json] [<handoff-file>...]
 ```
 
 The command runs each handoff's page through the pipeline. A handoff tells drafter everything
@@ -52,6 +52,7 @@ reads the pages from a planner's run file instead.
 |---|---|
 | `--workflow-run <run-file>` | Reads the handoff from a planner's Workflow run file. |
 | `--resume <run-id>` | Continues a stopped run. |
+| `--whole` | Drafts each blueprint page whole, whatever its `drafted.lock` entry says. |
 | `--dry-run` | Assembles the first stage's requests, prints their sizes and estimated cost, and submits nothing. |
 | `--sync` | Sends streamed Messages calls for this run instead of Message Batches. |
 | `--json` | Prints the result as JSON. |
@@ -103,7 +104,8 @@ The command runs stage 1 of the pipeline on each blueprint: the local check, the
 holding the consistency read and the blueprint read. It needs a clean tree and `[seat.blueprint]`
 in the configuration, and it reads every input from the commit the run started at. When the run
 ends with every blueprint decided, it records each accepted blueprint's blob id in
-`drafted.lock`. The exit status is the same as `page`'s.
+`drafted.lock`, and the blocking findings of each whole read that blocked, which the next read
+holds the blueprint's change to. The exit status is the same as `page`'s.
 
 ### check-plan
 

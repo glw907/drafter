@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -129,6 +130,16 @@ func (f *cliFixture) draft(brief, accepted string) {
 // scope runs the lock scoping on the fixture's blueprint at HEAD.
 func (f *cliFixture) scope() draftPlan {
 	f.t.Helper()
+	d, err := f.scopeWith(false, io.Discard)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	return d
+}
+
+// scopeWith runs the lock scoping with --whole set as whole, naming a lost bar commit on warn.
+func (f *cliFixture) scopeWith(whole bool, warn io.Writer) (draftPlan, error) {
+	f.t.Helper()
 	c, err := config.Load(f.root, config.Flags{})
 	if err != nil {
 		f.t.Fatal(err)
@@ -138,7 +149,7 @@ func (f *cliFixture) scope() draftPlan {
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	return scopeFromLock(c, f.root, head, hs)
+	return scopeFromLock(c, f.root, head, hs, whole, warn)
 }
 
 // editFact rewrites the shared fact's bullet and commits it.

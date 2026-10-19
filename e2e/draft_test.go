@@ -34,6 +34,7 @@ type draftStub struct {
 	*httptest.Server
 	mu       sync.Mutex
 	kinds    []string
+	bodies   []string
 	answers  map[string]string
 	failFrom int // refuse every Messages request from the nth on, as a spend limit does
 }
@@ -73,6 +74,7 @@ func newDraftStub(t *testing.T) *draftStub {
 			kind := schemaKind(body)
 			s.mu.Lock()
 			s.kinds = append(s.kinds, kind)
+			s.bodies = append(s.bodies, string(body))
 			refuse := s.failFrom > 0 && len(s.kinds) >= s.failFrom
 			text := s.answers[kind]
 			s.mu.Unlock()
@@ -144,10 +146,17 @@ func (s *draftStub) sent() []string {
 	return slices.Clone(s.kinds)
 }
 
+// sentBodies returns the body of every Messages request, in the order sent.
+func (s *draftStub) sentBodies() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.bodies)
+}
+
 func (s *draftStub) reset(failFrom int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.kinds, s.failFrom = nil, failFrom
+	s.kinds, s.bodies, s.failFrom = nil, nil, failFrom
 }
 
 func (s *draftStub) setAnswer(kind, text string) {

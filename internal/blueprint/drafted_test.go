@@ -68,6 +68,16 @@ func TestLockIntroducedAt(t *testing.T) {
 			commitLock(t, root, map[string]LockEntry{page: read}, "read accepted")
 			return want, drafted
 		}},
+		{"a blocked read written and cleared does not move it", func(t *testing.T, root string) (string, LockEntry) {
+			want := commitLock(t, root, map[string]LockEntry{page: drafted}, "draft")
+			barred := drafted
+			barred.Blocked = &Blocked{Commit: want, Findings: []BlockedFinding{{Location: "s", Text: "A step is missing."}}}
+			commitLock(t, root, map[string]LockEntry{page: barred}, "read blocked")
+			read := drafted
+			read.Accepted = "b-read"
+			commitLock(t, root, map[string]LockEntry{page: read}, "read accepted, bar cleared")
+			return want, read
+		}},
 		{"an entry the lock never held finds no commit", func(t *testing.T, root string) (string, LockEntry) {
 			commitLock(t, root, map[string]LockEntry{page: drafted}, "lock A")
 			return "", redrafted

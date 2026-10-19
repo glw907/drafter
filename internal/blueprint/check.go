@@ -375,10 +375,14 @@ func (c *projectCheck) lockEntries(files []string, scoped bool) {
 					fmt.Sprintf("the entry for %s records a drafted page, but the page is not on disk", pg),
 					"restore the page, or remove the entry")
 			}
-		case e.Accepted != "":
+		case e.Accepted != "" || e.Blocked != nil:
 			if _, ok := c.l.pages[pg]; !ok {
+				what := "an accepted blueprint"
+				if e.Accepted == "" {
+					what = "a blocked read"
+				}
 				c.add(c.l.lockRel, 1, plan.SeverityError, checkLock,
-					fmt.Sprintf("the entry for %s records an accepted blueprint, but the outline lists no such page", pg),
+					fmt.Sprintf("the entry for %s records %s, but the outline lists no such page", pg, what),
 					"add the page to "+c.Outline+", or remove the entry")
 			}
 		}

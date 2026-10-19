@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"path"
 	"slices"
 	"strings"
@@ -44,13 +45,15 @@ func draftInputs(c *config.Config, root, head, rel string, outline []byte, entry
 }
 
 // draftPlan is what drafter page decides about its blueprint pages before the run: which pages
-// run, the scope and change block of each, and the pages whose blueprint read is skipped.
+// run, the scope and change block of each, the pages whose blueprint read is skipped, and the
+// read of each page its bar sends back to the change since a blocked read.
 type draftPlan struct {
 	handoffs []handoff.Handoff
 	skipped  []pipeline.PageResult
 	scopes   map[string]blueprint.Scope
 	changes  map[string]string
 	skipRead map[string]bool
+	read     barMaps
 }
 
 // pageScope is the decision for one page.
@@ -60,38 +63,48 @@ type pageScope struct {
 	upToDate bool
 }
 
+// wholeOnRequest is the reason a page drafts whole under --whole.
+const wholeOnRequest = "drafted whole on request (--whole)"
+
 // scopeFromLock compares each blueprint page with the lock entry committed at head and decides how
-// the run treats it.
-func scopeFromLock(c *config.Config, root, head string, handoffs []handoff.Handoff) draftPlan {
-	d := draftPlan{scopes: map[string]blueprint.Scope{}, changes: map[string]string{}, skipRead: map[string]bool{}}
-	lockRel := path.Join(path.Dir(c.Blueprints.Outline), blueprint.LockFile)
-	var lock *blueprint.Lock
-	if data, err := gitShow(root, head, lockRel); err == nil {
-		lock, err = blueprint.DecodeLock(lockRel, data)
-		if err != nil {
-			lock = nil
-		}
+// the run treats it. With whole set, every page drafts whole and none is up to date. A page whose
+// read is not skipped and whose entry holds a bar reads the change since the bar's commit, while
+// its draft keeps the scope decided here; a page its bar holds is not run. A lock that does not
+// decode is an error, since every entry, bar, and skipped read would be lost with it.
+func scopeFromLock(c *config.Config, root, head string, handoffs []handoff.Handoff, whole bool, warn io.Writer) (draftPlan, error) {
+	d := draftPlan{
+		scopes: map[string]blueprint.Scope{}, changes: map[string]string{}, skipRead: map[string]bool{},
+		read: barMaps{scopes: map[string]blueprint.Scope{}, changes: map[string]string{}, bars: map[string]string{}, barFrom: map[string]string{}},
 	}
-	if lock == nil {
-		lock = &blueprint.Lock{Version: blueprint.Version}
+	lock, err := committedLock(c, root, head)
+	if err != nil {
+		return d, err
 	}
 	for _, h := range handoffs {
 		e := lock.Pages[h.Page.Path]
-		ps := pageScopeFor(c, root, head, lockRel, e, h)
+		ps := wholeBecause(wholeOnRequest)
+		if !whole {
+			ps = pageScopeFor(c, root, head, lockRel(c), e, h)
+		}
 		if ps.upToDate {
 			d.skipped = append(d.skipped, unchangedPage(h.Page.Path, upToDate))
 			continue
+		}
+		if blob, err := blueprint.CommitBlobID(root, head, h.Plan); err == nil && skipRead(e, blob) {
+			d.skipRead[h.Page.Path] = true
+		} else if e.Blocked != nil {
+			if r := applyBar(c, root, head, h, e.Blocked, d.read, warn); r != nil {
+				d.skipped = append(d.skipped, *r)
+				continue
+			}
 		}
 		d.handoffs = append(d.handoffs, h)
 		d.scopes[h.Page.Path] = ps.scope
 		if ps.change != "" {
 			d.changes[h.Page.Path] = ps.change
 		}
-		if blob, err := blueprint.CommitBlobID(root, head, h.Plan); err == nil && skipRead(e, blob) {
-			d.skipRead[h.Page.Path] = true
-		}
 	}
-	return d
+	return d, nil
 }
 
 // skipRead reports whether a page's blueprint read can be skipped: the lock records the

@@ -1,0 +1,44 @@
+{
+  "host": {
+    "args": {},
+    "resolved": {
+      "pages": [
+        {
+          "path": "docs/guide/install-widget.md",
+          "slug": "install-widget",
+          "title": "Install the widget",
+          "pageType": "task guide",
+          "job": "Install the widget CLI and run it once.",
+          "covers": ["The install command.", "The first run."],
+          "outOfScope": ["Plugin authoring."],
+          "figure": false,
+          "anatomy": "Task guide"
+        },
+        {
+          "path": "docs/guide/widget-rows.md",
+          "slug": "widget-rows",
+          "title": "Widget rows",
+          "pageType": "symptom row",
+          "job": "Recover from a failed widget run.",
+          "covers": ["Each failure a run can meet."],
+          "outOfScope": [],
+          "figure": false,
+          "anatomy": "Symptom row",
+          "register": "docs/house-style.md"
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "bar-anatomy",
+      "seat": "blueprint",
+      "context": { "page": { "path": "docs/guide/install-widget.md" }, "inputs": {}, "round": 1, "findings": "1. [steps] A step the reader needs is missing.\n2. [intro] Say what the page leaves out.", "afterFinalRead": false, "scope": "intro,steps", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "bar-register",
+      "seat": "blueprint",
+      "context": { "page": { "path": "docs/guide/widget-rows.md" }, "inputs": {}, "round": 1, "findings": "1. [rows] Order the rows by how often a run meets them.", "afterFinalRead": false, "scope": "page", "where": "", "narrow": null, "turn": 0, "facts": true }
+    }
+  ]
+}

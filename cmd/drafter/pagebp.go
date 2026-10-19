@@ -6,7 +6,6 @@ import (
 	"io"
 	"maps"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/glw907/drafter/internal/key"
 	"github.com/glw907/drafter/internal/pipeline"
 	"github.com/glw907/drafter/internal/plan"
-	runstate "github.com/glw907/drafter/internal/run"
 	"github.com/spf13/cobra"
 )
 
@@ -55,8 +53,8 @@ func runPageBlueprints(cmd *cobra.Command, args []string, f *pageFlags) error {
 	var d draftPlan
 	if st != nil {
 		d.handoffs, d.skipped = inRun(handoffs, st)
-	} else {
-		d = scopeFromLock(c, root, head, handoffs)
+	} else if d, err = scopeFromLock(c, root, head, handoffs, f.whole, cmd.ErrOrStderr()); err != nil {
+		return cannot(err)
 	}
 	if len(d.handoffs) == 0 {
 		if st != nil {
@@ -84,6 +82,7 @@ func runPageBlueprints(cmd *cobra.Command, args []string, f *pageFlags) error {
 	s, err := pipeline.Run(cmd.Context(), pipeline.Options{
 		Config: c, Handoffs: d.handoffs, API: client, Resume: f.resume, DryRun: f.dryRun,
 		Scopes: d.scopes, Changes: d.changes, Draft: true, SkipRead: d.skipRead,
+		ReadScopes: d.read.scopes, ReadChanges: d.read.changes, Bars: d.read.bars, BarFrom: d.read.barFrom,
 		Version: version(), Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr(), ResumeArgs: args,
 	})
 	if err != nil {
@@ -177,59 +176,45 @@ func checkStockTracks(c *config.Config, root, head string, handoffs []handoff.Ha
 // writes only when an entry changed, and writes nothing for a dry run or a run that stopped: the
 // resume writes the entries when it finishes.
 //
-// An entry's accepted id is the one the page's blueprint read accepted when that read judged the
-// whole blueprint; a skipped read and a scoped accept keep the id the entry held.
+// The reads' outcomes are written first, in the same write (recordReads): an accept that judged
+// the whole blueprint, or the change since a bar, sets the accepted id and clears the bar, and a
+// whole read that blocked records its bar. A drafted page's entry then keeps that accepted id, so
+// a skipped read and a scoped accept keep the id the entry held, and it carries no bar.
 func recordDrafted(c *config.Config, root, start string, handoffs []handoff.Handoff, s pipeline.Summary, dry bool, warn io.Writer) error {
 	if dry || s.Stop != "" {
 		return nil
-	}
-	gitDir, err := gitText(root, "rev-parse", "--absolute-git-dir")
-	if err != nil {
-		return err
-	}
-	l, err := runstate.TryLock(filepath.Join(gitDir, "drafter.lock"))
-	if err != nil {
-		return fmt.Errorf("another drafter run holds this worktree, so drafted.lock was not written: %w", err)
-	}
-	defer func() { _ = l.Release() }()
-	file := filepath.Join(root, filepath.FromSlash(path.Join(path.Dir(c.Blueprints.Outline), blueprint.LockFile)))
-	lock, err := blueprint.ReadLock(file)
-	if err != nil {
-		return err
 	}
 	plans := map[string]string{}
 	for _, h := range handoffs {
 		plans[h.Page.Path] = h.Plan
 	}
-	changed := false
-	for _, r := range s.Pages {
-		bp, ok := plans[r.Path]
-		if !ok || r.Status != pipeline.StatusAccepted {
-			continue
+	return updateLock(c, root, func(lock *blueprint.Lock) (bool, error) {
+		read := recordReads(lock, start, s)
+		drafted := false
+		for _, r := range s.Pages {
+			bp, ok := plans[r.Path]
+			if !ok || r.Status != pipeline.StatusAccepted {
+				continue
+			}
+			prior := lock.Pages[r.Path]
+			e, err := blueprint.DraftedEntry(root, start, bp, r.Path, prior.Accepted)
+			if err != nil {
+				return false, err
+			}
+			if e.Page == prior.Page && e.Blueprint == prior.Blueprint && e.Accepted == prior.Accepted && maps.Equal(e.Sections, prior.Sections) && prior.Blocked == nil {
+				continue
+			}
+			if lock.Pages == nil {
+				lock.Pages = map[string]blueprint.LockEntry{}
+			}
+			lock.Pages[r.Path] = e
+			drafted = true
 		}
-		prior := lock.Pages[r.Path]
-		accepted := prior.Accepted
-		if r.Accepted != "" && !scopedAccept(r) {
-			accepted = r.Accepted
+		if drafted {
+			warnMovedInputs(c, root, start, warn)
 		}
-		e, err := blueprint.DraftedEntry(root, start, bp, r.Path, accepted)
-		if err != nil {
-			return err
-		}
-		if e.Page == prior.Page && e.Blueprint == prior.Blueprint && e.Accepted == prior.Accepted && maps.Equal(e.Sections, prior.Sections) {
-			continue
-		}
-		if lock.Pages == nil {
-			lock.Pages = map[string]blueprint.LockEntry{}
-		}
-		lock.Pages[r.Path] = e
-		changed = true
-	}
-	if !changed {
-		return nil
-	}
-	warnMovedInputs(c, root, start, warn)
-	return blueprint.WriteLock(file, lock)
+		return read || drafted, nil
+	})
 }
 
 // warnMovedInputs names the facts and outline files that changed between the start commit and HEAD.

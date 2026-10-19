@@ -276,6 +276,12 @@ func (r *runner) addPages() error {
 		if sc, ok := r.o.Scopes[h.Page.Path]; ok {
 			p.w.Since, p.w.Scope, p.w.Change = r.o.Since, &sc, r.o.Changes[h.Page.Path]
 		}
+		if sc, ok := r.o.ReadScopes[h.Page.Path]; ok {
+			p.w.ReadScope, p.w.ReadChange = &sc, r.o.ReadChanges[h.Page.Path]
+		}
+		if from := r.o.BarFrom[h.Page.Path]; from != "" {
+			p.w.Bar, p.w.BarFrom, p.w.Since = r.o.Bars[h.Page.Path], from, from
+		}
 		p.w.Draft, p.w.SkipRead = r.o.Draft, r.o.SkipRead[h.Page.Path]
 		r.state.Pages[p.key] = p.ps
 		r.pages = append(r.pages, p)

@@ -70,6 +70,54 @@ func TestLockRoundTrip(t *testing.T) {
 	}
 }
 
+// TestLockBlocked round-trips an entry holding a read bar, and pins the bytes of a lock with no bar
+// to the format before the field existed.
+func TestLockBlocked(t *testing.T) {
+	const noBar = `# Written by drafter; do not edit by hand.
+version: 1
+pages:
+    docs/a.md:
+        page: p1
+        blueprint: b1
+        accepted: b1
+        sections:
+            _intro: sha256:aa
+`
+	tests := []struct {
+		name  string
+		entry LockEntry
+		want  string // the bytes WriteLock must give, or "" to check the round trip only
+	}{
+		{"an entry without a bar encodes as before", LockEntry{Page: "p1", Blueprint: "b1", Accepted: "b1", Sections: map[string]string{IntroKey: "sha256:aa"}}, noBar},
+		{"a drafted entry with a bar", LockEntry{Page: "p1", Blueprint: "b1", Sections: map[string]string{IntroKey: "sha256:aa"},
+			Blocked: &Blocked{Commit: "0123abcd", Findings: []BlockedFinding{{Location: "steps", Text: "A step is missing."}, {Location: "intro", Text: "Say what the page leaves out."}}}}, ""},
+		{"a bar-only entry", LockEntry{Blocked: &Blocked{Commit: "0123abcd", Findings: []BlockedFinding{{Location: "steps", Text: "A step is missing."}}}}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			want := &Lock{Version: Version, Pages: map[string]LockEntry{"docs/a.md": tt.entry}}
+			file := filepath.Join(t.TempDir(), "drafted.lock")
+			if err := WriteLock(file, want); err != nil {
+				t.Fatal(err)
+			}
+			raw, _ := os.ReadFile(file)
+			if tt.want != "" && string(raw) != tt.want {
+				t.Errorf("bytes =\n%s\nwant\n%s", raw, tt.want)
+			}
+			if tt.entry.Blocked != nil && (!strings.Contains(string(raw), "blocked:\n") || !strings.Contains(string(raw), "commit: 0123abcd")) {
+				t.Errorf("the bar is not written under blocked:\n%s", raw)
+			}
+			got, err := ReadLock(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("read back %+v, want %+v", got.Pages["docs/a.md"], tt.entry)
+			}
+		})
+	}
+}
+
 func TestReadLockErrors(t *testing.T) {
 	dir := t.TempDir()
 	if l, err := ReadLock(filepath.Join(dir, "absent.lock")); err != nil || l.Version != Version || len(l.Pages) != 0 {

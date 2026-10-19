@@ -326,6 +326,32 @@ func TestRecordDrafted(t *testing.T) {
 		}
 	})
 
+	t.Run("a draft after a bar accept writes a full entry with accepted and no bar", func(t *testing.T) {
+		f, c, hs, head := setup(t)
+		writeEntry(t, f, blueprint.LockEntry{Blocked: &blueprint.Blocked{Commit: head, Findings: []blueprint.BlockedFinding{{Location: "add-items", Text: "Say why."}}}})
+		blob := f.rev("HEAD:" + tallyBP)
+		s := acceptedSummary(blob, &blueprint.Scope{Kind: blueprint.ScopeWhole})
+		s.Pages[0].BarFrom, s.Pages[0].ReadScope = head, &blueprint.Scope{Kind: blueprint.ScopeScoped}
+		if err := recordDrafted(c, f.root, head, hs, s, false, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+		if e := readLock(t, f); e.Page == "" || len(e.Sections) == 0 || e.Accepted != blob || e.Blocked != nil {
+			t.Errorf("entry = %+v, want a full entry accepted at %s with no bar", e, blob)
+		}
+	})
+
+	t.Run("a page blocked inside drafter page gets a bar and no draft", func(t *testing.T) {
+		f, c, hs, head := setup(t)
+		s := pipeline.Summary{Pages: []pipeline.PageResult{{Path: tallyPage, Status: pipeline.StatusEscalated, Rule: "plan", WholeBlocked: true,
+			Findings: []pipeline.FindingResult{{Location: "add-items", Text: "Say why.", Blocking: true}}}}}
+		if err := recordDrafted(c, f.root, head, hs, s, false, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+		if e := readLock(t, f); e.Page != "" || e.Blocked == nil || e.Blocked.Commit != head {
+			t.Errorf("entry = %+v, want a bar-only entry at %s", e, head)
+		}
+	})
+
 	t.Run("a skipped read keeps accepted", func(t *testing.T) {
 		f, c, hs, head := setup(t)
 		writeEntry(t, f, blueprint.LockEntry{Accepted: "earlier"})

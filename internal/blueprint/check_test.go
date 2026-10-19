@@ -102,6 +102,9 @@ func TestCheckNewChecks(t *testing.T) {
 		{"failure handled by a handoff to another section", map[string]string{guideBlueprint: withEdit(t, "Ask an admin to grant the role, then try again.", "Go on to [[verify]] and try again.")}, false, "", "handler", "", ""},
 		{"accepted-only entry for an unlisted page", map[string]string{"blueprints/drafted.lock": "version: 1\npages:\n  docs/new.md:\n    accepted: aa\n"}, false,
 			"blueprints/drafted.lock", "lock", "error", "lists no such page"},
+		{"bar-only entry for a listed page", map[string]string{"blueprints/drafted.lock": barOnlyLock("docs/guide.md")}, false, "", "lock", "", ""},
+		{"bar-only entry for an unlisted page", map[string]string{"blueprints/drafted.lock": barOnlyLock("docs/new.md")}, false,
+			"blueprints/drafted.lock", "lock", "error", "records a blocked read, but the outline lists no such page"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -129,6 +132,11 @@ func TestCheckNewChecks(t *testing.T) {
 			t.Errorf("no %s %s finding in %s containing %q: %+v", tt.sev, tt.check, tt.file, tt.msg, hits)
 		})
 	}
+}
+
+// barOnlyLock is a lock whose one entry, for page, holds only a read bar.
+func barOnlyLock(page string) string {
+	return "version: 1\npages:\n  " + page + ":\n    blocked:\n      commit: 0123abcd\n      findings:\n        - location: rotate\n          text: A step is missing.\n"
 }
 
 // handlerAs returns the base blueprint with the failure's handler h-ask-admin recast as kind

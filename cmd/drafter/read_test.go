@@ -94,7 +94,7 @@ func TestRecordAccepted(t *testing.T) {
 		"a dry run":     {two, true},
 	} {
 		t.Run(name+" writes no lock", func(t *testing.T) {
-			if err := recordAccepted(c, root, tc.s, tc.dry); err != nil {
+			if err := recordAccepted(c, root, "start", tc.s, tc.dry); err != nil {
 				t.Fatal(err)
 			}
 			if got := lockBytes(t, root); got != "" {
@@ -104,7 +104,7 @@ func TestRecordAccepted(t *testing.T) {
 	}
 
 	t.Run("one accepted and one set aside leaves exactly one new accepted id", func(t *testing.T) {
-		if err := recordAccepted(c, root, two, false); err != nil {
+		if err := recordAccepted(c, root, "start", two, false); err != nil {
 			t.Fatal(err)
 		}
 		l, err := blueprint.ReadLock(filepath.Join(root, "blueprints/drafted.lock"))
@@ -118,7 +118,7 @@ func TestRecordAccepted(t *testing.T) {
 
 	t.Run("an accepted id already recorded leaves the file as it was", func(t *testing.T) {
 		before := lockBytes(t, root)
-		if err := recordAccepted(c, root, two, false); err != nil {
+		if err := recordAccepted(c, root, "start", two, false); err != nil {
 			t.Fatal(err)
 		}
 		if got := lockBytes(t, root); got != before {
@@ -136,7 +136,7 @@ func TestRecordAccepted(t *testing.T) {
 			{Path: "docs/a.md", Status: pipeline.StatusAccepted, Accepted: "aaa2"},
 			{Path: "docs/b.md", Status: pipeline.StatusEscalated, Rule: "plan"},
 		}}
-		if err := recordAccepted(c, root, s, false); err != nil {
+		if err := recordAccepted(c, root, "start", s, false); err != nil {
 			t.Fatal(err)
 		}
 		got, _ := blueprint.ReadLock(filepath.Join(root, "blueprints/drafted.lock"))
@@ -364,12 +364,14 @@ sections:
 `
 
 // readStub is an API stub for drafter read in sync mode. It records each Messages request body and,
-// from failFrom on, refuses every one at a spend limit.
+// from failFrom on, refuses every one at a spend limit. It answers every request with answer, or
+// with an accepting read when answer is empty.
 type readStub struct {
 	*httptest.Server
 	mu       sync.Mutex
 	bodies   []string
 	failFrom int
+	answer   string
 }
 
 func newReadStub(t *testing.T) *readStub {
@@ -389,7 +391,12 @@ func newReadStub(t *testing.T) *readStub {
 			s.mu.Lock()
 			s.bodies = append(s.bodies, string(body))
 			refuse := s.failFrom > 0 && len(s.bodies) >= s.failFrom
+			answer := s.answer
 			s.mu.Unlock()
+			if answer == "" {
+				answer = `{"verdict":"ok","findings":[],"summary":"read"}`
+			}
+			quoted, _ := json.Marshal(answer)
 			if refuse {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusBadRequest)
@@ -400,7 +407,7 @@ func newReadStub(t *testing.T) *readStub {
 			for _, ev := range [][2]string{
 				{"message_start", `{"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","model":"model-a","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":1}}}`},
 				{"content_block_start", `{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`},
-				{"content_block_delta", `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"{\"verdict\":\"ok\",\"findings\":[],\"summary\":\"read\"}"}}`},
+				{"content_block_delta", `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":` + string(quoted) + `}}`},
 				{"content_block_stop", `{"type":"content_block_stop","index":0}`},
 				{"message_delta", `{"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":5}}`},
 				{"message_stop", `{"type":"message_stop"}`},
@@ -423,9 +430,10 @@ func (s *readStub) requests() []string {
 
 // sinceProject is a committed two-page blueprint project whose configuration points at the stub.
 type sinceProject struct {
-	t    *testing.T
-	root string
-	stub *readStub
+	t     *testing.T
+	root  string
+	state string
+	stub  *readStub
 }
 
 func (p *sinceProject) git(args ...string) {
@@ -464,11 +472,11 @@ func (p *sinceProject) commit(edit func(string) string) {
 
 func newSinceProject(t *testing.T) *sinceProject {
 	t.Helper()
-	p := &sinceProject{t: t, root: t.TempDir(), stub: newReadStub(t)}
+	p := &sinceProject{t: t, root: t.TempDir(), state: t.TempDir(), stub: newReadStub(t)}
 	p.write("blueprints/outline.yaml", sinceOutline)
 	p.write("blueprints/docs/a.blueprint.yaml", sinceBlueprint)
 	p.write("blueprints/docs/b.blueprint.yaml", sinceBlueprint)
-	p.write("prompts.js", `return { draft: (c) => "Draft", blueprint: (c) => "Read the blueprint." + (c.scope ? "\nScope: " + c.scope : "") };`+"\n")
+	p.write("prompts.js", `return { draft: (c) => "Draft", blueprint: (c) => "Read the blueprint." + (c.scope ? "\nScope: " + c.scope : "") + (c.findings ? "\nFindings:\n" + c.findings : "") };`+"\n")
 	p.write("drafter.toml", `prompts = "prompts.js"
 seats = ["draft"]
 
@@ -492,7 +500,7 @@ max_tokens = 4000
 	if err := os.MkdirAll(filepath.Join(cfg, "drafter"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	user := fmt.Sprintf("workspace_id = \"wrkspc_test\"\npage_cap = 10\ncycle_ceiling = 100\napi_base_url = %q\nstate_dir = %q\n\n[prices.models.model-a]\ninput = 1\noutput = 5\n", p.stub.URL, t.TempDir())
+	user := fmt.Sprintf("workspace_id = \"wrkspc_test\"\npage_cap = 10\ncycle_ceiling = 100\napi_base_url = %q\nstate_dir = %q\n\n[prices.models.model-a]\ninput = 1\noutput = 5\n", p.stub.URL, p.state)
 	if err := os.WriteFile(filepath.Join(cfg, "drafter", "config.toml"), []byte(user), 0o644); err != nil {
 		t.Fatal(err)
 	}
