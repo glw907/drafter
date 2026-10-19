@@ -1,0 +1,24 @@
+Coherence read of docs/count-items.md. A section redraft changed the sections `add-items`, and the
+rest of the page stands as it was accepted. The page is inlined below with the brief at blueprints/docs/count-items.brief.json, the
+blueprint, its outline entry, and the facts the blueprint places or cites.
+
+Read the whole page as one argument, from the introduction to the close, against the blueprint's
+`argument` and `orderReason`. Check three things:
+- Transitions: each section leads into the next, and no lead-in promises what the next section no
+  longer delivers.
+- Repetition: no point is made twice across sections, as when a changed section restates what a
+  neighbor already says.
+- Flow: the argument builds in order, and no section relies on something only a later section
+  explains.
+
+Read each changed section against its neighbors first, the section before it and the section after
+it, since a redraft that reads well alone can break the seams around it.
+A finding may lie anywhere on the page, in a changed section or not: locate it where its fix
+belongs.
+
+Leave style, the anatomy, and the claims to the reads that have already passed the page. A finding
+blocks when a reader reading straight through would lose the thread; otherwise it is advisory.
+
+A finding names its location (the section heading, and the sentence when it applies),
+what is wrong, a rewrite that fixes it, and whether it blocks. Verdict "fix" if any blocking finding
+exists; otherwise "ok".

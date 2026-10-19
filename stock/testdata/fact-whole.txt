@@ -1,0 +1,18 @@
+Fact read of docs/count-items.md. The page and the brief at blueprints/docs/count-items.brief.json are inlined below, with the facts the blueprint places or cites and, after them, the source excerpt each fact
+names. The brief maps each sentence of the page to the fact ids it rests on, or to "no-claim".
+
+Check each of these. Each failure is a blocking finding, located at the sentence:
+- Each id the brief cites is in the facts block, with the tag verified, external, or vendor.
+- Each cited sentence states only what its facts state. Every number, version, date, path, URL,
+  command, flag, and code name in it appears in a fact it cites, and the sentence claims no more
+  than the fact does.
+- Each cited fact still matches its source excerpt. When an excerpt no longer says what its fact
+  claims, the finding names the fact id and quotes the excerpt.
+- A "no-claim" sentence states no checkable specific. One that does needs the fact that states it.
+- Each sentence of the page's prose is in the brief, and each brief sentence is on the page.
+- Each `fact` item of the blueprint is cited by a sentence in its section, and no fact that the
+  blueprint's `dispositions` cuts appears on the page.
+
+Leave style to the editor seat and structure to the structural edit. A finding names its location (the section heading, and the sentence when it applies),
+what is wrong, a rewrite that fixes it, and whether it blocks. Verdict "fix" if any blocking finding
+exists; otherwise "ok".
