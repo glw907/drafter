@@ -1,0 +1,68 @@
+{
+  "host": {
+    "args": {},
+    "resolved": {
+      "pages": [
+        {
+          "path": "docs/guide/install-widget.md",
+          "slug": "install-widget",
+          "title": "Install the widget",
+          "pageType": "task guide",
+          "job": "Install the widget CLI and run it once.",
+          "covers": ["The install command.", "The first run."],
+          "outOfScope": ["Plugin authoring."],
+          "figure": false,
+          "anatomy": "Task guide"
+        },
+        {
+          "path": "docs/guide/widget-rows.md",
+          "slug": "widget-rows",
+          "title": "Widget rows",
+          "pageType": "symptom row",
+          "job": "Recover from a failed widget run.",
+          "covers": ["Each failure a run can meet."],
+          "outOfScope": [],
+          "figure": false,
+          "anatomy": "Symptom row",
+          "register": "docs/house-style.md"
+        },
+        {
+          "path": "docs/guide/how-widgets-work.md",
+          "job": "Learn the widget's model."
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "whole-anatomy",
+      "seat": "blueprint",
+      "context": { "page": { "path": "docs/guide/install-widget.md" }, "inputs": {}, "round": 1, "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "whole-register",
+      "seat": "blueprint",
+      "context": { "page": { "path": "docs/guide/widget-rows.md" }, "inputs": {}, "round": 1, "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "whole-neither",
+      "seat": "blueprint",
+      "context": { "page": { "path": "docs/guide/how-widgets-work.md" }, "inputs": {}, "round": 1, "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "change-anatomy",
+      "seat": "blueprint",
+      "context": { "page": { "path": "docs/guide/install-widget.md" }, "inputs": {}, "round": 1, "findings": "", "afterFinalRead": false, "scope": "intro,steps", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "change-register",
+      "seat": "blueprint",
+      "context": { "page": { "path": "docs/guide/widget-rows.md" }, "inputs": {}, "round": 1, "findings": "", "afterFinalRead": false, "scope": "page", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "change-neither",
+      "seat": "blueprint",
+      "context": { "page": { "path": "docs/guide/how-widgets-work.md" }, "inputs": {}, "round": 1, "findings": "", "afterFinalRead": false, "scope": "intro", "where": "", "narrow": null, "turn": 0, "facts": true }
+    }
+  ]
+}
