@@ -537,7 +537,7 @@ section means, and keep each paraphrase in summary.`;
     return `DigitalOcean's test for a tutorial: "We ask that you thoroughly test it by reading through it and
 following it as a reader would." Follow the page step by step. You can't run a command, so read
 each step as the reader about to run it, and note each point where you had to infer something the
-page doesn't say.`;
+page doesn't say. Return each such point as one short entry in friction.`;
   }
   return "Read the page once, whole.";
 }
@@ -587,7 +587,8 @@ Step 2. Answer Part V's open-ended questions:
     What about the document might work well for them?
     What about the document might cause them problems?
 Return your answer to the second question as paraphrase, and the other answers in summary. Keep
-the paraphrase to one short paragraph and the summary to about 200 words, then end the answer.
+the paraphrase to two sentences and the summary to five sentences. Put every point that needs more
+room in friction, one short entry each, so that summary stays short.
 
 Step 3 follows in the next turn.`;
 }
