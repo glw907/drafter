@@ -588,7 +588,8 @@ Step 2. Answer Part V's open-ended questions:
     What about the document might cause them problems?
 Return your answer to the second question as paraphrase, and the other answers in summary. Keep
 the paraphrase to two sentences and the summary to five sentences. Put every point that needs more
-room in friction, one short entry each, so that summary stays short.
+room in friction, one short entry each, so that summary stays short. Write each field as plain
+text on one line, with no line breaks and no lists inside a string.
 
 Step 3 follows in the next turn.`;
 }
