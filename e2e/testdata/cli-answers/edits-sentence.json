@@ -1,0 +1,9 @@
+{
+  "edits": [
+    {"file": "page", "old": "Add items one at a time so that each one is counted.", "new": "Add items one at a time, and wait for each count to print before you add the next."},
+    {"file": "brief", "old": "Add items one at a time so that each one is counted.", "new": "Add items one at a time, and wait for each count to print before you add the next."}
+  ],
+  "resolutions": [
+    {"finding": 1, "status": "edited", "edits": [0, 1], "reason": "The section now carries the edited sentence."}
+  ]
+}

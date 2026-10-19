@@ -1,0 +1,11 @@
+{
+  "items": [
+    {"id": "f-state", "quote": "Tally keeps its count in a file named .tally in the current directory."},
+    {"id": "f-count", "quote": "The command `tally count` adds one for each item you name on the command line."},
+    {"id": "f-by", "quote": "The flag `--by` sets the amount each item adds, and the default is 1."},
+    {"id": "c-pace", "quote": "Add items one at a time so that each one is counted."},
+    {"id": "f-total", "quote": "The command `tally total` prints the saved total."},
+    {"id": "f-reset", "quote": "The command `tally reset` deletes the count file."},
+    {"id": "f-state-again", "quote": "The file is named .tally."}
+  ]
+}
