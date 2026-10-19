@@ -75,6 +75,18 @@ func TestBlueprintCommands(t *testing.T) {
 		}
 	})
 
+	t.Run("check warns on a failure handled by a fact and exits 0", func(t *testing.T) {
+		warn := strings.Replace(bpBlueprint, "          Only the lifetime.\n", "          Only the lifetime.\n"+
+			"      - id: s-rotate\n        kind: step\n        text: |\n          Rotate the key.\n        canFail: true\n"+
+			"      - id: x-rotate\n        kind: failure\n        from: s-rotate\n        symptom: |\n          The rotation is refused.\n        handledBy: f-life\n", 1)
+		write("blueprints/docs/guides/rotate-the-api-key.blueprint.yaml", warn)
+		defer write("blueprints/docs/guides/rotate-the-api-key.blueprint.yaml", bpBlueprint)
+		r := runEnv(t, p.dir, p.env, "check")
+		if r.code != 0 || !strings.Contains(r.stdout, "warning: handler:") || strings.Contains(r.stdout, "error:") {
+			t.Errorf("exit %d, stdout %q, want 0 with one handler warning and no error", r.code, r.stdout)
+		}
+	})
+
 	t.Run("check exits 1 on an error and 2 when it cannot run", func(t *testing.T) {
 		bad := strings.Replace(bpBlueprint, "    why: |\n      Rotation is the page's job.\n", "", 1)
 		write("blueprints/docs/guides/rotate-the-api-key.blueprint.yaml", bad)
