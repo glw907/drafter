@@ -171,7 +171,12 @@ func (p *liveProject) repoCost() float64 {
 func (p *liveProject) page(args ...string) liveSummary {
 	p.t.Helper()
 	var s liveSummary
-	callArgs := append([]string{"page"}, args...)
+	// DRAFTER_LIVE_SYNC=1 sends ordinary Messages calls at full price, for a day the batch queue is slow.
+	mode := []string{}
+	if os.Getenv("DRAFTER_LIVE_SYNC") == "1" {
+		mode = []string{"--sync"}
+	}
+	callArgs := append(append([]string{"page"}, mode...), args...)
 	callArgs = append(callArgs, "--json")
 	for range 6 {
 		left := budgetLeft(liveLimit, p.baseline, p.meter())
@@ -191,7 +196,7 @@ func (p *liveProject) page(args ...string) liveSummary {
 			p.t.Fatalf("drafter page exit %d\nstdout: %s\nstderr: %s", code, out, errOut)
 		}
 		p.t.Logf("stopped (%s); resuming run %s", s.Stop, s.RunID)
-		callArgs = append([]string{"page", "--resume", s.RunID}, append(args, "--json")...)
+		callArgs = append(append([]string{"page"}, mode...), append([]string{"--resume", s.RunID}, append(args, "--json")...)...)
 	}
 	p.t.Fatal("the run kept stopping")
 	return s
