@@ -1,0 +1,79 @@
+{
+  "CustomID": "",
+  "Model": "model-a",
+  "System": "",
+  "Messages": [
+    {
+      "Role": "user",
+      "Cached": [
+        "Files and command outputs your task needs are inlined below, each between a line \"=== file: PATH ===\" and a line \"=== end file: PATH ===\" (commands and source excerpts use the same shape with \"command\" and \"excerpt\"). A block that reads \"not inlined\" or \"no excerpt\" was left out on purpose. Do not run a command whose output is not inlined. If you would need to make an edit, or you could not make a check because something is not inlined, say so as a finding.\n\nRead the blueprint below.",
+        "The facts the blueprint places or cites, then the blueprint and its outline entry, follow. They are everything you read, apart from the change block when one follows them.\n\n=== facts placed or cited ===\n- lumen-key-ttl [verified]: A Lumen API key lives for 90 days.\n=== end facts ==="
+      ],
+      "Text": "=== blueprint ===\nversion: 1\nargument: |\n  Rotate a Lumen API key by publishing the new key before you retire the old one.\nintroduction:\n  covers: |\n    How to rotate an API key without interrupting publishing.\n  priorKnowledge: |\n    You can publish a site with Lumen.\n  notCovered: |\n    Revoking a key after the grace period.\n  facts: [lumen-key-ttl]\nframing:\n  readers: |\n    A site owner on a 90-day rotation schedule, who knows `lumen-key-ttl`.\n  introPlan: |\n    Open on the task and say what the page covers.\norderReason: |\n  The new key must be live before the old key retires, so creation comes first.\npreconditions: [key-exists]\nsections:\n  - id: before-you-begin\n    heading: Before you begin\n    why: |\n      The reader needs a workspace key before the first step.\n    opens: |\n      You need a workspace key and publish access.\n    items:\n      - id: f-ttl\n        kind: fact\n        fact: lumen-key-ttl\n        use: |\n          Only the lifetime.\n  - id: rotate\n    heading: Rotate the key\n    why: |\n      Rotation is the page's job, so it follows the prerequisites.\n    opens: |\n      Create the new key, then publish with it.\n    items:\n      - id: s-create\n        kind: step\n        text: |\n          Create a new key.\n        requires: [key-exists]\n        produces: [new-key]\n      - id: s-publish\n        kind: step\n        text: |\n          Publish the site with the new key.\n        requires: [new-key]\n        produces: [published]\n        canFail: true\n      - id: x-publish\n        kind: failure\n        from: s-publish\n        symptom: |\n          The publish is refused.\n        handledBy: h-retry\n      - id: h-retry\n        kind: handoff\n        text: |\n          Check the key, then publish again.\n=== end blueprint ===\n\n=== outline entry ===\n{\n  \"path\": \"docs/guides/rotate-the-api-key.md\",\n  \"slug\": \"rotate\",\n  \"title\": \"Rotate the API key\",\n  \"type\": \"task-guide\",\n  \"job\": \"Rotate a Lumen API key without interrupting publishing.\\n\",\n  \"covers\": [\n    \"Create and publish with a new key.\"\n  ]\n}\n=== end outline entry ===\n\nAnswer with a verdict, each finding with its location, the finding, a rewrite, and whether it blocks, a summary, and any friction you met in friction."
+    }
+  ],
+  "MaxTokens": 4000,
+  "Effort": "medium",
+  "Schema": {
+    "additionalProperties": false,
+    "properties": {
+      "findings": {
+        "description": "Every finding, blocking or advisory.",
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "blocking": {
+              "description": "Whether the page must not ship until this is fixed.",
+              "type": "boolean"
+            },
+            "finding": {
+              "description": "What is wrong.",
+              "type": "string"
+            },
+            "location": {
+              "description": "Where on the page the finding applies.",
+              "type": "string"
+            },
+            "rewrite": {
+              "description": "The rewrite that fixes it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "blocking",
+            "finding",
+            "location",
+            "rewrite"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "friction": {
+        "description": "Optional short notes on anything in the task that did not work or was missing.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "summary": {
+        "description": "A short summary of the read.",
+        "type": "string"
+      },
+      "verdict": {
+        "description": "ok when the page needs no change; fix otherwise.",
+        "enum": [
+          "ok",
+          "fix"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "findings",
+      "summary",
+      "verdict"
+    ],
+    "type": "object"
+  }
+}
