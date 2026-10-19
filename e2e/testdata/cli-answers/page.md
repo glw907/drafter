@@ -16,7 +16,7 @@ Run `tally count` with the items you want to add.
 
 The command `tally count` adds each item you name on the command line to the total.
 
-The command `tally count` counts the arguments after it and never reads their names.
+The command `tally count` counts the arguments left after it reads its flags, and it never reads their names.
 
 The command `tally count` creates the .tally file the first time it runs.
 
@@ -28,7 +28,7 @@ Run `tally total` in the same directory.
 
 The command `tally total` prints the saved total.
 
-The command `tally total` prints 0 when the .tally file does not exist.
+The command `tally total` prints 0 when the .tally file does not exist or holds no number.
 
 If `tally total` prints 0 although you counted items, you are in the wrong directory.
 
