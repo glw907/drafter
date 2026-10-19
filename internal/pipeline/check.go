@@ -112,22 +112,31 @@ func (p *page) gateStepOnce(ctx context.Context, kind string) error {
 	return nil
 }
 
+// coveragePhase names the coverage check that follows a write of the exchange kind. A section
+// exchange takes the place of the draft, so its check is the initial one.
 func coveragePhase(kind string) string {
 	switch kind {
 	case exRedraft:
 		return covRedraft
 	case exFinal:
 		return covFinal
+	case exCoherence:
+		return covCoherence
 	}
 	return covInitial
 }
 
+// exchangeStep names the step that asks the exchange kind's next turn, a gate-fix turn included.
 func exchangeStep(kind string) string {
 	switch kind {
 	case exRedraft:
 		return stRedraft
 	case exFinal:
 		return stFinalRedraft
+	case exSection:
+		return stSection
+	case exCoherence:
+		return stCoherenceFix
 	}
 	return stGateFix
 }
@@ -206,6 +215,7 @@ func (p *page) redGate(kind string, own []gate.Section) error {
 		return p.escalate("contract", "gate", nil, "the gate stayed red after the edits applied")
 	}
 	ex := p.w.Ex
+	ex.GateFix = true
 	first := 1
 	for _, f := range ex.Findings {
 		first = max(first, f.N+1)

@@ -15,8 +15,19 @@ import (
 // The block states its own delimiters and none of them is a "=== file:" line, so the request's
 // file inlining never reads it as a path.
 func FactsBlock(view *plan.Plan, facts *plan.Facts) string {
+	return factsBlock("The facts the blueprint places or cites, then the blueprint and its outline entry, follow. They are everything you read, apart from the change block when one follows them.", view, facts)
+}
+
+// DraftingFactsBlock is FactsBlock for a seat that drafts or reviews the page from its blueprint.
+// Such a seat also reads the page and brief inlined above, so the opening drops FactsBlock's claim
+// that the blocks are everything it reads; the rest of the block is the same.
+func DraftingFactsBlock(view *plan.Plan, facts *plan.Facts) string {
+	return factsBlock("The facts the blueprint places or cites, then the blueprint and its outline entry, follow. The page must carry what they say; read them with any file inlined above and any change block that follows them.", view, facts)
+}
+
+func factsBlock(opening string, view *plan.Plan, facts *plan.Facts) string {
 	var b strings.Builder
-	b.WriteString("The facts the blueprint places or cites, then the blueprint and its outline entry, follow. They are everything you read, apart from the change block when one follows them.\n\n")
+	b.WriteString(opening + "\n\n")
 	b.WriteString("=== facts placed or cited ===\n")
 	ids := placedFacts(view)
 	for _, id := range ids {

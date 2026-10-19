@@ -37,6 +37,14 @@ type Answer struct {
 	Resolutions []Resolution `json:"resolutions"`
 }
 
+// Bound limits an answer to some sections of a page. Headings are the page's section headings in
+// order, which cut the page as coverage.Spans cuts it, and Allowed holds the headings of the
+// sections the answer may change. A nil *Bound limits nothing.
+type Bound struct {
+	Headings []string
+	Allowed  []string
+}
+
 // Status values a Resolution takes.
 const (
 	StatusEdited   = "edited"

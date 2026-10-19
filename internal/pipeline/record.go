@@ -35,6 +35,18 @@ type record struct {
 	FinalStatus  string            `json:"final_status"`
 	FinalHashes  map[string]string `json:"final_hashes"`
 	GateExcerpts []string          `json:"gate_excerpts"`
+	Writes       []writeRecord     `json:"writes"`
+}
+
+// writeRecord is one write of the page and brief: its number, which names the write<n> files it
+// saved in the page's run directory, the step and exchange kind that made it, empty for a whole
+// draft, and whether it answered a red gate. A reader of the record attributes each change to the
+// page to the write that made it.
+type writeRecord struct {
+	N       int    `json:"n"`
+	Step    string `json:"step"`
+	Kind    string `json:"kind"`
+	GateFix bool   `json:"gate_fix"`
 }
 
 // stageRecord is one submitted request.
@@ -85,7 +97,7 @@ func newRecord() record {
 		SeatsNotRun: []string{}, InputHashes: map[string]string{}, Stages: []stageRecord{},
 		Verdicts: []verdictRecord{}, Findings: []findingRecord{}, Resolutions: []resolutionEntry{},
 		Faults: []string{}, Friction: []string{}, Warnings: []string{},
-		FinalHashes: map[string]string{}, GateExcerpts: []string{},
+		FinalHashes: map[string]string{}, GateExcerpts: []string{}, Writes: []writeRecord{},
 	}
 }
 

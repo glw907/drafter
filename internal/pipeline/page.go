@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/glw907/drafter/internal/atomicfile"
+	"github.com/glw907/drafter/internal/blueprint"
 	"github.com/glw907/drafter/internal/gate"
 	"github.com/glw907/drafter/internal/handoff"
 	"github.com/glw907/drafter/internal/plan"
@@ -33,7 +34,8 @@ type page struct {
 	pl  *plan.Plan
 	// plan format: markdown plans carry no plan.Plan.
 	markdown bool
-	// blueprint marks a page whose plan is a blueprint, which stage 1 reads and stops at.
+	// blueprint marks a page whose plan is a blueprint, which stage 1 reads and, unless the run
+	// drafts, stops at.
 	blueprint bool
 	bp        *bpInputs
 }
@@ -159,15 +161,26 @@ func (p *page) runs(seat string) bool {
 }
 
 // missingSeats lists the seats this page renders through its module that the module lacks. A
-// blueprint page renders only the blueprint seat, since stage 1 reads it and stops.
+// blueprint page that does not draft renders only the blueprint seat, since stage 1 reads it and
+// stops. One that drafts renders the blueprint seat unless its read is skipped, then every seat a
+// drafted page renders. A scoped page that names sections also renders the coherence seat: the run
+// checks seats before it decides whether the page is a section redraft, which any such page may
+// become.
 func (p *page) missingSeats() []string {
 	need := []string{"blueprint"}
-	if !p.blueprint {
-		need = []string{"draft"}
+	if !p.blueprint || p.w.Draft {
+		need = nil
+		if p.blueprint && !p.w.SkipRead {
+			need = append(need, "blueprint")
+		}
+		need = append(need, "draft")
 		for _, seat := range []string{"structure", "editor", "fact", "reader"} {
 			if p.runs(seat) {
 				need = append(need, seat)
 			}
+		}
+		if p.blueprint && p.w.Scope != nil && p.w.Scope.Kind == blueprint.ScopeScoped && len(p.w.Scope.IDs) > 0 {
+			need = append(need, "coherence")
 		}
 	}
 	have := p.mod.Seats()
@@ -184,10 +197,22 @@ func (p *page) slug() string {
 	return strings.TrimSuffix(path.Base(p.h.Page.Path), path.Ext(p.h.Page.Path))
 }
 
-// planDoc returns the decoded plan, loading it once.
+// planDoc returns the decoded plan, loading it once. A blueprint page's plan is the blueprint's
+// projection, as committed at the run's start.
 func (p *page) planDoc() (*plan.Plan, error) {
 	if p.pl != nil || p.markdown {
 		return p.pl, nil
+	}
+	if p.blueprint {
+		in, err := p.blueprintInputs()
+		if err != nil {
+			return nil, err
+		}
+		if in.view == nil {
+			return nil, fmt.Errorf("blueprint %s does not decode", p.h.Plan)
+		}
+		p.pl = in.view
+		return in.view, nil
 	}
 	data, err := os.ReadFile(p.abs(p.h.Plan))
 	if err != nil {
@@ -202,8 +227,10 @@ func (p *page) planDoc() (*plan.Plan, error) {
 }
 
 // writeFiles records the page's write, then writes the page and brief atomically and records the
-// hashes they now have. The saved contents let a resume redo an interrupted write at no cost.
-func (p *page) writeFiles(pageText, briefText string) error {
+// hashes they now have. The saved contents let a resume redo an interrupted write at no cost. ex is
+// the exchange whose answer the write applies, nil for a whole draft, and the record's write log
+// names it.
+func (p *page) writeFiles(pageText, briefText string, ex *exchange) error {
 	contents := map[string]string{p.h.Page.Path: pageText, p.h.Page.Brief: briefText}
 	w := run.Write{Pre: map[string]string{}, Saved: map[string]string{}}
 	n := len(p.ps.Writes) + 1
@@ -222,6 +249,11 @@ func (p *page) writeFiles(pageText, briefText string) error {
 		}
 	}
 	p.ps.Writes = append(p.ps.Writes, w)
+	logged := writeRecord{N: n, Step: p.ps.Step}
+	if ex != nil {
+		logged.Kind, logged.GateFix = ex.Kind, ex.GateFix
+	}
+	p.w.Rec.Writes = append(p.w.Rec.Writes, logged)
 	if err := p.r.save(); err != nil {
 		return err
 	}
