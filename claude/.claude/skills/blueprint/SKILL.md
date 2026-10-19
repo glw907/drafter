@@ -38,9 +38,9 @@ When a fact changes, `drafter refs` is the lookup: [Find where a fact is used](f
 
 ## Read
 
-Before the first edit, note `git rev-parse HEAD` as the base. Every read uses that base. Run `drafter check <blueprint>`, commit, then read: `drafter read --sync --since <base> <blueprint>`. The read judges the change as a code reviewer judges a pull request; [What `drafter read` does with a blueprint](format.md#what-drafter-read-does-with-a-blueprint) says what blocks and what returns as a "Nit:". It prints each finding with its location and whether it blocks.
+Before the first edit, note `git rev-parse HEAD` as the base. Every read uses that base. Run `drafter check <blueprint>`, commit, then read as a separate command: `drafter read --sync --since <base> <blueprint>`. A read of an uncommitted tree prints "nothing changed" and judges nothing. The read judges the change as a code reviewer judges a pull request; [What `drafter read` does with a blueprint](format.md#what-drafter-read-does-with-a-blueprint) says what blocks and what returns as a "Nit:". It prints each finding with its location and whether it blocks.
 
-Fix every blocking finding, and any Nits you choose, in one batch. Run `drafter check <blueprint>`, commit, and read again. Polish goes before a read, never after an accepted one. Stop at an accept or after the third read. Findings that start "Already present:" are older defects and stay out of the edit.
+Fix every blocking finding, and any Nits you choose, in one batch. Run `drafter check <blueprint>`, commit, and read again. Polish goes before a read, never after an accepted one: once a read accepts, make no further edit, Nits included, because an edit after the last read is a change no read saw. Stop at an accept or after the third read. Findings that start "Already present:" are older defects and stay out of the edit.
 
 | The read ends with | Do |
 |---|---|
