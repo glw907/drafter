@@ -1,0 +1,135 @@
+{
+  "host": {
+    "args": {},
+    "resolved": {
+      "pages": [
+        {
+          "path": "docs/count-items.md",
+          "slug": "count-items",
+          "title": "Count items with tally",
+          "pageType": "task guide",
+          "job": "Count a list of items with tally and read the total.\n",
+          "covers": ["Add items to the count.", "Read the saved total."],
+          "outOfScope": ["Installing tally."],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "blueprints/docs/count-items.brief.json",
+          "standard": "google",
+          "reader": "A developer who runs command-line tools and has tally installed.\n"
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "blueprint-whole",
+      "seat": "blueprint",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 1, "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "blueprint-change",
+      "seat": "blueprint",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 1, "findings": "", "afterFinalRead": false, "scope": "add-items", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "draft-whole",
+      "seat": "draft",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 1, "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "draft-section",
+      "seat": "draft",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 1, "findings": "Finding 1 (blueprint, blocking)\nLocation: Add items\nText: The blueprint entry for this section changed. The section must carry its entry as it now stands.\nRewrite: Rewrite this section only.\n", "afterFinalRead": false, "scope": "add-items", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "draft-redraft",
+      "seat": "draft",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 2, "findings": "Finding 1 (editor, blocking)\nLocation: Add items\nText: The step is in passive voice and hides who runs the command.\nRewrite: Run tally count and name each item.\n\nFinding 2 (structure, advisory)\nLocation: Read the total\nText: The section opens without saying why the reader reads the total.\nRewrite: Open on checking the count.\n", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "draft-final",
+      "seat": "draft",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": "final", "findings": "Finding 1 (reader, blocking)\nLocation: Before you begin\nText: The page never says which directory the count file lives in.\nRewrite: Say that tally keeps the count in the current directory.\n", "afterFinalRead": true, "scope": "", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "structure-whole",
+      "seat": "structure",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 1, "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "structure-scoped",
+      "seat": "structure",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 1, "findings": "", "afterFinalRead": false, "scope": "add-items", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "structure-narrow",
+      "seat": "structure",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 2, "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": { "baseline": "5d41402abc4b2a76b9719d911017c592ab01d3f4", "own": { "verdict": "fix", "findings": [ { "location": "Read the total", "finding": "The section comes before the reader has added any items.", "rewrite": "Move it after Add items.", "blocking": true } ], "summary": "One section is out of order." } }, "turn": 0, "facts": true }
+    },
+    {
+      "name": "editor-whole",
+      "seat": "editor",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 1, "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "editor-scoped",
+      "seat": "editor",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 1, "findings": "", "afterFinalRead": false, "scope": "add-items", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "editor-narrow",
+      "seat": "editor",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 2, "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": { "baseline": "5d41402abc4b2a76b9719d911017c592ab01d3f4", "own": { "verdict": "fix", "findings": [ { "location": "Add items", "finding": "The step is in passive voice and hides who runs the command.", "rewrite": "Run tally count and name each item.", "blocking": true } ], "summary": "One sentence breaks the active voice rule." } }, "turn": 0, "facts": true }
+    },
+    {
+      "name": "editor-final",
+      "seat": "editor",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": "final", "findings": "", "afterFinalRead": false, "scope": "Finding 1 (reader, blocking)\nLocation: Before you begin\nText: The page never says which directory the count file lives in.\nResolution: edited. The section now says the count file is in the current directory.\n", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "fact-whole",
+      "seat": "fact",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 1, "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "fact-scoped",
+      "seat": "fact",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 1, "findings": "", "afterFinalRead": false, "scope": "add-items", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "fact-narrow",
+      "seat": "fact",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 2, "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": { "baseline": "5d41402abc4b2a76b9719d911017c592ab01d3f4", "own": { "verdict": "fix", "findings": [ { "location": "Add items", "finding": "The sentence says each item adds 2, and tally-by-flag gives the default as 1.", "rewrite": "Say that each item adds 1 unless you set the flag.", "blocking": true } ], "summary": "One sentence states a default its fact does not." } }, "turn": 0, "facts": true }
+    },
+    {
+      "name": "fact-final",
+      "seat": "fact",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": "final", "findings": "", "afterFinalRead": false, "scope": "Finding 1 (reader, blocking)\nLocation: Before you begin\nText: The page never says which directory the count file lives in.\nResolution: edited. The section now says the count file is in the current directory.\n", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "reader-turn1",
+      "seat": "reader",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 1, "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 1, "facts": true }
+    },
+    {
+      "name": "reader-turn2",
+      "seat": "reader",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 1, "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 2, "facts": true }
+    },
+    {
+      "name": "reader-retest",
+      "seat": "reader",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": "final", "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 2, "facts": true }
+    },
+    {
+      "name": "coherence-read",
+      "seat": "coherence",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 1, "findings": "", "afterFinalRead": false, "scope": "add-items", "where": "", "narrow": null, "turn": 0, "facts": true }
+    },
+    {
+      "name": "coherence-retest",
+      "seat": "coherence",
+      "context": { "page": { "path": "docs/count-items.md", "slug": "count-items", "title": "Count items with tally", "pageType": "task guide", "job": "Count a list of items with tally and read the total.\n", "covers": ["Add items to the count.", "Read the saved total."], "outOfScope": ["Installing tally."], "figure": false, "anatomy": "Task guide", "brief": "blueprints/docs/count-items.brief.json", "standard": "google", "reader": "A developer who runs command-line tools and has tally installed.\n" }, "inputs": { "job": "Count a list of items with tally and read the total.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": [], "claimInventory": [], "factIds": ["tally-state-file", "tally-count-cmd", "tally-by-flag", "tally-total-cmd", "tally-reset-cmd"] }, "round": 2, "findings": "", "afterFinalRead": false, "scope": "add-items", "where": "", "narrow": null, "turn": 0, "facts": true }
+    }
+  ]
+}

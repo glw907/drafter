@@ -1,0 +1,16 @@
+Copy edit of docs/count-items.md against the Google developer documentation style guide. The page is
+inlined below with the brief at blueprints/docs/count-items.brief.json. Grade the page against the rules in
+`drafter:google-rubric.md` and the patterns in `drafter:google-tells.md`, both inlined below.
+Each rule a sentence breaks, and each pattern a sentence shows, is a blocking finding; name the
+rule or the pattern by its heading. A point of preference that neither file states is advisory,
+and its finding starts "Nit:". Also apply the prose rules of the anatomy "Task guide" in `drafter:anatomies.md#task-guide`, inlined below.
+
+A rewrite changes wording, never a claim. Keep each number, command, flag, path, and name the
+sentence states, since the brief cites the facts behind them, and a rewrite that adds a specific
+breaks the page's provenance. A heading is the blueprint's, verbatim, so a finding on a heading is
+advisory: its fix goes in the blueprint. Leave structure to the structural edit and the claims to
+the fact read.
+
+A finding names its location (the section heading, and the sentence when it applies),
+what is wrong, a rewrite that fixes it, and whether it blocks. Verdict "fix" if any blocking finding
+exists; otherwise "ok".
