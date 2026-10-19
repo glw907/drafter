@@ -3,6 +3,7 @@
   "Source": "synthetic",
   "BatchDiscount": 0.5,
   "Models": {
+    "dear-s": {"Input": 6, "Output": 16, "CacheWrite5m": 5, "CacheWrite1h": 8, "CacheRead": 0.5},
     "plain-s": {"Input": 4, "Output": 16, "CacheWrite5m": 5, "CacheWrite1h": 8, "CacheRead": 0.5},
     "haiku-s": {
       "Input": 1, "Output": 5, "CacheWrite5m": 1.25, "CacheWrite1h": 2, "CacheRead": 0.125,

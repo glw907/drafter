@@ -22,7 +22,13 @@ func buildWire(r Request) (wire, error) {
 		block := anthropic.NewTextBlock(m.Text)
 		switch m.Role {
 		case "user":
-			w.messages = append(w.messages, anthropic.NewUserMessage(block))
+			var blocks []anthropic.ContentBlockParamUnion
+			for _, part := range m.Cached {
+				b := anthropic.NewTextBlock(part)
+				b.OfText.CacheControl = anthropic.NewCacheControlEphemeralParam()
+				blocks = append(blocks, b)
+			}
+			w.messages = append(w.messages, anthropic.NewUserMessage(append(blocks, block)...))
 		case "assistant":
 			w.messages = append(w.messages, anthropic.NewAssistantMessage(block))
 		default:
