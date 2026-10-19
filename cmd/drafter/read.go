@@ -403,7 +403,7 @@ func blueprintHandoffs(c *config.Config, root, head string, args []string) ([]ha
 		if err != nil {
 			return nil, err
 		}
-		brief := strings.TrimSuffix(blueprint.BlueprintPath(c.Blueprints.Root, pagePath), ".blueprint.yaml") + ".brief.json"
+		brief := blueprint.BriefPath(c.Blueprints.Root, pagePath)
 		ctx, err := json.Marshal(map[string]any{"resolved": map[string]any{"pages": []any{entryJSON(o, *entry, brief)}}})
 		if err != nil {
 			return nil, err

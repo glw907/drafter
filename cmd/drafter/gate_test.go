@@ -64,8 +64,9 @@ func gatePageArg(root, page string) []string {
 func TestGateCleanPageExitsZero(t *testing.T) {
 	root := gateProject(t, nil)
 	out, errs, code := gateRun(t, gatePageArg(root, "docs/guide.md")...)
-	if code != 0 || out != "" || errs != "0 errors, 0 warnings\n" {
-		t.Errorf("exit %d, stdout %q, stderr %q; want a silent pass", code, out, errs)
+	want := "no brief for docs/guide.md; provenance check skipped\n"
+	if code != 0 || out != want || errs != "0 errors, 0 warnings\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want a pass noting the skipped provenance check", code, out, errs)
 	}
 }
 
@@ -204,6 +205,118 @@ func TestGateStockPreflight(t *testing.T) {
 	if err := stockGatePreflight("drafter gate --page {page}", root); err != nil {
 		t.Errorf("preflight with drafter on PATH = %v, want nil", err)
 	}
+}
+
+func TestProvenanceGateSkipsAPageWithoutABrief(t *testing.T) {
+	root := gateProject(t, nil)
+	out, errs, code := gateRun(t, gatePageArg(root, "docs/guide.md")...)
+	if code != 0 || out != "no brief for docs/guide.md; provenance check skipped\n" || errs != "0 errors, 0 warnings\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want the skip message and a pass", code, out, errs)
+	}
+}
+
+const (
+	provPage  = "# Rotate the widget key\n\nRotating a key needs the admin role.\n"
+	provBrief = `{"sentences": [
+  {"text": "Rotating a key needs the admin role.", "id": "f:bbbbbb"}
+]}
+`
+	provBriefFile = "blueprints/docs/guide.brief.json"
+)
+
+func TestProvenanceGateCleanPrintsTheCount(t *testing.T) {
+	root := gateProject(t, map[string]string{"docs/guide.md": provPage, provBriefFile: provBrief})
+	out, errs, code := gateRun(t, gatePageArg(root, "docs/guide.md")...)
+	if code != 0 || out != "provenance: docs/guide.md: 1 sentences (cited 1, no-claim 0)\n" || errs != "0 errors, 0 warnings\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want the count line and a pass", code, out, errs)
+	}
+}
+
+func TestProvenanceGateFindings(t *testing.T) {
+	facts := readCatalog(t, "facts/facts.md")
+	candidate := strings.Replace(facts, "Source: `src/rotate.go`. [verified]", "Source: `src/rotate.go`. [candidate]", 1)
+	tests := []struct {
+		name     string
+		files    map[string]string
+		wantLine string
+		wantErrs string
+	}{
+		{"an id the store lacks", map[string]string{provBriefFile: strings.Replace(provBrief, "f:bbbbbb", "f:zzzzzz", 1)},
+			provBriefFile + ":2: error: provenance: sentence 1", "2 errors"},
+		{"a candidate fact", map[string]string{provBriefFile: provBrief, "blueprints/facts/facts.md": candidate},
+			"tagged [candidate]", "2 errors"},
+		{"a fact item no sentence cites", map[string]string{provBriefFile: `{"sentences": [{"text": "Rotating a key needs the admin role.", "id": "no-claim"}]}`},
+			provBriefFile + ":1: error: provenance: fact item needs-admin places f:bbbbbb", "1 error"},
+		{"page text the brief lacks", map[string]string{provBriefFile: provBrief, "docs/guide.md": provPage + "\nExtra words stand alone here.\n"},
+			"docs/guide.md:5: error: provenance: unclassified page text", "1 error"},
+		{"a brief with no sentences key", map[string]string{provBriefFile: `{"page": "docs/guide.md"}`},
+			provBriefFile + `:1: error: provenance: the brief has no "sentences" key`, "1 error"},
+		{"an empty sentences list on a page with prose", map[string]string{provBriefFile: `{"sentences": []}`},
+			"docs/guide.md:3: error: provenance: unclassified page text", "2 errors"},
+		{"no facts directory", map[string]string{provBriefFile: provBrief, "blueprints/facts/facts.md": ""},
+			"f:bbbbbb resolves to no fact: the project sets no facts.dir", "1 error"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files := map[string]string{"docs/guide.md": provPage}
+			maps.Copy(files, tt.files)
+			root := gateProject(t, files)
+			out, errs, code := gateRun(t, gatePageArg(root, "docs/guide.md")...)
+			if code != 1 || !strings.Contains(out, tt.wantLine) || !strings.Contains(errs, tt.wantErrs) {
+				t.Errorf("exit %d, want 1\nstdout %s\nstderr %s\nwant stdout holding %q and stderr %q", code, out, errs, tt.wantLine, tt.wantErrs)
+			}
+			if strings.Contains(out, "provenance: docs/guide.md:") {
+				t.Errorf("stdout %q holds the clean count line beside a defect", out)
+			}
+		})
+	}
+}
+
+func TestProvenanceGateCannotRun(t *testing.T) {
+	root := gateProject(t, map[string]string{"docs/guide.md": provPage, provBriefFile: provBrief, "drafter.toml": "[facts]\ndir = \"nofacts\"\n"})
+	_, errs, code := gateRun(t, gatePageArg(root, "docs/guide.md")...)
+	if code != exitCannotRun || !strings.Contains(errs, "facts directory") {
+		t.Errorf("exit %d, stderr %q; want %d naming the facts directory", code, errs, exitCannotRun)
+	}
+}
+
+func TestProvenanceGateOutputReadsAsThePagesOwn(t *testing.T) {
+	const page = "docs/guide.md"
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  string
+	}{
+		{"a brief defect", map[string]string{provBriefFile: strings.Replace(provBrief, "f:bbbbbb", "f:zzzzzz", 1)}, provBriefFile + ":2:"},
+		{"a page defect", map[string]string{provBriefFile: provBrief, page: provPage + "\nExtra words stand alone here.\n"}, page + ":5:"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files := map[string]string{page: provPage}
+			maps.Copy(files, tt.files)
+			root := gateProject(t, files)
+			out, errs, code := gateRun(t, gatePageArg(root, page)...)
+			if code != 1 || !strings.Contains(out, tt.want) {
+				t.Fatalf("exit %d, stdout %q; want a finding at %s", code, out, tt.want)
+			}
+			own, foreign := gateReplay(t, out+errs).ForPage(page, provBriefFile)
+			if len(own) == 0 || foreign {
+				t.Errorf("ForPage = %v, foreign %v; want the page's own red", own, foreign)
+			}
+		})
+	}
+	t.Run("a clean check does not turn foreign red into the page's own", func(t *testing.T) {
+		facts := strings.Replace(readCatalog(t, "facts/facts.md"), "Source: `src/rotate.go`.", "Source: `src/rotate.go#Missing`.", 1)
+		root := gateProject(t, map[string]string{page: provPage, provBriefFile: provBrief, "blueprints/facts/facts.md": facts})
+		out, errs, code := gateRun(t, gatePageArg(root, page)...)
+		if code != 1 || !strings.Contains(out, "store:") {
+			t.Fatalf("exit %d, stdout %q; want a store finding", code, out)
+		}
+		own, foreign := gateReplay(t, out+errs).ForPage(page, provBriefFile)
+		if len(own) != 0 || !foreign {
+			t.Errorf("ForPage = %v, foreign %v; want a foreign red", own, foreign)
+		}
+	})
 }
 
 func TestGateRedOutputReplaysThroughTheGateRunner(t *testing.T) {
