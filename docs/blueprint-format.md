@@ -100,13 +100,19 @@ The `framing` mapping carries the framing record's four descriptive parts. Each 
 | `readers` | Who arrives, from where, and why. |
 | `background` | The background the page rests on. |
 | `placeInDocSet` | Where the page sits in the doc set. |
-| `introPlan` | How the introduction opens and what it promises. |
+| `introPlan` | How the introduction opens and what it promises. Required: `drafter check` reports a blueprint with no `framing`, or with no `introPlan`, as an `error`. |
 
 A part cites a fact as a backticked id. A backticked token counts as a citation when the facts
 store holds a bullet with that id, or when it starts with the prefix, through the first colon,
 that every id in the store shares. A mistyped id therefore reaches the facts check as a missing
 fact. The narration of how the planning session moved against an older plan belongs in the commit
 message, not here.
+
+The decoder doesn't require `introPlan`, so a converted blueprint still decodes. `drafter convert`
+lists `framing.introPlan` among the choices it leaves to you, and `drafter check` reports it as an
+error until you fill it in. For
+what a good plan for the introduction answers, see the
+[introductions reference](../stock/introductions.md).
 
 ### exemplars
 
@@ -201,10 +207,50 @@ writes the marks that record a human edit.
 | `types` | list | yes | The page types the doc set declares. |
 | `pages` | list | yes | Every page, in order. |
 | `crossLinks` | list | no | Links one page should carry to another. |
+| `tracks` | list | no | The reader tracks that group the pages. |
 
-Each entry of `types` has a `name` and an `anatomy`. The `anatomy` names the register entry the
-type follows, such as `Task guide`, and `drafter check` requires one. A page's `type` must be a
-declared type.
+Each entry of `types` has a `name` and an `anatomy`. The `anatomy` is the shape the type follows,
+and `drafter check` requires one. A page's `type` must be a declared type.
+
+### Anatomies
+
+An anatomy is either a stock anatomy or an entry in a register. The stock anatomies are `Concept
+page`, `Task guide`, `Tutorial`, `Reference entry`, and `Troubleshooting page`. The
+[anatomies reference](../stock/anatomies.md) describes each one. Any other name must be an entry
+in the register of the track that holds the type's pages. An entry is a heading, or a list item
+that opens with a bold name, under the register's `## The page anatomies` section. With no
+`tracks`, an outline can't name a register, so `drafter check` warns about an anatomy that isn't a
+stock name. With `tracks`, it reports the same anatomy as an error.
+
+### tracks
+
+A track groups the pages one kind of reader uses. An outline with no `tracks`, or with `tracks: []`,
+skips the track checks, and an anatomy that isn't a stock name warns instead of failing. Each entry of `tracks` has these fields.
+
+| Field | Required | Holds |
+|---|---|---|
+| `name` | yes | The track's name. Each name appears once. |
+| `reader` | yes | The reader profile, in prose: who reads these pages and what they bring. |
+| `standard` | yes | The published style standard the track follows. `google` is the only value. |
+| `paths` | yes | A list of at least one glob over page paths. |
+| `register` | no | The repository path of a register file that adds anatomy entries. |
+
+A glob matches a page path segment by segment, as Go's `path.Match` does, except that a `**`
+segment matches zero or more segments. `docs/**` matches every page under `docs`,
+and `docs/**/*.md` matches `docs/a.md` and `docs/a/b.md`.
+
+With `tracks` declared, `drafter check` reports these states.
+
+| State | Severity |
+|---|---|
+| A managed page matches no track, or matches two. | error |
+| A track names a `standard` other than `google`. | error |
+| A track's `register` file doesn't exist. | error |
+| A glob in `paths` is malformed. | error |
+| A track's globs match no managed page. | warning |
+
+A missing field, an empty value, `paths: []`, and a repeated track `name` stop the command, as a
+malformed outline does. These checks run once for the whole outline, whichever blueprints you name.
 
 Each entry of `pages` has these fields.
 
@@ -308,7 +354,9 @@ as an example item.
 | `refs` | Every `[[id]]` in a prose field names a section id. | error |
 | `why` | Every section has a non-empty `why`. | error |
 | `use` | A `use` that's present starts with `Only` or `Omit`. | error |
-| `types` | The page's `type` is one `types` declares, and the type's `anatomy` isn't empty. | error |
+| `types` | The page's `type` is one `types` declares, and the type's `anatomy` isn't empty. Each declared type's `anatomy` is a stock name or an entry in its track's register. | error, or warning when the outline declares no `tracks` |
+| `tracks` | Each managed page matches exactly one track, and each track names a known `standard`, an existing `register`, and well-formed globs. | error, or warning for a track that matches no managed page |
+| `framing` | The blueprint has a `framing` with an `introPlan`. | error |
 | `lock` | An entry with a `page` id names a page on disk, and an entry with only an `accepted` id names a page the outline lists. | error |
 | `convention` | `blueprints.root` is `blueprints`, and `facts.dir` is `<root>/facts`. | warning |
 | `handler` | A `failure`'s handler gives the reader a next action. A `handledBy` that names only a `fact` item, a `sentence` with `mode: verbatim`, or a `link` or `handoff` that sends the reader back to the section holding the failure's `from` step warns. The message carries the fix: hand off to the step or section that gives the reader a next action. | warning |

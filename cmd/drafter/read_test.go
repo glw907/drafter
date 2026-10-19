@@ -307,6 +307,11 @@ introduction:
     Nothing.
   notCovered: |
     Other things.
+framing:
+  readers: |
+    A reader doing the thing.
+  introPlan: |
+    Open on the task and say what the page covers.
 orderReason: |
   The steps run in order.
 sections:
@@ -725,7 +730,7 @@ func stockSummaryConfig(t *testing.T) *config.Config {
 }
 
 func TestSummaryCountsDemotedAndAlreadyPresent(t *testing.T) {
-	s := pipeline.Summary{Pages: []pipeline.PageResult{{
+	s := pipeline.Summary{Prompts: "drafter:prompts.js", PromptsHash: "sha256:0123456789ab", Pages: []pipeline.PageResult{{
 		Path: "docs/a.md", Status: pipeline.StatusAccepted, Cost: 0.5, Demoted: 1, AlreadyPresent: 2,
 		Scope: &blueprint.Scope{Kind: blueprint.ScopeScoped, Facts: []string{}},
 	}}}
@@ -734,13 +739,13 @@ func TestSummaryCountsDemotedAndAlreadyPresent(t *testing.T) {
 	if err := writeSummaryText(&text, c, s, false); err != nil {
 		t.Fatal(err)
 	}
-	if want := "prices: 2026-10-18 (default)\ndocs/a.md: accepted [scoped: page] already present: 2 demoted conflicts: 1 $0.5000\n"; text.String() != want {
+	if want := "prices: 2026-10-18 (default)\nprompts: drafter:prompts.js sha256:0123456789ab\ndocs/a.md: accepted [scoped: page] already present: 2 demoted conflicts: 1 $0.5000\n"; text.String() != want {
 		t.Errorf("text summary = %q, want %q", text.String(), want)
 	}
 	if err := writeSummaryJSON(&js, c, s); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"demoted": 1`, `"already_present": 2`, `"facts": []`, `"prices_date": "2026-10-18"`, `"prices_date_source": "default"`} {
+	for _, want := range []string{`"demoted": 1`, `"already_present": 2`, `"facts": []`, `"prices_date": "2026-10-18"`, `"prices_date_source": "default"`, `"prompts": "drafter:prompts.js"`, `"prompts_hash": "sha256:0123456789ab"`} {
 		if !strings.Contains(js.String(), want) {
 			t.Errorf("JSON summary lacks %q\n%s", want, js.String())
 		}

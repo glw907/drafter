@@ -156,6 +156,14 @@ func validateOutline(r *plan.Reporter, o *Outline) {
 		}
 		names[t.Name] = true
 	}
+	trackNames := map[string]bool{}
+	for i := range o.Tracks {
+		t := &o.Tracks[i]
+		if line, ok := t.Lines["name"]; ok && trackNames[t.Name] && !r.Faulted(line) {
+			r.Add(line, fmt.Sprintf("tracks[%d]: track %q is declared twice", i, t.Name), "declare each track once")
+		}
+		trackNames[t.Name] = true
+	}
 	paths, slugs := map[string]bool{}, map[string]bool{}
 	for i := range o.Pages {
 		p := &o.Pages[i]

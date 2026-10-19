@@ -117,14 +117,30 @@ type Outline struct {
 	Types      []Type      `yaml:"types" plan:"required"`
 	Pages      []Page      `yaml:"pages" plan:"required"`
 	CrossLinks []CrossLink `yaml:"crossLinks"`
+	Tracks     []Track     `yaml:"tracks"`
 
 	Line  int            `yaml:"-"`
 	Lines map[string]int `yaml:"-"`
 }
 
-// Type declares a page type and the register anatomy it follows. Anatomy is the name of an entry
-// in the project's register, such as "Task guide". A check requires one; the converter leaves it
-// for a person to name.
+// Track groups pages for one reader. Reader is the reader profile in prose, Standard names the
+// published style standard the track follows (only "google" ships), Paths are globs over page
+// paths in which a "**" segment matches any number of segments, and Register is the optional
+// tracked path of a project register that adds anatomy entries beyond the stock ones.
+type Track struct {
+	Name     string   `yaml:"name" plan:"required"`
+	Reader   string   `yaml:"reader" plan:"required,prose"`
+	Standard string   `yaml:"standard" plan:"required"`
+	Paths    []string `yaml:"paths" plan:"required"`
+	Register string   `yaml:"register"`
+
+	Line  int            `yaml:"-"`
+	Lines map[string]int `yaml:"-"`
+}
+
+// Type declares a page type and the anatomy it follows. Anatomy is a stock anatomy name, such as
+// "Task guide", or the name of an entry in the register of the track that holds the type's pages.
+// A check requires one; the converter leaves it for a person to name.
 type Type struct {
 	Name    string `yaml:"name" plan:"required"`
 	Anatomy string `yaml:"anatomy"`

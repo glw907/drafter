@@ -21,6 +21,12 @@ func scopedFacts(ids []string, facts ...string) blueprint.Scope {
 	return blueprint.Scope{Kind: blueprint.ScopeScoped, IDs: ids, Facts: facts}
 }
 
+// scopedBasePairing is a scoped page as Compare builds it now: facts the change touched, the
+// facts whose bullet changed, and the facts that joined the page. Both lists are non-nil.
+func scopedBasePairing(facts, bullets, joined []string) blueprint.Scope {
+	return blueprint.Scope{Kind: blueprint.ScopeScoped, Facts: facts, Bullets: append([]string{}, bullets...), Joined: append([]string{}, joined...)}
+}
+
 func statusPage(s Summary, page string) PageResult {
 	for _, p := range s.Pages {
 		if p.Path == page {
@@ -163,6 +169,36 @@ func TestChangeReadsShareTheirFirstBlocks(t *testing.T) {
 	}
 }
 
+// TestBasePairingLeavesTheChangeReadBytesAlone checks that Scope.Bullets and Scope.Joined steer
+// only the consistency rule: the request a change read sends is the same with and without them.
+func TestBasePairingLeavesTheChangeReadBytesAlone(t *testing.T) {
+	read := func(scope blueprint.Scope) []batch.Message {
+		h := newBlueprintHarness(t, withPages("a"))
+		o := h.options()
+		o.Since = h.head()
+		o.Scopes = map[string]blueprint.Scope{pageA: scope}
+		o.Changes = map[string]string{pageA: changeBlockA}
+		if _, err := Run(context.Background(), o); err != nil {
+			t.Fatal(err)
+		}
+		var out []batch.Message
+		for _, r := range requestsFor(h, "s1", "blueprint") {
+			out = append(out, r.Messages[len(r.Messages)-1])
+		}
+		return out
+	}
+	old := scopedFacts([]string{"intro"}, "lumen-key-ttl")
+	paired := scopedBasePairing([]string{"lumen-key-ttl"}, []string{"lumen-key-ttl"}, []string{"lumen-grace"})
+	paired.IDs = old.IDs
+	without, with := read(old), read(paired)
+	if len(without) != 1 || len(with) != 1 {
+		t.Fatalf("%d and %d blueprint requests, want 1 each", len(without), len(with))
+	}
+	if without[0].Text != with[0].Text || !slices.Equal(without[0].Cached, with[0].Cached) {
+		t.Errorf("the request changed with Bullets and Joined set:\n%q\n%q", without[0].Text, with[0].Text)
+	}
+}
+
 func TestChangeReadConsistency(t *testing.T) {
 	const grace, ttl = "lumen-grace", "lumen-key-ttl"
 	conflict := func(facts []string, with string) string {
@@ -211,6 +247,21 @@ func TestChangeReadConsistency(t *testing.T) {
 		{"a named fact with an empty with blocks", scopedFacts(nil), conflict([]string{ttl}, ""), "ok", false, "consistency", 0, nil, nil},
 		{"an empty facts list with a with blocks", scopedFacts(nil), conflict([]string{}, grace), "ok", false, "consistency", 0, nil, nil},
 		{"an unplaced conflict with a blueprint fix blocks on the blueprint", scopedFacts(nil), emptyFacts, "fix", false, "blueprint", 0, nil, nil},
+		{"a re-cited conflict the base carried is already present", scopedBasePairing([]string{ttl}, nil, nil), conflict([]string{ttl}, grace), "ok", false, "accepted", 1, []string{"Already present: "}, nil},
+		{"a re-cited with fact the base carried is already present", scopedBasePairing([]string{grace}, nil, nil), conflict([]string{ttl}, grace), "ok", false, "accepted", 1, []string{"Already present: "}, nil},
+		{"both sides re-cited are already present", scopedBasePairing([]string{ttl, grace}, nil, nil), conflict([]string{ttl}, grace), "ok", false, "accepted", 1, []string{"Already present: "}, nil},
+		{"a with fact the change brought onto the page blocks", scopedBasePairing([]string{ttl, grace}, nil, []string{grace}), conflict([]string{ttl}, grace), "ok", false, "consistency", 0, nil, nil},
+		{"a fact the change brought onto the page blocks when it is in facts", scopedBasePairing([]string{ttl, grace}, nil, []string{ttl}), conflict([]string{ttl}, grace), "ok", false, "consistency", 0, nil, nil},
+		{"a conflict whose bullet changed blocks", scopedBasePairing([]string{ttl}, []string{ttl}, nil), conflict([]string{ttl}, grace), "ok", false, "consistency", 0, nil, nil},
+		{"a conflict whose with bullet changed blocks", scopedBasePairing(nil, []string{grace}, nil), conflict([]string{ttl}, grace), "ok", false, "consistency", 0, nil, nil},
+		{"a bullet change outside the conflict leaves it already present", scopedBasePairing([]string{ttl}, []string{"other-fact"}, []string{"another"}), conflict([]string{ttl}, grace), "ok", false, "accepted", 1, []string{"Already present: "}, nil},
+		{"a scoped state with nil bullets and joined keeps the facts rule", blueprint.Scope{Kind: blueprint.ScopeScoped, Facts: []string{ttl}}, conflict([]string{ttl}, grace), "ok", false, "consistency", 0, nil, nil},
+		{"a scoped state with nil joined keeps the facts rule", blueprint.Scope{Kind: blueprint.ScopeScoped, Facts: []string{ttl}, Bullets: []string{}}, conflict([]string{ttl}, grace), "ok", false, "consistency", 0, nil, nil},
+		{"a scoped state with nil bullets keeps the facts rule", blueprint.Scope{Kind: blueprint.ScopeScoped, Facts: []string{ttl}, Joined: []string{}}, conflict([]string{ttl}, grace), "ok", false, "consistency", 0, nil, nil},
+		{"a re-cited fact in a conflict with a linked page still blocks", scopedBasePairing([]string{ttl}, nil, nil), conflict([]string{ttl}, "docs/reference/keys.md#Key lifetime"), "ok", true, "consistency", 0, nil, nil},
+		{"a re-cited conflict with an unknown fact still blocks", scopedBasePairing([]string{ttl}, nil, nil), conflict([]string{"no-such-fact"}, grace), "ok", false, "consistency", 0, nil, nil},
+		{"a re-cited conflict with an empty with still blocks", scopedBasePairing([]string{ttl}, nil, nil), conflict([]string{ttl}, ""), "ok", false, "consistency", 0, nil, nil},
+		{"a re-cited conflict with a blueprint fix blocks on the blueprint", scopedBasePairing([]string{ttl}, nil, nil), conflict([]string{ttl}, grace), "fix", false, "blueprint", 0, nil, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

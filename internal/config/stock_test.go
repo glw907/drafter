@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 const stockUserLayer = `key_env = "EXAMPLE_KEY"
 workspace_id = "wrkspc_example"
@@ -12,6 +15,7 @@ func TestStockDefaultsRunWithoutSeatOrGateSettings(t *testing.T) {
 	sb := newSandbox(t)
 	writeFile(t, sb.user, stockUserLayer)
 	writeFile(t, sb.project(), "prompts = \"prompts.js\"\n")
+	writeFile(t, filepath.Join(sb.root, "prompts.js"), "return {}\n")
 	c, err := Load(sb.root, Flags{})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -40,7 +44,7 @@ func TestStockDefaultsRunWithoutSeatOrGateSettings(t *testing.T) {
 		{"prices.models.claude-opus-5-5.cache_write_5m", "5", "default"},
 		{"prices.models.claude-opus-5-5.cache_write_1h", "8", "default"},
 		{"prices.models.claude-opus-5-5.cache_read", "0.2", "default"},
-		{"prompts", sb.root + "/prompts.js", "drafter.toml"},
+		{"prompts", sb.root + "/prompts.js " + ShortHash([]byte("return {}\n")), "drafter.toml"},
 		{"key_env", "EXAMPLE_KEY", "user"},
 	}
 	for _, tt := range tests {

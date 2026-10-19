@@ -209,13 +209,16 @@ func (r *runner) copyInputs() error {
 		r.state.Inputs[role] = run.Input{Name: name, Hash: hashBytes(data)}
 		return path, nil
 	}
-	module, err := os.ReadFile(r.cfg.Prompts)
+	source, module, err := r.o.Config.Module()
 	if err != nil {
-		return fmt.Errorf("read prompts module: %w", err)
+		return err
 	}
 	if r.cfg.Prompts, err = put("prompts", "prompts.js", module); err != nil {
 		return err
 	}
+	in := r.state.Inputs["prompts"]
+	in.Source = source
+	r.state.Inputs["prompts"] = in
 	for name, s := range r.cfg.Seat {
 		if s.Agent == "" {
 			continue
@@ -283,18 +286,49 @@ func (r *runner) addPages() error {
 	return nil
 }
 
-// loadModules loads the prompts module once per distinct handoff context.
+// loadModules loads the prompts module once per distinct handoff context, then checks that it
+// defines every seat its page renders. Both run before the first stage's spend, so a module that
+// can't serve the run refuses with nothing spent.
 func (r *runner) loadModules() error {
-	src, err := os.ReadFile(r.cfg.Prompts)
-	if err != nil {
-		return fmt.Errorf("read prompts module: %w", err)
+	var src []byte
+	if r.cfg.Prompts == "" {
+		// A dry run copies nothing, so the stock module comes straight from the binary.
+		_, stockSrc, err := r.o.Config.Module()
+		if err != nil {
+			return err
+		}
+		src = stockSrc
+	} else {
+		var err error
+		if src, err = os.ReadFile(r.cfg.Prompts); err != nil {
+			return fmt.Errorf("read prompts module: %w", err)
+		}
+	}
+	name := r.o.Config.ModuleName()
+	if r.o.Config.Prompts != "" {
+		name = filepath.Base(name)
 	}
 	for _, p := range r.pages {
-		if p.mod, err = r.moduleFor(p.h, src, filepath.Base(r.o.Config.Prompts)); err != nil {
+		var err error
+		if p.mod, err = r.moduleFor(p.h, src, name); err != nil {
 			return err
+		}
+		if missing := p.missingSeats(); len(missing) > 0 {
+			return r.missingSeatsError(name, p, missing)
 		}
 	}
 	return nil
+}
+
+// missingSeatsError names the seats the module lacks for page p. The consistency and coverage
+// prompts are built in Go, so no module seat serves them.
+func (r *runner) missingSeatsError(name string, p *page, missing []string) error {
+	msg := fmt.Sprintf("prompts module %s has no seat %s, which %s renders", name,
+		strings.Join(missing, ", "), p.h.Page.Path)
+	if r.o.Config.Prompts == "" {
+		msg += "; the stock prompts module carries only the blueprint read until drafter's stock seat prompts land; set prompts"
+	}
+	return errors.New(msg)
 }
 
 // hostFor builds the host a module loads under: the handoff's context, or, for a handoff with

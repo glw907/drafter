@@ -132,7 +132,13 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 		if st != nil {
 			return cannot(fmt.Errorf("none of the blueprints is in run %s", f.resume))
 		}
-		return writeReadSummary(out, c, pipeline.Summary{Pages: skipped}, f.dryRun)
+		s := pipeline.Summary{Pages: skipped}
+		if name, src, err := c.Module(); err == nil {
+			s.Prompts, s.PromptsHash = name, config.ShortHash(src)
+		} else {
+			s.Prompts = c.ModuleName()
+		}
+		return writeReadSummary(out, c, s, f.dryRun)
 	}
 	k, err := key.Resolve(c)
 	if err != nil {
@@ -378,7 +384,7 @@ func blueprintHandoffs(c *config.Config, root, head string, args []string) ([]ha
 		if err != nil {
 			return nil, err
 		}
-		ctx, err := json.Marshal(map[string]any{"resolved": map[string]any{"pages": []any{entryJSON(*entry)}}})
+		ctx, err := json.Marshal(map[string]any{"resolved": map[string]any{"pages": []any{entryJSON(o, *entry)}}})
 		if err != nil {
 			return nil, err
 		}
@@ -395,12 +401,18 @@ func blueprintHandoffs(c *config.Config, root, head string, args []string) ([]ha
 }
 
 // entryJSON is an outline entry in the shape of the chain's JSON outlines, which the prompts
-// module reads from resolved.pages.
-func entryJSON(p blueprint.Page) map[string]any {
-	return map[string]any{
+// module reads from resolved.pages. It adds the anatomy the page's type follows and, when the
+// page's track names one, the register that holds the anatomy's entry.
+func entryJSON(o *blueprint.Outline, p blueprint.Page) map[string]any {
+	e := map[string]any{
 		"path": p.Path, "slug": p.Slug, "title": p.Title, "pageType": p.Type, "job": p.Job,
 		"covers": nonNil(p.Covers), "outOfScope": nonNil(p.OutOfScope), "figure": p.Figure,
+		"anatomy": o.AnatomyOf(p.Type),
 	}
+	if t, ok := o.TrackFor(p.Path); ok && t.Register != "" {
+		e["register"] = t.Register
+	}
+	return e
 }
 
 func nonNil(s []string) []string {

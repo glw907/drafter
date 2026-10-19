@@ -23,12 +23,18 @@ const (
 // section ids, in blueprint order, and may be empty for a scoped page: a removed section, a
 // reorder, a field outside sections, and an outline-entry change name no section. Facts holds the
 // ids of the facts the change touched and is never nil on a scoped page, so a nil Facts marks a
-// state recorded before the field existed. Why says what made a page whole.
+// state recorded before the field existed. Bullets holds the facts whose bullet changed and Joined
+// the facts the current blueprint places or cites that the earlier one did not; a conflict between
+// facts in neither was already on the page. Both are never nil on a scoped page, and their tags
+// carry no omitempty because an empty slice written without its key would read back as nil, the
+// mark of a state recorded before the fields existed. Why says what made a page whole.
 type Scope struct {
-	Kind  string   `json:"kind"`
-	IDs   []string `json:"ids,omitempty"`
-	Facts []string `json:"facts"`
-	Why   string   `json:"why,omitempty"`
+	Kind    string   `json:"kind"`
+	IDs     []string `json:"ids,omitempty"`
+	Facts   []string `json:"facts"`
+	Bullets []string `json:"bullets"`
+	Joined  []string `json:"joined"`
+	Why     string   `json:"why,omitempty"`
 }
 
 // Revision is one version of a page's inputs: its blueprint file, its outline entry (nil when the
@@ -50,7 +56,8 @@ type Revision struct {
 // Scope.Facts is the union, over the old and new versions of every new, removed, or differing item
 // (matched by id, which is unique across sections and items) and of the fields outside sections
 // when they differ, of the facts each places or cites, plus every fact the page places or cites at
-// either revision whose bullet changed.
+// either revision whose bullet changed. Scope.Bullets lists every fact in either store whose bullet
+// changed, cited or not, so a conflict with a changed bullet never reads as already present.
 func Compare(file string, old, cur Revision) Scope {
 	whole := func(why string) Scope { return Scope{Kind: ScopeWhole, Why: why} }
 	ob, ofs := Decode(file, old.Blueprint)
@@ -143,6 +150,21 @@ func Compare(file string, old, cur Revision) Scope {
 		}
 	}
 
+	var bullets []string
+	for _, id := range slices.Compact(slices.Sorted(slices.Values(slices.Concat(old.Facts.IDs(), cur.Facts.IDs())))) {
+		if bulletChanged(id) {
+			bullets = append(bullets, id)
+		}
+	}
+	atBase := citedFacts(ob, old.Facts)
+	var joined []string
+	for _, id := range citedFacts(cb, cur.Facts) {
+		if id != "" && !slices.Contains(atBase, id) && !slices.Contains(joined, id) {
+			joined = append(joined, id)
+		}
+	}
+	slices.Sort(joined)
+
 	var changed []string
 	for i := range cb.Sections {
 		s := &cb.Sections[i]
@@ -154,7 +176,13 @@ func Compare(file string, old, cur Revision) Scope {
 	if len(changed) == 0 && !differs {
 		return Scope{Kind: ScopeUnchanged}
 	}
-	return Scope{Kind: ScopeScoped, IDs: changed, Facts: append([]string{}, slices.Sorted(maps.Keys(facts))...)}
+	return Scope{
+		Kind:    ScopeScoped,
+		IDs:     changed,
+		Facts:   append([]string{}, slices.Sorted(maps.Keys(facts))...),
+		Bullets: append([]string{}, bullets...),
+		Joined:  append([]string{}, joined...),
+	}
 }
 
 // withoutSections is the blueprint with its sections dropped, the fields Compare holds apart.

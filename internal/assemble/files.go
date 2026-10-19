@@ -182,9 +182,17 @@ func (r *repo) fileBlocks(texts ...string) []string {
 		for _, tok := range tokens(text) {
 			t, ok := r.resolve(tok)
 			if !ok && strings.TrimRight(tok, ".:;!?") != tok {
-				t, ok = r.resolve(strings.TrimRight(tok, ".:;!?"))
+				tok = strings.TrimRight(tok, ".:;!?")
+				t, ok = r.resolve(tok)
 			}
-			if !ok || seen[t.real] {
+			if !ok {
+				if b, ok := r.tokenBlock(tok); ok && !seen[tok] {
+					seen[tok] = true
+					blocks = append(blocks, b)
+				}
+				continue
+			}
+			if seen[t.real] {
 				continue
 			}
 			seen[t.real] = true

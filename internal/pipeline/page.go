@@ -158,6 +158,28 @@ func (p *page) runs(seat string) bool {
 	return slices.Contains(p.r.cfg.Seats, seat)
 }
 
+// missingSeats lists the seats this page renders through its module that the module lacks. A
+// blueprint page renders only the blueprint seat, since stage 1 reads it and stops.
+func (p *page) missingSeats() []string {
+	need := []string{"blueprint"}
+	if !p.blueprint {
+		need = []string{"draft"}
+		for _, seat := range []string{"structure", "editor", "fact", "reader"} {
+			if p.runs(seat) {
+				need = append(need, seat)
+			}
+		}
+	}
+	have := p.mod.Seats()
+	var missing []string
+	for _, seat := range need {
+		if !slices.Contains(have, seat) {
+			missing = append(missing, seat)
+		}
+	}
+	return missing
+}
+
 func (p *page) slug() string {
 	return strings.TrimSuffix(path.Base(p.h.Page.Path), path.Ext(p.h.Page.Path))
 }

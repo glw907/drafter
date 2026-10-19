@@ -83,7 +83,13 @@ func runCheckPrompts(cmd *cobra.Command, f *checkPromptsFlags) error {
 		return exitError{code: exitCannotRun, msg: fmt.Sprintf(format, a...)}
 	}
 	modulePath := f.module
-	if modulePath == "" {
+	var src []byte
+	var err error
+	if f.module != "" {
+		if src, err = os.ReadFile(f.module); err != nil {
+			return cannot("read module: %v", err)
+		}
+	} else {
 		root, err := plan.GitRoot(".")
 		if err != nil {
 			return cannot("find the project to read its prompts setting: %v (or pass --module)", err)
@@ -92,14 +98,12 @@ func runCheckPrompts(cmd *cobra.Command, f *checkPromptsFlags) error {
 		if err != nil {
 			return exitError{code: exitCannotRun, msg: err.Error()}
 		}
-		if c.Prompts == "" {
-			return cannot("prompts is not set; set it in drafter.toml or pass --module")
+		if c.Prompts == "" && c.RequirePrompts {
+			return cannot("%s", config.RefusedStock)
 		}
-		modulePath = c.Prompts
-	}
-	src, err := os.ReadFile(modulePath)
-	if err != nil {
-		return cannot("read module: %v", err)
+		if modulePath, src, err = c.Module(); err != nil {
+			return cannot("%v", err)
+		}
 	}
 	raw, err := os.ReadFile(f.matrix)
 	if err != nil {

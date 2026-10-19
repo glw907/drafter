@@ -9,6 +9,11 @@ introduction:
   notCovered: |
     Creating a key.
   facts: [lumen-grace]
+framing:
+  readers: |
+    A site owner revoking a key after a rotation.
+  introPlan: |
+    Open on the task and say what the page covers.
 orderReason: |
   Revocation is one action, so the page has one section.
 sections:

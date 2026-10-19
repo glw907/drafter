@@ -135,6 +135,7 @@ func (c *Config) apply(l *layer) {
 		put(c, l, "gate.failure_pattern", &c.Gate.FailurePattern, g.FailurePattern)
 	}
 	putPath(c, l, "prompts", &c.Prompts, f.Prompts)
+	put(c, l, "require_prompts", &c.RequirePrompts, f.RequirePrompts)
 	put(c, l, "seats", &c.Seats, f.Seats)
 	for name, sf := range f.Seat {
 		s := c.Seat[name]

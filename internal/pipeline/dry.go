@@ -14,6 +14,7 @@ const defaultPoll = 30 * time.Second
 // their worst case. It submits nothing and writes no ledger line, run directory, or state.
 func (r *runner) dryRun(ctx context.Context) (Summary, error) {
 	var s Summary
+	s.Prompts, s.PromptsHash = r.promptsReport()
 	for _, p := range r.pages {
 		p.ps.Status = StatusRunning
 	}

@@ -12,15 +12,13 @@
 
 ## Medium
 
-- [ ] **#12** Stop a base-only fact conflict from escalating a change read `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
-  In the edit-quality rerun, prompt 5 runs t5a and t5b ended on a consistency escalation (exit 1, no blocking finding) over conflicts between facts the change did not touch, so the loop had nothing to fix. #6 closed only the empty-`facts` shape. `internal/pipeline/blueprint.go`
-
 - [ ] **#13** Give a whole read a stable bar on a base that reads clean `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
   Four whole reads of the edit-quality test base each blocked on a different finding after the previous one was fixed, so a base can't be driven to an accept. The change read is unaffected because it labels base defects "Already present:". `claude/.claude/workflows/docs-page-chain.js`
 
 - [ ] **#6** Stop an unplaceable consistency answer from blocking a change read `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
   A base conflict between two recurring facts escalates whenever a tweak re-cites one of them (the rerun's tweak 5). `internal/pipeline/blueprint.go`
   The first case, a conflict with empty `facts` and `with`, closed in the skill-rules pass: a change read records it as an "Unplaced:" warning and never blocks. Evidence is the unplaced rows of `TestChangeReadConsistency` and format-test runs 20261018T223440Z-9f9c8f61 and 20261018T224305Z-769284ec, each of which recorded an "Unplaced:" warning. `--json`'s `demoted` counts unplaced and already-present conflicts together, so only `record.json` tells them apart.
+  The base-pairing case closed with #12: a conflict between two store facts the base already carried no longer blocks when the tweak only re-cites one of them.
 
 - [ ] **#7** Record the demoted conflicts and "Already present:" findings beyond a pruned run directory `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
   A change-read accept keeps them only in the run's record, and B3 may let a scoped accept write the lock. They need a durable home first. `internal/pipeline/blueprint.go`
@@ -46,7 +44,19 @@
 - [ ] **#5** Read `blueprints.root` from `drafter.toml` in the page hook `#improvement` `#drafter` *(2026-10-18)*
   The hook checks only the conventional `blueprints/` root. `bin/.local/bin/drafter-page-hook`
 
+- [ ] **#15** Label a resumed run's missing-seat error from the run copy `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  On a resume, `loadModules` names the module and picks the stock hint from the current config, not the run's copy, so a stock run resumed after `prompts` is set reads `other.js` with no stock hint. The label is error text only. It could read `state.Inputs["prompts"].Source`. `internal/pipeline/start.go`
+
+- [ ] **#16** Skip fenced code when reading a register's `## The page anatomies` entries `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  A heading or bold-lead bullet inside a code fence under that section counts as an anatomy entry. Low risk. `internal/blueprint/tracks.go`
+
+- [ ] **#17** Make the stock read's anatomy slug match drafter's slugger for non-ASCII names `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  `slug` in `stock/prompts.js` handles only ASCII names, so a non-ASCII anatomy name with no register builds a `drafter:anatomies.md#` token that may not resolve. Every stock name is ASCII today. `stock/prompts.js`
+
 ## Done
+
+- [x] **#12** Stop a base-only fact conflict from escalating a change read `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18 → 2026-10-18)*
+  A change read no longer blocks on a conflict between store facts that the base already carried. `Scope` gains `Bullets` (facts whose bullet changed) and `Joined` (facts the change brought onto the page), and a conflict with a fact in neither comes back as "Already present:". A conflict whose bullet changed, or whose fact the change newly placed or cited, still blocks, and a scoped state saved before the fields existed keeps the old rule. Replay, offline against the four conflicts the edit-quality rerun saved: every one has both sides cited at the base, and `Bullets` and `Joined` came back empty for all four, so the rule demotes each to "Already present:" where the old rule blocked on the re-cited side. `internal/pipeline/blueprint.go`, `internal/blueprint/since.go`
 
 - [x] **#4** Teach the skill when a caution is a failure row with a handler `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18 → 2026-10-18)*
   The skill now sends a caution to the "Add a failure case" row. In the rerun, tweak 4 added a `failure` item with `handledBy`. `claude/.claude/skills/blueprint/SKILL.md`

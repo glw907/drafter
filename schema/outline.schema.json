@@ -18,7 +18,7 @@
         "required": ["name"],
         "properties": {
           "name": { "type": "string", "minLength": 1, "description": "The type name a page's type field uses." },
-          "anatomy": { "type": "string", "minLength": 1, "description": "The name of the register anatomy entry the type follows, such as Task guide. drafter check requires one." }
+          "anatomy": { "type": "string", "minLength": 1, "description": "The anatomy the type follows: a stock anatomy name such as Task guide, or an entry in the register of the track that holds the type's pages. drafter check requires one." }
         }
       }
     },
@@ -40,6 +40,27 @@
           "outOfScope": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "What the page leaves to other pages." },
           "figure": { "type": "boolean", "default": false, "description": "True for a page that carries a figure, which stays on the docs page chain." },
           "managed": { "type": "boolean", "default": true, "description": "False for a page drafter never drafts, such as a historical record. Such an entry needs only its path." }
+        }
+      }
+    },
+    "tracks": {
+      "type": "array",
+      "description": "Reader tracks: each groups the pages one reader profile uses. With tracks declared, every managed page matches exactly one.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "reader", "standard", "paths"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "description": "The track's name, unique in the outline." },
+          "reader": { "type": "string", "minLength": 1, "description": "The reader profile: who reads these pages and what they bring." },
+          "standard": { "enum": ["google"], "description": "The published style standard the track follows. Only google ships." },
+          "paths": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Globs over page paths. A ** segment matches any number of segments."
+          },
+          "register": { "type": "string", "minLength": 1, "description": "A tracked repository path to a register whose \"## The page anatomies\" section adds anatomy entries beyond the stock ones." }
         }
       }
     },

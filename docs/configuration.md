@@ -85,10 +85,17 @@ drafter checks each layer as it loads it and stops at the first problem, naming 
 
 Some problems show up only when a command needs the missing setting. `drafter config` and
 `drafter page` require `workspace_id`, `page_cap`, and `cycle_ceiling`. Inside a project, they also
-require `gate.command`, `prompts`, and, for each seat that runs, the seat's `model`, `effort`,
-`max_tokens`, and a `prices.models` entry for its model. Only `prompts` has no stock default, so
-a new project sets it. The `consistency` seat is required only
-when `facts.dir` is set. drafter lists every missing setting in one error.
+require `gate.command` and, for each seat that runs, the seat's `model`, `effort`, `max_tokens`,
+and a `prices.models` entry for its model. Each of these has a stock default, so a new project can
+leave them unset. `prompts` is optional too, but the stock prompts module defines only the
+`blueprint` seat, so `drafter page` needs a `prompts` module that defines the others; see
+[The prompts module](prompts-module.md). The `consistency` seat is required only when `facts.dir`
+is set. drafter lists every missing setting in one error.
+
+A project that doesn't want the stock prompts module sets `require_prompts = true` in
+`drafter.toml`. With it set and `prompts` unset, `drafter config`, `drafter page`, and
+`drafter read` refuse with `prompts is not set, and require_prompts in drafter.toml refuses the
+stock module`.
 
 ## Settings
 
@@ -275,7 +282,8 @@ the failing lines of a red log. drafter uses the two to attribute each failing s
 
 | Setting | Layers | Default | Environment variable |
 |---|---|---|---|
-| `prompts` | project, local | None. Required to run. | `DRAFTER_PROMPTS` |
+| `prompts` | project, local | Unset. A run uses the stock module. | `DRAFTER_PROMPTS` |
+| `require_prompts` | project | `false` | None. |
 | `seats` | project, local | Every seat. | None. |
 | `seat.<name>.agent` | project, local | Unset. | None. |
 | `seat.<name>.model` | project, local | `claude-opus-5-5` | None. |
@@ -283,8 +291,18 @@ the failing lines of a red log. drafter uses the two to attribute each failing s
 | `seat.<name>.max_tokens` | project, local | `64000` for `draft`, `32000` for the rest. | None. |
 | `seat.<name>.inputs` | project, local | None. | None. |
 
-`prompts` is the path to the prompts module. [The prompts module](prompts-module.md) describes its
-contract.
+`prompts` is the path to the prompts module. When it's unset, drafter uses the stock module that
+ships in its binary. [The prompts module](prompts-module.md) describes the contract and the stock
+module. In `drafter config`, the `prompts` row shows the module's source and a short hash, such as
+`drafter:prompts.js sha256:` followed by 12 hex digits. A `prompts` path that can't be read shows
+`(missing)` after the path.
+
+`require_prompts` makes a project refuse the stock module. Only the committed `drafter.toml` can
+set it, so a user or local file can't lift the guard. It has no environment variable or flag.
+
+The resume fingerprint leaves `require_prompts` out, because it changes no request and no cost.
+A resume still runs the check. A run that started on the stock module refuses to resume after the
+project sets `require_prompts` and leaves `prompts` unset.
 
 The eight seats are `draft`, `structure`, `editor`, `fact`, `reader`, `coverage`, `consistency`,
 and `blueprint`. `seats` lists the ones that run in `drafter page`, and by default it names the

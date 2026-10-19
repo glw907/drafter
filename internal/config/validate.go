@@ -12,10 +12,13 @@ const (
 	// ScopeMoney requires workspace_id, page_cap, and cycle_ceiling. It serves commands that
 	// resolve money settings outside a project.
 	ScopeMoney Scope = iota + 1
-	// ScopeRun adds gate.command, prompts, and, for each running seat, its model, effort,
-	// max_tokens, and a price entry for its model.
+	// ScopeRun adds gate.command, the require_prompts guard, and, for each running seat, its
+	// model, effort, max_tokens, and a price entry for its model.
 	ScopeRun
 )
+
+// RefusedStock is the refusal for a project that sets require_prompts and names no prompts module.
+const RefusedStock = "prompts is not set, and require_prompts in drafter.toml refuses the stock module"
 
 // Validate returns one error naming every problem in s, or nil. The consistency seat runs, and
 // so is required, only when facts.dir is set.
@@ -37,8 +40,8 @@ func (c *Config) Validate(s Scope) error {
 		if c.Gate.Command == "" {
 			missing("gate.command")
 		}
-		if c.Prompts == "" {
-			missing("prompts")
+		if c.Prompts == "" && c.RequirePrompts {
+			problems = append(problems, errors.New(RefusedStock))
 		}
 		for _, name := range c.Seats {
 			if name == "consistency" && c.Facts.Dir == "" {

@@ -20,13 +20,15 @@ type Config struct {
 	Retries         Retries
 	Gate            Gate
 	Prompts         string
-	Seats           []string // the seats that run; draft is always among them
-	Seat            map[string]Seat
-	Facts           Facts
-	Blueprints      Blueprints
-	Register        map[string][]string
-	InlineFiles     []string
-	Root            string // the project root, empty outside a project
+	// RequirePrompts refuses the stock prompts module when Prompts is unset.
+	RequirePrompts bool
+	Seats          []string // the seats that run; draft is always among them
+	Seat           map[string]Seat
+	Facts          Facts
+	Blueprints     Blueprints
+	Register       map[string][]string
+	InlineFiles    []string
+	Root           string // the project root, empty outside a project
 
 	src     map[string]origin
 	capSets map[string][]string

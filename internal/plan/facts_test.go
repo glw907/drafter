@@ -8,6 +8,17 @@ import (
 	"testing"
 )
 
+func TestFactsIDs(t *testing.T) {
+	fs := ParseFacts(map[string]string{"facts.md": "- `f:b` B. [verified]\n- `f:a` A. [verified]\n- `f:b` B again. [verified]\n"}, "/nowhere")
+	if got := fs.IDs(); !slices.Equal(got, []string{"f:a", "f:b"}) {
+		t.Errorf("IDs = %v, want [f:a f:b]", got)
+	}
+	var none *Facts
+	if got := none.IDs(); len(got) != 0 {
+		t.Errorf("IDs of a nil store = %v, want none", got)
+	}
+}
+
 func TestCheckTag(t *testing.T) {
 	tests := []struct {
 		name, text, tag, problem string

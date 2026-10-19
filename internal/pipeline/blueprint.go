@@ -176,18 +176,34 @@ func scopeSentence(scope string) string {
 // outside what a change read touched. It fails closed: a conflict that names no fact, a fact the
 // store lacks, or a with that is neither a store fact nor a page the plan links is touched. with
 // names a page as page#heading, so the heading is cut before the page is looked up.
+//
+// A conflict between store facts is present at the base, and so untouched, when no fact on either
+// side had its bullet changed or joined the page in the change. Re-citing a fact touches it for
+// Scope.Facts but does not make the page carry a conflict it already carried. A scope with nil
+// Bullets or Joined, one saved before they existed, has no such record and counts every fact in
+// Scope.Facts as touched. A conflict with a linked page counts every fact in Scope.Facts as
+// touched in either case.
 func (p *page) untouched(in *bpInputs, ids []string, with string) bool {
 	if !p.changeRead() || p.r.facts == nil || len(ids) == 0 {
 		return false
 	}
-	touched := p.w.Scope.Facts
+	sc := p.w.Scope
 	for _, id := range ids {
-		if p.r.facts.Count(id) == 0 || slices.Contains(touched, id) {
+		if p.r.facts.Count(id) == 0 {
 			return false
 		}
 	}
 	if p.r.facts.Count(with) > 0 {
-		return !slices.Contains(touched, with)
+		all := append(slices.Clone(ids), with)
+		if sc.Bullets != nil && sc.Joined != nil {
+			return !slices.ContainsFunc(all, func(id string) bool {
+				return slices.Contains(sc.Bullets, id) || slices.Contains(sc.Joined, id)
+			})
+		}
+		return !slices.ContainsFunc(all, func(id string) bool { return slices.Contains(sc.Facts, id) })
+	}
+	if slices.ContainsFunc(ids, func(id string) bool { return slices.Contains(sc.Facts, id) }) {
+		return false
 	}
 	file, _, _ := strings.Cut(with, "#")
 	return slices.Contains(assemble.LinkedPages(in.view), file)

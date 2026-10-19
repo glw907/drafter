@@ -79,6 +79,13 @@ func (e *setupEnv) do(t *testing.T, name string, args ...string) result {
 	}
 }
 
+// withEnv returns a copy of the environment with extra variables added.
+func (e *setupEnv) withEnv(extra ...string) *setupEnv {
+	c := *e
+	c.env = append(append([]string{}, e.env...), extra...)
+	return &c
+}
+
 // write puts content at a path relative to the project.
 func (e *setupEnv) write(t *testing.T, rel, content string) {
 	t.Helper()
@@ -140,6 +147,8 @@ framing:
     A developer who has the tool installed.
   background: |
     The tool exposes one function.
+  introPlan: |
+    Open on the task and say what the page covers.
 orderReason: |
   The page has one section, so the order is that section.
 sections:
@@ -161,6 +170,15 @@ sections:
 	setupFact = "# Tool facts\n\n- `f:abc123` The tool defines a function named Run. Source: `tool.go:3-4` (`Run`). [verified]\n"
 
 	setupPage = "# Use the tool\n\nSee the [readme](../README.md).\n\n## Run the tool\n\nThe tool defines a function named Run.\n"
+
+	setupTracks = `tracks:
+  - name: project-docs
+    reader: |
+      A developer who uses the tool.
+    standard: google
+    paths:
+      - docs/**
+`
 
 	// setupStyle is a one-rule synthetic Google style, so the project's .vale.ini resolves offline.
 	setupStyle = "extends: existence\nmessage: \"avoid '%s'\"\nlevel: error\ntokens:\n  - foobarbaz\n"
@@ -186,13 +204,14 @@ func TestSetupFromNothing(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(userConfig), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	user := "key_env = \"DRAFTER_API_KEY\"\nworkspace_id = \"wrkspc_synthetic\"\npage_cap = 5\ncycle_ceiling = 20\n"
+	user := "key_env = \"DRAFTER_API_KEY\"\nworkspace_id = \"wrkspc_test\"\npage_cap = 5\ncycle_ceiling = 20\n"
 	if err := os.WriteFile(userConfig, []byte(user), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	e.write(t, "drafter.toml", e.read(t, "drafter.toml")+"prompts = \"prompts.js\"\n")
-	e.write(t, "prompts.js", "// synthetic prompts\n")
 	r = e.mustRun(t, "drafter", "config")
+	if !strings.Contains(r.stdout, "drafter:prompts.js sha256:") {
+		t.Errorf("config shows no stock prompts row:\n%s", r.stdout)
+	}
 	for _, key := range []string{"gate.command", "seat.draft.model", "prices.date"} {
 		found := false
 		for line := range strings.SplitSeq(r.stdout, "\n") {
@@ -206,7 +225,7 @@ func TestSetupFromNothing(t *testing.T) {
 	}
 
 	// 3. A managed page, its blueprint and fact, the synthetic style, then a clean tree and the gate.
-	e.write(t, "blueprints/outline.yaml", e.read(t, "blueprints/outline.yaml")+setupOutlinePage)
+	e.write(t, "blueprints/outline.yaml", e.read(t, "blueprints/outline.yaml")+setupOutlinePage+setupTracks)
 	e.write(t, "blueprints/docs/use-the-tool.blueprint.yaml", setupBlueprint)
 	e.write(t, "blueprints/facts/tool.md", setupFact)
 	e.write(t, "docs/use-the-tool.md", setupPage)
@@ -222,7 +241,39 @@ func TestSetupFromNothing(t *testing.T) {
 	}
 	e.mustRun(t, "drafter", "gate", "--page", "docs/use-the-tool.md")
 
-	// 4. Each red, restored after.
+	// 4. The stock module, the guard, and the two new checks, each restored after.
+	stub := newAPIStub(t)
+	const bp = "blueprints/docs/use-the-tool.blueprint.yaml"
+	dry := e.withEnv("DRAFTER_API_BASE_URL="+stub.URL, "DRAFTER_API_KEY=sk-ant-synthetic")
+	r = dry.mustRun(t, "drafter", "read", "--dry-run", bp)
+	if !strings.Contains(r.stdout, "prompts: drafter:prompts.js sha256:") {
+		t.Errorf("dry-run read prints no prompts line:\n%s%s", r.stdout, r.stderr)
+	}
+	if got := stub.submitted(); len(got) != 0 {
+		t.Errorf("dry-run read submitted %v", got)
+	}
+
+	outline := e.read(t, "blueprints/outline.yaml")
+	e.write(t, "blueprints/outline.yaml", strings.Replace(outline, "anatomy: Task guide", "anatomy: Nonexistent page", 1))
+	if r := e.do(t, "drafter", "check"); r.code == 0 || !strings.Contains(r.stdout+r.stderr, "Nonexistent page") {
+		t.Errorf("unknown anatomy: exit %d, want a failure naming it\n%s%s", r.code, r.stdout, r.stderr)
+	}
+	e.write(t, "blueprints/outline.yaml", outline)
+
+	e.write(t, bp, strings.Replace(setupBlueprint, "  introPlan: |\n    Open on the task and say what the page covers.\n", "", 1))
+	if r := e.do(t, "drafter", "check"); r.code == 0 || !strings.Contains(r.stdout+r.stderr, "introPlan") {
+		t.Errorf("missing introPlan: exit %d, want a failure naming it\n%s%s", r.code, r.stdout, r.stderr)
+	}
+	e.write(t, bp, setupBlueprint)
+
+	project := e.read(t, "drafter.toml")
+	e.write(t, "drafter.toml", project+"require_prompts = true\n")
+	if r := e.do(t, "drafter", "read", "--dry-run", bp); r.code != 2 || !strings.Contains(r.stdout+r.stderr, "prompts is not set, and require_prompts in drafter.toml refuses the stock module") {
+		t.Errorf("require_prompts: exit %d, want 2 with the refusal\n%s%s", r.code, r.stdout, r.stderr)
+	}
+	e.write(t, "drafter.toml", project)
+
+	// 5. Each red, restored after.
 	const page = "docs/use-the-tool.md"
 	red := func(name, mutated string, want int, wantOut string) {
 		t.Helper()

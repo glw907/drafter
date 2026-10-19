@@ -169,15 +169,29 @@ func anchorsOf(src []byte) map[string]bool {
 // prefixes id and name alike and strips the prefix from id only, so only an id anchor works.
 var htmlAnchorRe = regexp.MustCompile(`(?i)<a\s(?:[^>]*\s)?id\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))`)
 
+// Heading is one heading of a Markdown file: its level (1 to 6), the 1-based line it starts on in
+// the file as given, and the slug it renders with.
+type Heading struct {
+	Level int
+	Line  int
+	Slug  string
+}
+
+// Headings returns every heading of a Markdown file in document order, each with the slug the
+// file's one slugger gives it. Headings come from a CommonMark parse, as Anchors' do, so a setext
+// heading counts and a line in a fence does not.
+func Headings(src []byte) []Heading {
+	var out []Heading
+	walkAnchors(src, func(h Heading) { out = append(out, h) }, func(string) {})
+	return out
+}
+
 // Anchors returns every anchor a Markdown file offers, in document order and without repeats: the
 // slug of each heading, setext and ATX alike, and the id of each <a id> element. Headings come
 // from a CommonMark parse and never from fenced code. An element counts only where the parse
 // reads it as raw HTML, so one inside a code span or a fence does not. A heading written as raw
 // HTML is not a heading to the parse and so yields no anchor.
 func Anchors(src []byte) []string {
-	src = withoutFrontMatter(src)
-	doc := goldmark.New().Parser().Parse(text.NewReader(src))
-	sl := newSlugger()
 	var anchors []string
 	seen := map[string]bool{}
 	add := func(a string) {
@@ -186,9 +200,19 @@ func Anchors(src []byte) []string {
 			anchors = append(anchors, a)
 		}
 	}
+	walkAnchors(src, func(h Heading) { add(h.Slug) }, add)
+	return anchors
+}
+
+// walkAnchors parses src once and reports each heading and each <a id> value in document order.
+func walkAnchors(src []byte, heading func(Heading), anchor func(string)) {
+	body := withoutFrontMatter(src)
+	skipped := bytes.Count(src[:len(src)-len(body)], []byte("\n"))
+	doc := goldmark.New().Parser().Parse(text.NewReader(body))
+	sl := newSlugger()
 	addElements := func(markup []byte) {
 		for _, m := range htmlAnchorRe.FindAllSubmatch(markup, -1) {
-			add(cmp.Or(string(m[1]), string(m[2]), string(m[3])))
+			anchor(cmp.Or(string(m[1]), string(m[2]), string(m[3])))
 		}
 	}
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -198,19 +222,45 @@ func Anchors(src []byte) []string {
 		switch n := n.(type) {
 		case *ast.Heading:
 			var b strings.Builder
-			headingText(n, src, &b)
-			add(sl.slug(b.String()))
+			headingText(n, body, &b)
+			heading(Heading{Level: n.Level, Line: skipped + headingLine(n, body), Slug: sl.slug(b.String())})
 		case *ast.RawHTML:
-			addElements(n.Segments.Value(src))
+			addElements(n.Segments.Value(body))
 		case *ast.HTMLBlock:
 			// Types 6 and 7 hold markup; the others are comments, scripts, and similar.
 			if n.HTMLBlockType == ast.HTMLBlockType6 || n.HTMLBlockType == ast.HTMLBlockType7 {
-				addElements(n.Lines().Value(src))
+				addElements(n.Lines().Value(body))
 			}
 		}
 		return ast.WalkContinue, nil
 	})
-	return anchors
+}
+
+// emptyATX matches the line of an ATX heading with no text, capturing its hashes.
+var emptyATX = regexp.MustCompile(`^ {0,3}(#{1,6})[ \t]*(?:#+[ \t]*)?$`)
+
+// headingLine returns the 1-based line of n in src. goldmark gives an ATX heading with no text no
+// source lines, so its line is the first empty-heading line of its level after the last block
+// before it that has any.
+func headingLine(n *ast.Heading, src []byte) int {
+	if n.Lines().Len() > 0 {
+		return 1 + bytes.Count(src[:n.Lines().At(0).Start], []byte("\n"))
+	}
+	from := 0
+	for p := n.PreviousSibling(); p != nil; p = p.PreviousSibling() {
+		if l := p.Lines(); l != nil && l.Len() > 0 {
+			from = l.At(l.Len() - 1).Stop
+			break
+		}
+	}
+	line := 1 + bytes.Count(src[:from], []byte("\n"))
+	for text := range strings.SplitSeq(string(src[from:]), "\n") {
+		if m := emptyATX.FindStringSubmatch(text); m != nil && len(m[1]) == n.Level {
+			return line
+		}
+		line++
+	}
+	return line
 }
 
 // withoutFrontMatter drops a leading --- block, which the parse would otherwise read as a
