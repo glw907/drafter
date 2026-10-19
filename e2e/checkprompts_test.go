@@ -149,6 +149,21 @@ func TestCheckPromptsCannotRun(t *testing.T) {
 	}
 }
 
+func TestStockCheckPromptsOnTheFixture(t *testing.T) {
+	dir := t.TempDir()
+	copyDir(t, "testdata/cli", dir)
+	gitRun(t, dir, "init", "-q", "-b", "main")
+	gitRun(t, dir, "add", ".")
+	gitRun(t, dir, "commit", "-q", "-m", "fixture")
+	r := run(t, dir, "check-prompts", "--matrix", "prompts-matrix.json")
+	if r.code != 0 || r.stdout != "" {
+		t.Errorf("exit %d, stdout %q, stderr %q", r.code, r.stdout, r.stderr)
+	}
+	if !strings.Contains(r.stderr, "22 cases, 0 failed") {
+		t.Errorf("stderr %q", r.stderr)
+	}
+}
+
 func TestCheckPromptsJSON(t *testing.T) {
 	d := promptsData(t)
 	exp, err := os.ReadFile(d + "/expect.json")

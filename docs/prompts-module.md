@@ -204,3 +204,15 @@ Each prompt must contain its context's `page.path` and, when the context has fin
 findings text. With `--expect <file>`, drafter compares each prompt byte for byte with the
 rendering that the file holds for the same case name. A name on only one side fails. The command
 exits 0 when every case passes, 1 when any case fails, and 2 when it can't read or load an input.
+
+When the project sets no `prompts`, the command checks drafter's stock module, and two more checks
+run on each prompt. A project module, set by `prompts` or `--module`, gets neither.
+
+- `path`: every token that looks like a path must resolve. A token is a path when it holds a `/`
+  and no `://`, or begins `drafter:`. A trailing `.`, `,`, `;`, or `:` is trimmed, and a `#slug` is
+  cut first. A repository path must name a file or directory that git tracks, except the
+  context's `page.path` and `page.brief`, which the run itself produces. A `drafter:` name must be
+  one of the stock files. A token that doesn't resolve fails, and the failure names it.
+- `names`: the prompt must not hold `cairn`, `docs/internal`, `docs-register`, `sveltekit`,
+  `cloudflare`, `wrangler`, `glw907`, `npm run check:`, or `option-map`, in any letter case. Each
+  string found fails once.
