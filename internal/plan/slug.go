@@ -59,6 +59,19 @@ func (s *slugger) slug(value string) string {
 	return result
 }
 
+// HeadingSlugs returns the slug each heading renders with on a page titled title, in order. The
+// title takes the first slug, as the plan check's anchor test counts it, so a heading that repeats
+// the title takes -1.
+func HeadingSlugs(title string, headings []string) []string {
+	sl := newSlugger()
+	sl.slug(title)
+	out := make([]string, len(headings))
+	for i, h := range headings {
+		out[i] = sl.slug(h)
+	}
+	return out
+}
+
 // slugOf lowercases value, deletes every character github-slugger's regex lists, and turns each
 // space into a hyphen. It does not track repeats.
 func slugOf(value string) string {

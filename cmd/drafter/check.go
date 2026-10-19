@@ -27,8 +27,10 @@ func newCheckCmd() *cobra.Command {
 It decodes each blueprint, runs the plan checks on its view (ids, reader state, recovery,
 links, cross-links, and fact citability), and adds the blueprint checks: each managed page
 has one blueprint, every [[id]] reference resolves, every section says why, every use opens
-with Only or Omit, page types declare an anatomy, and drafted.lock agrees with the disk and
-the outline. With no blueprint named it also verifies the facts store: each fact's id, tag, and
+with Only or Omit, page types declare an anatomy, drafted.lock agrees with the disk and
+the outline. The handler check warns when a failure is handled by a fact, a verbatim sentence,
+or a link or handoff back to the section of the failing step, since none gives the reader a
+next action. With no blueprint named it also verifies the facts store: each fact's id, tag, and
 source pointers against the repository. Findings print as file:line: severity: check: message
 (fix). The exit status is 0 when no finding is an error, 1 when any is, and 2 when the command
 could not run.`,

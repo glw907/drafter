@@ -20,6 +20,7 @@ const (
 	checkRefs       = "refs"
 	checkWhy        = "why"
 	checkUse        = "use"
+	checkHandler    = "handler"
 	checkTypes      = "types"
 	checkLock       = "lock"
 	checkConvention = "convention"
@@ -134,6 +135,7 @@ func (c *projectCheck) blueprintData(rel string, data []byte) (*Blueprint, Page)
 	c.findings = append(c.findings, plan.Check(rel, View(b, entry, c.l.facts), opts)...)
 	c.references(rel, b)
 	c.sections(rel, b)
+	c.handlers(rel, b, entry.Title)
 	c.pageType(entry)
 	return b, entry
 }
@@ -153,6 +155,74 @@ func (c *projectCheck) sections(file string, b *Blueprint) {
 			}
 		}
 	}
+}
+
+// handlers warns on a failure whose handler gives the reader no next action: a fact, a verbatim
+// sentence, or a link or handoff that sends the reader back to the section holding the step the
+// failure comes from. Only a step, or a link or handoff elsewhere, moves the reader on.
+func (c *projectCheck) handlers(file string, b *Blueprint, title string) {
+	headings := make([]string, len(b.Sections))
+	for i, s := range b.Sections {
+		headings[i] = s.Heading
+	}
+	slugs := plan.HeadingSlugs(title, headings)
+	anchors := map[string]string{} // section id to anchor
+	home := map[string]string{}    // item id to the id of its section
+	items := map[string]Item{}
+	for i, s := range b.Sections {
+		anchors[s.ID] = cmp.Or(s.Anchor, slugs[i])
+		for _, it := range s.Items {
+			home[it.ID] = s.ID
+			items[it.ID] = it
+		}
+	}
+	for _, s := range b.Sections {
+		for _, it := range s.Items {
+			if it.Kind != "failure" {
+				continue
+			}
+			h, ok := items[it.HandledBy]
+			if !ok {
+				continue
+			}
+			var what string
+			switch {
+			case h.Kind == "fact":
+				what = "a fact"
+			case h.Kind == "sentence" && h.Mode == "verbatim":
+				what = "a verbatim sentence"
+			case (h.Kind == "link" || h.Kind == "handoff") && it.From != "" && sendsBack(h, home[it.From], anchors):
+				what = "a " + h.Kind + " back to the section of " + it.From
+			default:
+				continue
+			}
+			c.add(file, cmp.Or(it.Lines["handledBy"], it.Line), plan.SeverityWarning, checkHandler,
+				fmt.Sprintf("failure %q is handled by %s (%s), which gives the reader no next action; hand off to the step or section that does", it.ID, what, h.ID),
+				"make the handler a step, or point it at the section that gives the reader a next action")
+		}
+	}
+}
+
+// anchorRef matches a #anchor reference in prose or a link target.
+var anchorRef = regexp.MustCompile(`#([^\s)\]]+)`)
+
+// sendsBack reports whether a link or handoff refers to the section with the given id and to no
+// other section, by [[id]] or #anchor in its target or text. A [[id]] in a link's target is no
+// path the links check resolves, so it belongs in the text.
+func sendsBack(h Item, section string, anchors map[string]string) bool {
+	text := h.Target + " " + h.Text
+	named := map[string]bool{}
+	for _, m := range sectionRef.FindAllStringSubmatch(text, -1) {
+		named[m[1]] = true
+	}
+	for _, m := range anchorRef.FindAllStringSubmatch(text, -1) {
+		for id, anchor := range anchors {
+			if anchor == m[1] {
+				named[id] = true
+			}
+		}
+	}
+	return len(named) == 1 && named[section]
 }
 
 // opensWith reports whether s starts with one of the words, as a whole word.

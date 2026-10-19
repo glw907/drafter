@@ -90,6 +90,16 @@ func TestCheckNewChecks(t *testing.T) {
 		{"lock entry for a page missing from disk", map[string]string{"blueprints/drafted.lock": "version: 1\npages:\n  docs/gone.md:\n    page: aa\n"}, false,
 			"blueprints/drafted.lock", "lock", "error", "not on disk"},
 		{"accepted-only entry for a listed page", map[string]string{"blueprints/drafted.lock": "version: 1\npages:\n  docs/guide.md:\n    accepted: aa\n"}, false, "", "lock", "", ""},
+		{"failure handled by a fact", map[string]string{guideBlueprint: withEdit(t, "handledBy: h-ask-admin", "handledBy: needs-admin")}, false, guideBlueprint, "handler", "warning", "hand off to the step or section"},
+		{"failure handled by a step", map[string]string{guideBlueprint: withEdit(t, "handledBy: h-ask-admin", "handledBy: s-verify")}, false, "", "handler", "", ""},
+		{"failure handled by a verbatim sentence", map[string]string{guideBlueprint: handlerAs(t, "sentence\n        mode: verbatim")}, false, guideBlueprint, "handler", "warning", "hand off to the step or section"},
+		{"failure handled by a claim sentence", map[string]string{guideBlueprint: handlerAs(t, "sentence\n        mode: claim")}, false, "", "handler", "", ""},
+		{"failure handled by a link back by anchor", map[string]string{guideBlueprint: handlerLink(t, "target: \"#rotate-the-key\"\n        text: Ask an admin")}, false, guideBlueprint, "handler", "warning", "hand off to the step or section"},
+		{"failure handled by a link to another section's anchor", map[string]string{guideBlueprint: handlerLink(t, "target: \"#verify-the-new-key\"\n        text: Ask an admin")}, false, "", "handler", "", ""},
+		{"failure handled by a link back by section id", map[string]string{guideBlueprint: handlerLink(t, "target: https://example.com/docs/keys\n        text: Back to [[rotate]]")}, false, guideBlueprint, "handler", "warning", "hand off to the step or section"},
+		{"failure handled by a link to another section by id", map[string]string{guideBlueprint: handlerLink(t, "target: https://example.com/docs/keys\n        text: On to [[verify]]")}, false, "", "handler", "", ""},
+		{"failure handled by a handoff back to the section", map[string]string{guideBlueprint: withEdit(t, "Ask an admin to grant the role, then try again.", "Go back to [[rotate]] and try again.")}, false, guideBlueprint, "handler", "warning", "hand off to the step or section"},
+		{"failure handled by a handoff to another section", map[string]string{guideBlueprint: withEdit(t, "Ask an admin to grant the role, then try again.", "Go on to [[verify]] and try again.")}, false, "", "handler", "", ""},
 		{"accepted-only entry for an unlisted page", map[string]string{"blueprints/drafted.lock": "version: 1\npages:\n  docs/new.md:\n    accepted: aa\n"}, false,
 			"blueprints/drafted.lock", "lock", "error", "lists no such page"},
 	}
@@ -102,6 +112,9 @@ func TestCheckNewChecks(t *testing.T) {
 				t.Fatal(err)
 			}
 			hits := findingsFor(got, tt.check)
+			if tt.check == "handler" && plan.HasError(got) {
+				t.Errorf("a handler fixture has an error finding: %+v", got)
+			}
 			if tt.sev == "" {
 				if len(hits) != 0 {
 					t.Errorf("the passing twin has %s findings: %+v", tt.check, hits)
@@ -116,6 +129,21 @@ func TestCheckNewChecks(t *testing.T) {
 			t.Errorf("no %s %s finding in %s containing %q: %+v", tt.sev, tt.check, tt.file, tt.msg, hits)
 		})
 	}
+}
+
+// handlerAs returns the base blueprint with the failure's handler h-ask-admin recast as kind
+// (which may carry a mode line), keeping its text.
+func handlerAs(t *testing.T, kind string) string {
+	t.Helper()
+	return withEdit(t, "kind: handoff\n        text: |\n          Ask an admin", "kind: "+kind+"\n        text: |\n          Ask an admin")
+}
+
+// handlerLink returns the base blueprint with the failure's handler recast as a link with the
+// given target and text lines.
+func handlerLink(t *testing.T, target string) string {
+	t.Helper()
+	return withEdit(t, "kind: handoff\n        text: |\n          Ask an admin to grant the role, then try again.\n",
+		"kind: link\n        "+target+"\n")
 }
 
 func TestCheckConvention(t *testing.T) {
