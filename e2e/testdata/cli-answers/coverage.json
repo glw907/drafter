@@ -1,13 +1,13 @@
 {
   "items": [
     {"id": "f-state", "quote": "Tally keeps its count in a file named .tally in the current directory."},
-    {"id": "c-dir", "quote": "Run every tally command in the directory that holds the count file."},
+    {"id": "c-dir", "quote": "Run every tally command in the same directory."},
+    {"id": "s-reset", "quote": "To start from zero, run `tally reset` first."},
+    {"id": "f-reset", "quote": "The command `tally reset` deletes the count file."},
     {"id": "s-count", "quote": "Run `tally count` with the items you want to add."},
     {"id": "f-count", "quote": "The command `tally count` adds each item you name on the command line to the total."},
-    {"id": "f-args", "quote": "The command `tally count` counts the arguments left after it reads its flags, and it never reads their names."},
     {"id": "f-creates", "quote": "The command `tally count` creates the .tally file the first time it runs."},
-    {"id": "f-quiet", "quote": "The command `tally count` prints nothing."},
-    {"id": "f-empty", "quote": "The command `tally total` prints 0 when the .tally file does not exist or holds no number."},
+    {"id": "f-empty", "quote": "The command `tally total` prints 0 when the .tally file does not exist."},
     {"id": "x-empty", "quote": "If `tally total` prints 0 although you counted items, you are in the wrong directory."},
     {"id": "h-dir", "quote": "Run `tally total` in the directory where you ran `tally count`."},
     {"id": "c-pace", "quote": "Pick the items you want to count."},

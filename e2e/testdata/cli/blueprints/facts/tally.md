@@ -9,4 +9,4 @@
 - `tally-count-creates` The command `tally count` creates the .tally file the first time it runs. Source: `main.go:39` (`WriteFile`). [verified]
 - `tally-count-quiet` The command `tally count` prints nothing. Source: `main.go:33-40` (`runCount`). [verified]
 - `tally-by-int` The flag --by takes a whole number. Source: `main.go:36` (`Int`). [verified]
-- `tally-total-empty` The command `tally total` prints 0 when the .tally file does not exist or holds no number. Source: `main.go:42-48` (`Atoi`). [verified]
+- `tally-total-empty` The command `tally total` prints 0 when the .tally file does not exist. Source: `main.go:42-48` (`readTotal`). [verified]

@@ -6,7 +6,11 @@ Tally counts the items you name.
 
 Tally keeps its count in a file named .tally in the current directory.
 
-Run every tally command in the directory that holds the count file.
+Run every tally command in the same directory.
+
+To start from zero, run `tally reset` first.
+
+The command `tally reset` deletes the count file.
 
 ## Add items
 
@@ -16,19 +20,14 @@ Run `tally count` with the items you want to add.
 
 The command `tally count` adds each item you name on the command line to the total.
 
-The command `tally count` counts the arguments left after it reads its flags, and it never reads their names.
-
 The command `tally count` creates the .tally file the first time it runs.
-
-The command `tally count` prints nothing.
-
 ## Read the total
 
 Run `tally total` in the same directory.
 
 The command `tally total` prints the saved total.
 
-The command `tally total` prints 0 when the .tally file does not exist or holds no number.
+The command `tally total` prints 0 when the .tally file does not exist.
 
 If `tally total` prints 0 although you counted items, you are in the wrong directory.
 

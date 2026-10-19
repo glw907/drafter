@@ -33,8 +33,18 @@ sections:
         kind: sentence
         mode: claim
         text: |
-          Run every tally command in the directory that holds the count file.
+          Run every tally command in the same directory.
         facts: [tally-state-file]
+      - id: s-reset
+        kind: step
+        optional: true
+        text: |
+          To start from zero, run `tally reset` first.
+        requires: [tally-installed, count-directory]
+        produces: [clean-count]
+      - id: f-reset
+        kind: fact
+        fact: tally-reset-cmd
   - id: add-items
     heading: Add items
     why: |
@@ -56,15 +66,9 @@ sections:
       - id: f-count
         kind: fact
         fact: tally-count-cmd
-      - id: f-args
-        kind: fact
-        fact: tally-count-args
       - id: f-creates
         kind: fact
         fact: tally-count-creates
-      - id: f-quiet
-        kind: fact
-        fact: tally-count-quiet
   - id: read-the-total
     heading: Read the total
     why: |
