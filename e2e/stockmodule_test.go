@@ -24,7 +24,23 @@ func stockModuleEnv(t *testing.T, stub *apiStub) pageEnv {
 	return p
 }
 
-func TestPageRefusesTheStockModuleBeforeSpend(t *testing.T) {
+// partialModuleEnv is a page project whose prompts module defines only the draft seat and whose
+// seats setting is left at its default, so the run needs seats the module lacks.
+func partialModuleEnv(t *testing.T, stub *apiStub) pageEnv {
+	t.Helper()
+	p := newPageEnv(t, stub)
+	path := filepath.Join(p.dir, "drafter.toml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, path, strings.Replace(string(data), "seats = [\"draft\"]\n", "", 1))
+	gitRun(t, p.dir, "add", "drafter.toml")
+	gitRun(t, p.dir, "commit", "-q", "-m", "run the default seats")
+	return p
+}
+
+func TestPageRefusesAModuleWithoutASeatBeforeSpend(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		args []string
@@ -34,13 +50,13 @@ func TestPageRefusesTheStockModuleBeforeSpend(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			stub := newAPIStub(t)
-			p := stockModuleEnv(t, stub)
+			p := partialModuleEnv(t, stub)
 			r := p.page(t, append(tt.args, p.handoffFile(t))...)
 			if r.code != 2 {
 				t.Fatalf("exit %d, want 2\nstdout %s\nstderr %s", r.code, r.stdout, r.stderr)
 			}
 			for _, want := range []string{
-				"no seat draft", "the stock prompts module carries only the blueprint read", guidePage,
+				"has no seat structure, editor, fact, reader", guidePage,
 			} {
 				if !strings.Contains(r.stderr, want) {
 					t.Errorf("stderr lacks %q:\n%s", want, r.stderr)

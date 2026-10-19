@@ -138,10 +138,10 @@ func TestModuleSeatsRefuseBeforeSpend(t *testing.T) {
 		notWant string
 	}{
 		{
-			"the stock module cannot draft a page",
+			"a module with only the blueprint seat cannot draft a page",
 			func(t *testing.T) *harness { return newHarness(t, withoutFacts, withPages("b")) },
-			"",
-			[]string{"no seat draft, structure, editor, fact, reader", "docs/guides/revoke-a-key.md", "stock prompts module carries only the blueprint read"},
+			`return { blueprint: (c) => "x" };` + "\n",
+			[]string{"no seat draft, structure, editor, fact, reader", "docs/guides/revoke-a-key.md"},
 			"",
 		},
 		{
@@ -149,16 +149,16 @@ func TestModuleSeatsRefuseBeforeSpend(t *testing.T) {
 			func(t *testing.T) *harness {
 				return newHarness(t, withoutFacts, withPages("b"), withSeats("draft", "structure"))
 			},
-			"",
+			`return { blueprint: (c) => "x" };` + "\n",
 			[]string{"no seat draft, structure"},
 			"editor",
 		},
 		{
-			"a custom module gets no stock hint",
+			"a custom module names only the seats it lacks",
 			func(t *testing.T) *harness { return newHarness(t, withoutFacts, withPages("b")) },
 			`return { draft: (c) => "x" };` + "\n",
 			[]string{"no seat structure, editor, fact, reader"},
-			"stock prompts module",
+			"draft,",
 		},
 	}
 	for _, tt := range tests {
@@ -190,6 +190,16 @@ func TestModuleSeatsRefuseBeforeSpend(t *testing.T) {
 				t.Errorf("%d reservations before the refusal", len(lines))
 			}
 		})
+	}
+}
+
+func TestStockModuleServesEverySeatOfAPage(t *testing.T) {
+	h := newHarness(t, withoutFacts, withPages("b"))
+	h.cfg.Prompts = ""
+	// Stub builders in the stock module serve every seat a plan page renders, so the load check
+	// passes and the run reaches the API.
+	if _, err := h.run(); err != nil && strings.Contains(err.Error(), "has no seat") {
+		t.Fatalf("the stock module lacks a seat: %v", err)
 	}
 }
 

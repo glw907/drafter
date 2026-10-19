@@ -130,6 +130,10 @@ type work struct {
 	// rule reported as a warning, already present or unplaced.
 	Change  string `json:"change,omitempty"`
 	Demoted int    `json:"demoted,omitempty"`
+	// Draft says the page drafts after its blueprint read, and SkipRead that the read is skipped.
+	// A state saved before drafting existed decodes both as false: a read, not a draft.
+	Draft    bool `json:"draft,omitempty"`
+	SkipRead bool `json:"skip_read,omitempty"`
 }
 
 // readerState is the final reader's two-turn conversation.

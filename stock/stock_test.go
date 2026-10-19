@@ -51,8 +51,9 @@ func loadStockMatrix(t *testing.T) (stockMatrix, *prompts.Module) {
 
 func TestStockModuleSeats(t *testing.T) {
 	_, mod := loadStockMatrix(t)
-	if got := mod.Seats(); !slices.Equal(got, []string{"blueprint"}) {
-		t.Errorf("seats = %v, want [blueprint]", got)
+	want := []string{"blueprint", "coherence", "draft", "editor", "fact", "reader", "structure"}
+	if got := mod.Seats(); !slices.Equal(got, want) {
+		t.Errorf("seats = %v, want %v", got, want)
 	}
 }
 

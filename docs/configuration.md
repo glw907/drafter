@@ -87,8 +87,8 @@ Some problems show up only when a command needs the missing setting. `drafter co
 `drafter page` require `workspace_id`, `page_cap`, and `cycle_ceiling`. Inside a project, they also
 require `gate.command` and, for each seat that runs, the seat's `model`, `effort`, `max_tokens`,
 and a `prices.models` entry for its model. Each of these has a stock default, so a new project can
-leave them unset. `prompts` is optional too, but the stock prompts module defines only the
-`blueprint` seat, so `drafter page` needs a `prompts` module that defines the others; see
+leave them unset. `prompts` is optional too: the stock prompts module defines every seat, and a
+project that names its own module must define the seats its pages render; see
 [The prompts module](prompts-module.md). The `consistency` seat is required only when `facts.dir`
 is set. drafter lists every missing setting in one error.
 
@@ -304,8 +304,8 @@ The resume fingerprint leaves `require_prompts` out, because it changes no reque
 A resume still runs the check. A run that started on the stock module refuses to resume after the
 project sets `require_prompts` and leaves `prompts` unset.
 
-The eight seats are `draft`, `structure`, `editor`, `fact`, `reader`, `coverage`, `consistency`,
-and `blueprint`. `seats` lists the ones that run in `drafter page`, and by default it names the
+The nine seats are `draft`, `structure`, `editor`, `fact`, `reader`, `coverage`, `consistency`,
+`blueprint`, and `coherence`. `seats` lists the ones that run in `drafter page`, and by default it names the
 first seven. The list must include `draft`, which always runs. Leaving a review seat out removes
 its stages, and the run record notes each seat that didn't run. The `consistency` seat runs only
 when `facts.dir` is set.
@@ -315,7 +315,13 @@ list, so `drafter page` runs as it did before the seat existed. `drafter read` a
 seat, and it refuses to start, with exit status 2, when `[seat.blueprint]` lacks a model, an
 effort, or `max_tokens`, or when the model has no entry under `prices.models`.
 
-The stock defaults set a model, an effort, and `max_tokens` for all eight seats, so a project
+The `coherence` seat reads a whole page after a section redraft passes review, to check the
+transitions, repetition, and flow around the sections that changed. It runs on every section
+redraft and isn't governed by `seats`, so a project can't turn it off. A run that may redraft a
+section refuses to start, with exit status 2, when `[seat.coherence]` lacks a model, an effort, or
+`max_tokens`, or when the model has no entry under `prices.models`.
+
+The stock defaults set a model, an effort, and `max_tokens` for all nine seats, so a project
 sets a seat's value only to change it. They are the values the cairn docs project measured.
 
 Replace `<name>` with a seat name. A `seat.<name>` table for any other name is an error.

@@ -276,6 +276,7 @@ func (r *runner) addPages() error {
 		if sc, ok := r.o.Scopes[h.Page.Path]; ok {
 			p.w.Since, p.w.Scope, p.w.Change = r.o.Since, &sc, r.o.Changes[h.Page.Path]
 		}
+		p.w.Draft, p.w.SkipRead = r.o.Draft, r.o.SkipRead[h.Page.Path]
 		r.state.Pages[p.key] = p.ps
 		r.pages = append(r.pages, p)
 		if err := p.snapshotPre(); err != nil {
@@ -323,12 +324,8 @@ func (r *runner) loadModules() error {
 // missingSeatsError names the seats the module lacks for page p. The consistency and coverage
 // prompts are built in Go, so no module seat serves them.
 func (r *runner) missingSeatsError(name string, p *page, missing []string) error {
-	msg := fmt.Sprintf("prompts module %s has no seat %s, which %s renders", name,
+	return fmt.Errorf("prompts module %s has no seat %s, which %s renders", name,
 		strings.Join(missing, ", "), p.h.Page.Path)
-	if r.o.Config.Prompts == "" {
-		msg += "; the stock prompts module carries only the blueprint read until drafter's stock seat prompts land; set prompts"
-	}
-	return errors.New(msg)
 }
 
 // hostFor builds the host a module loads under: the handoff's context, or, for a handoff with

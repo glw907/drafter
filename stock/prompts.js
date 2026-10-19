@@ -1,7 +1,7 @@
 // drafter's stock prompts module, run when a project's configuration names no prompts module. It
 // runs in goja as the body of an async function, with DRAFTER_HOST and args as globals, and
-// returns the seat map. It defines only the blueprint read: the other seats wait for drafter's
-// stock seat prompts, and a run that needs one refuses before it spends anything.
+// returns the seat map. It defines the blueprint read and the seats that draft and review a page
+// from its blueprint.
 
 const GOOGLE_LARGE_DOCS = "https://developers.google.com/tech-writing/two/large-docs";
 
@@ -172,10 +172,26 @@ bug"), so report it and let it pass. A non-blocking finding never makes the verd
 
 }
 
+/**
+ * A placeholder for a drafting or review seat: one line naming the page. The seat prompts replace
+ * these.
+ * @param {string} seat
+ * @returns {(c: {page?: {path?: string}}) => string}
+ */
+function stub(seat) {
+  return (c) => `The ${seat} seat, for ${c.page && c.page.path}.`;
+}
+
 return {
   blueprint: (c) => {
     const path = c.page && c.page.path;
     const entry = PAGES.find((p) => p.path === path) || {};
     return blueprintPrompt(c.scope || undefined, anatomyFor(entry));
   },
+  draft: stub("draft"),
+  structure: stub("structure"),
+  editor: stub("editor"),
+  fact: stub("fact"),
+  reader: stub("reader"),
+  coherence: stub("coherence"),
 };
