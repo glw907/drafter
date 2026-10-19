@@ -95,15 +95,19 @@ func runPage(cmd *cobra.Command, args []string, f *pageFlags) error {
 	if err != nil {
 		return exitError{code: exitCannotRun, msg: err.Error()}
 	}
+	resumeArgs := args
+	if f.workflowRun != "" {
+		resumeArgs = []string{"--workflow-run", f.workflowRun}
+	}
 	client := batch.New(batch.Options{Key: k, BaseURL: c.APIBaseURL, WorkspaceID: c.WorkspaceID})
 	s, err := pipeline.Run(cmd.Context(), pipeline.Options{
 		Config: c, Handoffs: handoffs, API: client, Resume: f.resume, DryRun: f.dryRun,
-		Version: version(), Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr(),
+		Version: version(), Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr(), ResumeArgs: resumeArgs,
 	})
 	if err != nil {
 		msg := err.Error()
 		if s.RunID != "" {
-			msg += "; resume with drafter page --resume " + s.RunID
+			msg += "; resume with " + pipeline.ResumeCommand("drafter page", c.Mode == "sync", s.RunID, resumeArgs)
 		}
 		return exitError{code: exitCannotRun, msg: msg}
 	}

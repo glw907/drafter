@@ -67,6 +67,9 @@ type Options struct {
 	// Command names the command that started the run, for the resume hint; "drafter page" when
 	// empty.
 	Command string
+	// ResumeArgs are the arguments the resume hint repeats after the run ID: the blueprints or
+	// handoff files as given, or --workflow-run and its path.
+	ResumeArgs []string
 }
 
 // command is the command a stopped run is resumed with.
@@ -96,7 +99,8 @@ type PageResult struct {
 	AlreadyPresent int `json:"already_present,omitempty"`
 	// Findings are the blueprint read's findings, blocking or not, in the order the read gave them.
 	Findings []FindingResult `json:"findings,omitempty"`
-	// Warnings are the record's warnings: conflicts a change read set aside.
+	// Warnings are the record's warnings: the blueprint check's warnings and the conflicts a
+	// change read set aside.
 	Warnings []string `json:"warnings,omitempty"`
 	// Detail is what an escalation says beyond its rule, such as the conflicts that blocked.
 	Detail string `json:"detail,omitempty"`
@@ -208,22 +212,36 @@ func (r *runner) summary() Summary {
 	return s
 }
 
-// resumeCommand is the command that continues the stopped run: the sync flag when the run's mode
-// is sync, since a resume under another mode fails the configuration check, and the pages as the
-// command was given them.
+// resumeCommand is the command that continues the stopped run.
 func (r *runner) resumeCommand() string {
+	return ResumeCommand(r.command(), r.cfg.Mode == "sync", r.state.RunID, r.o.ResumeArgs)
+}
+
+// ResumeCommand is the command line that continues a stopped run: the sync flag when the run's mode
+// is sync, since a resume under another mode fails the configuration check, then args as the
+// command was given them.
+func ResumeCommand(command string, sync bool, runID string, args []string) string {
 	var b strings.Builder
-	b.WriteString(r.command())
-	if r.cfg.Mode == "sync" {
+	b.WriteString(command)
+	if sync {
 		b.WriteString(" --sync")
 	}
-	b.WriteString(" --resume " + r.state.RunID)
-	for _, p := range r.pages {
-		if p.h.File != "" {
-			b.WriteString(" " + p.h.File)
-		}
+	b.WriteString(" --resume " + runID)
+	for _, a := range args {
+		b.WriteString(" " + shellWord(a))
 	}
 	return b.String()
+}
+
+// shellWord quotes a for a POSIX shell when it holds a character the shell would split or expand.
+func shellWord(a string) string {
+	safe := func(c rune) bool {
+		return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("_./:@%+=,-", c)
+	}
+	if a != "" && !strings.ContainsFunc(a, func(c rune) bool { return !safe(c) }) {
+		return a
+	}
+	return "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
 }
 
 // halt stops the run, resumable. The first reason wins.

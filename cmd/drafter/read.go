@@ -141,12 +141,12 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 	client := batch.New(batch.Options{Key: k, BaseURL: c.APIBaseURL, WorkspaceID: c.WorkspaceID})
 	s, err := pipeline.Run(cmd.Context(), pipeline.Options{
 		Config: c, Handoffs: handoffs, API: client, Resume: f.resume, DryRun: f.dryRun, Since: since, Scopes: scopes, Changes: changes,
-		Version: version(), Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr(), Command: "drafter read",
+		Version: version(), Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr(), Command: "drafter read", ResumeArgs: args,
 	})
 	if err != nil {
 		msg := err.Error()
 		if s.RunID != "" {
-			msg += "; resume with drafter read --resume " + s.RunID
+			msg += "; resume with " + pipeline.ResumeCommand("drafter read", c.Mode == "sync", s.RunID, args)
 		}
 		return cannot(errors.New(msg))
 	}

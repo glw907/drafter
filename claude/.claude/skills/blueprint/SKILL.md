@@ -44,7 +44,7 @@ Fix every blocking finding, and any Nits you choose, in one batch. Run `drafter 
 
 | The read ends with | Do |
 |---|---|
-| Exit 0, no blocking finding printed | Accepted. Stop. |
+| Exit 0, no blocking finding printed, and no "nothing changed" line | Accepted. Stop. |
 | Exit 0 with a blocking finding printed, or exit 1 with the blueprint read's findings | Fix and read again. |
 | Exit 1 from a consistency escalation | Fix the conflict the change caused and read again. |
 | Exit 1 escalated on rule `cap`, or exit 3 naming `cycle cap` or `spend limit` | Stop reading, commit, and report the stop to the user. |

@@ -89,12 +89,34 @@ func TestResumeLineNamesSyncAndPages(t *testing.T) {
 	h := newBlueprintHarness(t, withPages("a"), func(h *harness) { h.cfg.CycleCeiling = 0.0001; h.cfg.Mode = "sync" })
 	h.opts = h.options()
 	h.opts.Command = "drafter read"
-	h.opts.Handoffs[0].File = "blueprints/a.blueprint.yaml"
+	h.opts.ResumeArgs = []string{"blueprints/a.blueprint.yaml", "my pages/b.yaml"}
 	s, err := Run(t.Context(), h.opts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "drafter read --sync --resume " + s.RunID + " blueprints/a.blueprint.yaml"; s.ResumeLine != want {
+	if want := "drafter read --sync --resume " + s.RunID + " blueprints/a.blueprint.yaml 'my pages/b.yaml'"; s.ResumeLine != want {
 		t.Errorf("ResumeLine = %q, want %q", s.ResumeLine, want)
+	}
+}
+
+func TestResumeCommand(t *testing.T) {
+	tests := []struct {
+		name    string
+		command string
+		sync    bool
+		args    []string
+		want    string
+	}{
+		{"workflow run", "drafter page", false, []string{"--workflow-run", "runs/wf.json"}, "drafter page --resume r1 --workflow-run runs/wf.json"},
+		{"handoff files, sync", "drafter page", true, []string{"a.json", "b.json"}, "drafter page --sync --resume r1 a.json b.json"},
+		{"path with a space", "drafter read", false, []string{"my pages/a.yaml"}, "drafter read --resume r1 'my pages/a.yaml'"},
+		{"path with a quote", "drafter read", false, []string{"it's.yaml"}, `drafter read --resume r1 'it'\''s.yaml'`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ResumeCommand(tt.command, tt.sync, "r1", tt.args); got != tt.want {
+				t.Errorf("ResumeCommand = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
