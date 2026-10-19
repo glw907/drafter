@@ -1,6 +1,8 @@
 package blueprint
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -48,5 +50,25 @@ func TestCitedErrors(t *testing.T) {
 	p.Outline = "blueprints/none.yaml"
 	if _, err := p.Cited("blueprints/docs/guide.blueprint.yaml"); err == nil {
 		t.Error("a missing outline gave no error")
+	}
+}
+
+func TestCitedInReadsTheBytesItIsGiven(t *testing.T) {
+	const rel = "blueprints/docs/guide.blueprint.yaml"
+	p := catalogProject(t, map[string]string{rel: withEdit(t, "Keys are long-lived,", "Keys are long-lived (`f:eeeeee`),")})
+	outline, err := os.ReadFile(p.abs(p.Outline))
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, err := os.ReadFile(filepath.Join("testdata", "catalog", "base.blueprint.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := p.CitedIn(rel, base, outline)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"f:aaaaaa", "f:bbbbbb", "f:cccccc"}; !slices.Equal(got, want) {
+		t.Errorf("CitedIn over the base bytes = %v, want %v although the working tree cites f:eeeeee", got, want)
 	}
 }

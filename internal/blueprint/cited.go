@@ -23,6 +23,12 @@ func (p Project) Cited(rel string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read outline: %w", err)
 	}
+	return p.CitedIn(rel, data, outline)
+}
+
+// CitedIn is Cited over the given blueprint and outline bytes, so a caller can read both as
+// committed at a revision. The lock and the facts store still come from the working tree.
+func (p Project) CitedIn(rel string, data, outline []byte) ([]string, error) {
 	l, err := p.loadOutline(outline)
 	if err != nil {
 		return nil, err

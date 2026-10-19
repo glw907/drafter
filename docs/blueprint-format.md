@@ -322,6 +322,12 @@ committed at `HEAD`, holds no `page` id, and neither file has uncommitted change
 named blueprint before it writes anything, and the first one that doesn't qualify stops the call with
 the page and the fix. The entry it writes keeps `accepted`.
 
+`drafter page` writes a page's entry when it accepts the page. The entry holds the page as written,
+the blueprint as committed at the run's start, and the section hashes of the written page. The
+entry keeps its `accepted` id, except when the page's blueprint read judged the whole blueprint:
+then `accepted` is the blueprint it accepted. A scoped read and a skipped read leave `accepted`
+alone. See [What `drafter page` does with a blueprint](#what-drafter-page-does-with-a-blueprint).
+
 ## What `drafter check` checks
 
 `drafter check [--root dir] [--json] [<blueprint>...]` validates every blueprint under the
@@ -534,3 +540,54 @@ applies the register to prose.
 `drafter read` prints each finding under its page with its location and whether it blocks, and
 prints the record's warnings and any escalation detail. `--json` carries the same as fields of the
 page.
+
+## What `drafter page` does with a blueprint
+
+`drafter page` drafts a page from its blueprint. Name the page (`docs/x.md`) or its blueprint
+(`blueprints/docs/x.blueprint.yaml`). An argument that ends in `.blueprint.yaml` is a blueprint,
+one that ends in `.md` is a page, and anything else is a [handoff file](handoff.md). Give one kind
+of argument, not a mix, and don't combine blueprints with `--workflow-run`.
+
+A run starts on a clean worktree and reads every input from the commit it starts at: the blueprint,
+the outline, the facts, the page, and its brief. For each page it first decides what to run, by
+comparing the blueprint with the entry in `drafted.lock`.
+
+| The page | The run |
+|---|---|
+| Has no entry, or an entry with only `accepted`, or no committed page | Drafts the page whole. |
+| Matches its entry: blueprint, facts, and outline entry all unchanged | Isn't run. The command prints `up to date with drafted.lock`, spends nothing, and needs no API key, Vale, or `drafter` on `PATH`. |
+| Changed in its structure: a section added, removed, or reordered, or a page-level field changed | Drafts the page whole, after a read of the change. |
+| Changed in some sections, and has no brief at the start commit | Drafts the page whole, because a section redraft can't cover sentences the brief doesn't list. |
+| Changed in some sections, and a changed fact is cited by a sentence in the page's preamble | Drafts the page whole. |
+| Changed in some sections | Redrafts those sections. |
+
+A changed fact bullet counts for every section that cites it, in the blueprint or in the page's
+brief. The redraft edits only the changed sections, under a bound: an edit outside them, or on a
+heading, is refused. The review reads are narrowed to the same sections. A read of the whole page
+for coherence follows, and its findings can change any section. A gate fix can too. A finding the
+bound can't fix is declined with the reason that it lies outside the changed sections.
+
+When the entry's `accepted` id equals the blueprint at the start commit, the blueprint read is
+skipped. That happens after a change to a fact alone.
+
+To tell what changed, drafter needs the outline entry and the facts the earlier draft saw. The
+lock names no commit, so drafter finds the commit that introduced the page's current entry, by
+walking the history of `drafted.lock`, and reads those two from that commit's parent. A
+`drafter read` that rewrites only `accepted` doesn't move the commit. The walk stops at a lock it
+can't decode.
+
+On the stock prompts module, a page whose outline declares tracks must match exactly one, and the
+track must name the `google` standard. A project module is not checked.
+
+### What the run writes
+
+A run writes the page and its brief, and, when it ends with every page decided, the lock. It never
+commits. Commit the page, the brief, and `drafted.lock` together, with nothing committed between
+them and the run's start. A fact or outline edit committed on its own after the run began can hide
+from the next run, so drafter warns and names the files when it finds one.
+
+A run that stopped writes no lock entry, because its pages aren't final. Resume it with
+`drafter page --resume <id>` and the same arguments, and the resume writes the entries of the
+pages accepted before and after the stop. If you discard a stopped run's pages instead, run again.
+If the lock can't be written after the run finished, the command prints the run's summary, then the
+error and the command that resumes the run. The resume submits no request and writes the lock.

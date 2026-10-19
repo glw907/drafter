@@ -26,7 +26,7 @@ func TestStockEntryJSONAnatomyAndRegister(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := entryJSON(o, blueprint.Page{Path: tt.path, Type: tt.typ})
+			e := entryJSON(o, blueprint.Page{Path: tt.path, Type: tt.typ}, "")
 			if e["anatomy"] != tt.anatomy {
 				t.Errorf("anatomy = %v, want %q", e["anatomy"], tt.anatomy)
 			}
