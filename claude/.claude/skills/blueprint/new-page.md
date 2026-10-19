@@ -4,7 +4,7 @@ Use this procedure when a docs page does not exist yet. You write two things: th
 
 ## 1. Settle the page's job and type
 
-Write down the job: what the reader accomplishes with the page. Pick its page type from the types `outline.yaml` declares. Read the register entry for that type's introduction and ending, which the type's `anatomy` names. The entry's fields and what each requires are in [outline.yaml](format.md#outlineyaml).
+Write down the job: what the reader accomplishes with the page. Pick its page type from the types `outline.yaml` declares. Read the anatomy the type names in [anatomies.md](anatomies.md) for its introduction and ending, or, when the outline's track for the page names a register, that register's entry for the anatomy. The entry's fields and what each requires are in [outline.yaml](format.md#outlineyaml).
 
 Set `covers` and `outOfScope` from the neighbors: read the outline whole, so you know each page's job and what another page owns. Keep out of this page whatever a neighbor owns.
 
@@ -33,7 +33,7 @@ Use the item kinds in [Items](format.md#items). Place facts as [Say what a place
 
 ## 4. Frame the introduction
 
-Decide the introduction's framing from the reader before any prose exists. Introductions follow no fixed pattern; reason this page's framing fresh, never from another page's record. Read the register's introduction rules. Then fill the `framing` mapping, whose four parts are in [framing](format.md#framing):
+Decide the introduction's framing from the reader before any prose exists. Introductions follow no fixed pattern; reason this page's framing fresh, never from another page's record. Read [introductions.md](introductions.md), and the introduction rules of the register only when the page's track names one. Then fill the `framing` mapping, whose four parts are in [framing](format.md#framing):
 
 1. **Readers.** Work out who arrives, from where (which pages link here, which index group lists it, a search, a command's output), what each is looking for, what each knows, and what each lacks. Name each reader. When a reader is likely to arrive in the wrong place, name them and the page they belong on.
 2. **Background.** Name the general model the page sits in, where each outside system fits when the page touches it, and why the thing the page covers exists. Back every point with a fact id. A point you cannot back stays out of the record, and you say so in your report.
