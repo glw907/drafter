@@ -32,7 +32,7 @@ func cleanAnswer() Answer {
 }
 
 func TestApplyClean(t *testing.T) {
-	got, err := Apply(basePage, baseBrief, baseFindings, nil, cleanAnswer())
+	got, err := Apply(basePage, baseBrief, baseFindings, nil, cleanAnswer(), nil)
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestApplyRefusals(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			a := cleanAnswer()
 			tt.mutate(&a)
-			got, err := Apply(basePage, baseBrief, baseFindings, nil, a)
+			got, err := Apply(basePage, baseBrief, baseFindings, nil, a, nil)
 			var ref *Refusal
 			if !errors.As(err, &ref) {
 				t.Fatalf("err = %v, want *Refusal", err)
@@ -149,7 +149,7 @@ func TestApplyBriefEditClean(t *testing.T) {
 	a := cleanAnswer()
 	a.Edits = append(a.Edits, Edit{File: "brief", Old: `"alpha"`, New: `"alpha beta"`})
 	a.Resolutions[0].Edits = []int{0, 1}
-	got, err := Apply(basePage, baseBrief, baseFindings, nil, a)
+	got, err := Apply(basePage, baseBrief, baseFindings, nil, a, nil)
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestApplyEditsInOrder(t *testing.T) {
 		},
 		Resolutions: res,
 	}
-	got, err := Apply(page, "{}", fs, nil, ok)
+	got, err := Apply(page, "{}", fs, nil, ok, nil)
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestApplyEditsInOrder(t *testing.T) {
 
 	// The reverse order leaves "one" twice at edit 0.
 	bad := Answer{Edits: []Edit{ok.Edits[1], ok.Edits[0]}, Resolutions: res}
-	_, err = Apply(page, "{}", fs, nil, bad)
+	_, err = Apply(page, "{}", fs, nil, bad, nil)
 	var ref *Refusal
 	if !errors.As(err, &ref) {
 		t.Fatalf("err = %v, want *Refusal", err)
@@ -206,7 +206,7 @@ func TestApplyResolutionsAccumulate(t *testing.T) {
 			{Finding: 3, Status: "declined", Reason: "r3"},
 		},
 	}
-	applied, err := Apply(basePage, baseBrief, fs[:3], nil, first)
+	applied, err := Apply(basePage, baseBrief, fs[:3], nil, first, nil)
 	if err != nil {
 		t.Fatalf("first Apply: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestApplyResolutionsAccumulate(t *testing.T) {
 		Edits:       []Edit{{File: "page", Old: "gamma", New: "omega"}},
 		Resolutions: []Resolution{{Finding: 4, Status: "edited", Edits: []int{0}, Reason: "r4"}},
 	}
-	got, err := Apply(applied.Page, applied.Brief, fs, applied.Resolutions, second)
+	got, err := Apply(applied.Page, applied.Brief, fs, applied.Resolutions, second, nil)
 	if err != nil {
 		t.Fatalf("second Apply: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestApplyResolutionsAccumulate(t *testing.T) {
 		Edits:       []Edit{{File: "page", Old: "delta", New: "theta"}},
 		Resolutions: []Resolution{{Finding: 2, Status: "edited", Edits: []int{0}, Reason: "r2b"}},
 	}
-	got, err = Apply(got.Page, got.Brief, fs, got.Resolutions, third)
+	got, err = Apply(got.Page, got.Brief, fs, got.Resolutions, third, nil)
 	if err != nil {
 		t.Fatalf("third Apply: %v", err)
 	}
@@ -254,11 +254,11 @@ func TestApplyRefusalAddsNothingToUnion(t *testing.T) {
 		Edits:       []Edit{{File: "page", Old: "zeta", New: "x"}},
 		Resolutions: []Resolution{{Finding: 2, Status: "edited", Edits: []int{0}}},
 	}
-	if _, err := Apply(basePage, baseBrief, fs, prior, bad); err == nil {
+	if _, err := Apply(basePage, baseBrief, fs, prior, bad, nil); err == nil {
 		t.Fatal("Apply accepted a bad answer")
 	}
 	// The caller still holds only prior, so finding 2 stays unresolved.
-	_, err := Apply(basePage, baseBrief, fs, prior, Answer{})
+	_, err := Apply(basePage, baseBrief, fs, prior, Answer{}, nil)
 	var ref *Refusal
 	if !errors.As(err, &ref) || !slices.Equal(ref.Problems, []string{"finding 2 has no resolution"}) {
 		t.Errorf("err = %v, want finding 2 unresolved", err)
@@ -277,11 +277,11 @@ func TestApplyDeclinedFindings(t *testing.T) {
 		{Finding: 3, Status: "edited", Edits: []int{}, Reason: "x"},
 	}}
 	// Finding 3 is blocking and edited with no edits: refused; fix it.
-	if _, err := Apply(basePage, baseBrief, fs, nil, a); err == nil {
+	if _, err := Apply(basePage, baseBrief, fs, nil, a, nil); err == nil {
 		t.Fatal("Apply accepted a blocking edited finding with no edits")
 	}
 	a.Resolutions[2] = Resolution{Finding: 3, Status: "declined", Reason: "also wrong"}
-	got, err := Apply(basePage, baseBrief, fs, nil, a)
+	got, err := Apply(basePage, baseBrief, fs, nil, a, nil)
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -329,7 +329,7 @@ func TestApplyReaderRedraftFixture(t *testing.T) {
 		{N: 4, Seat: "reader"},
 		{N: 5, Seat: "reader"},
 	}
-	got, err := Apply(readFile(t, "reader-redraft.page.md"), readFile(t, "reader-redraft.brief.json"), fs, nil, a)
+	got, err := Apply(readFile(t, "reader-redraft.page.md"), readFile(t, "reader-redraft.brief.json"), fs, nil, a, nil)
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}

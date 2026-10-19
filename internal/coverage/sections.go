@@ -21,11 +21,25 @@ type region struct {
 	norm    string
 }
 
-// split cuts page into one region per plan section, in plan order, and the preamble above the
-// first planned heading. A plan section matches the first page heading at or after the previous
-// match whose normalized text equals its own; headings inside code fences are ignored.
-func split(p *plan.Plan, page []byte) (preamble region, regions []region) {
-	lines := strings.Split(string(page), "\n")
+// Span is where one part of a page lies, as 0-based indexes into the page's lines, the page split
+// on "\n": the heading's line, and the lines below it from Start up to End, exclusive. The
+// preamble's Span is always Found, with Heading -1. A section whose heading is not found has Found
+// false, Heading -1, and no lines.
+type Span struct {
+	Found               bool
+	Heading, Start, End int
+}
+
+// Spans cuts page by the given section headings as Regions does and returns where each part lies:
+// the preamble, then one Span per heading, in order.
+func Spans(headings []string, page []byte) (preamble Span, sections []Span) {
+	return spans(headings, strings.Split(string(page), "\n"))
+}
+
+// spans is the one rule every cut of a page follows. A heading matches the first page heading at
+// or after the previous match whose normalized text equals its own; headings inside code fences
+// are ignored. A section runs to the next matched heading.
+func spans(headings, lines []string) (preamble Span, sections []Span) {
 	type heading struct {
 		line int
 		text string
@@ -45,47 +59,66 @@ func split(p *plan.Plan, page []byte) (preamble region, regions []region) {
 		}
 	}
 
-	regions = make([]region, len(p.Sections))
-	starts := make([]int, len(p.Sections))
+	sections = make([]Span, len(headings))
 	next := 0
-	for i, s := range p.Sections {
-		regions[i].heading = s.Heading
-		starts[i] = -1
-		want := Normalize(s.Heading)
+	for i, h := range headings {
+		sections[i].Heading = -1
+		want := Normalize(h)
 		for j := next; j < len(heads); j++ {
 			if heads[j].text == want {
-				starts[i] = heads[j].line
-				regions[i].found = true
+				sections[i].Heading = heads[j].line
+				sections[i].Found = true
 				next = j + 1
 				break
 			}
 		}
 	}
 
-	fill := func(r *region, from, to int) {
-		r.raw = strings.Join(lines[from:to], "\n")
-		r.norm = Normalize(r.raw)
-	}
 	first := len(lines)
-	for _, s := range starts {
-		if s >= 0 {
-			first = s
+	for _, s := range sections {
+		if s.Found {
+			first = s.Heading
 			break
 		}
 	}
-	fill(&preamble, 0, first)
-	for i := range regions {
-		if !regions[i].found {
+	preamble = Span{Found: true, Heading: -1, End: first}
+	for i := range sections {
+		if !sections[i].Found {
 			continue
 		}
 		end := len(lines)
-		for _, s := range starts[i+1:] {
-			if s >= 0 {
-				end = s
+		for _, s := range sections[i+1:] {
+			if s.Found {
+				end = s.Heading
 				break
 			}
 		}
-		fill(&regions[i], starts[i]+1, end)
+		sections[i].Start, sections[i].End = sections[i].Heading+1, end
+	}
+	return preamble, sections
+}
+
+// split cuts page into one region per plan section, in plan order, and the preamble above the
+// first planned heading.
+func split(p *plan.Plan, page []byte) (preamble region, regions []region) {
+	headings := make([]string, len(p.Sections))
+	for i, s := range p.Sections {
+		headings[i] = s.Heading
+	}
+	lines := strings.Split(string(page), "\n")
+	pre, sections := spans(headings, lines)
+	fill := func(r *region, s Span) {
+		r.raw = strings.Join(lines[s.Start:s.End], "\n")
+		r.norm = Normalize(r.raw)
+	}
+	fill(&preamble, pre)
+	regions = make([]region, len(sections))
+	for i, s := range sections {
+		regions[i].heading = headings[i]
+		if s.Found {
+			regions[i].found = true
+			fill(&regions[i], s)
+		}
 	}
 	return preamble, regions
 }
@@ -95,15 +128,14 @@ func split(p *plan.Plan, page []byte) (preamble region, regions []region) {
 // found. The text under a heading runs to the next matched heading and omits the heading line;
 // a heading that is not found has no text.
 func Regions(headings []string, page []byte) (preamble string, text []string, found []bool) {
-	p := &plan.Plan{Sections: make([]plan.Section, len(headings))}
-	for i, h := range headings {
-		p.Sections[i].Heading = h
+	lines := strings.Split(string(page), "\n")
+	pre, sections := spans(headings, lines)
+	text = make([]string, len(sections))
+	found = make([]bool, len(sections))
+	for i, s := range sections {
+		if s.Found {
+			text[i], found[i] = strings.Join(lines[s.Start:s.End], "\n"), true
+		}
 	}
-	pre, regions := split(p, page)
-	text = make([]string, len(regions))
-	found = make([]bool, len(regions))
-	for i, r := range regions {
-		text[i], found[i] = r.raw, r.found
-	}
-	return pre.raw, text, found
+	return strings.Join(lines[pre.Start:pre.End], "\n"), text, found
 }

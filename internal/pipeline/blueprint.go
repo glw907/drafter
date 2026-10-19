@@ -11,6 +11,8 @@ import (
 	"github.com/glw907/drafter/internal/assemble"
 	"github.com/glw907/drafter/internal/batch"
 	"github.com/glw907/drafter/internal/blueprint"
+	"github.com/glw907/drafter/internal/coverage"
+	"github.com/glw907/drafter/internal/edits"
 	"github.com/glw907/drafter/internal/plan"
 	"github.com/glw907/drafter/internal/prompts"
 )
@@ -111,6 +113,9 @@ func (p *page) doBlueprintCheck() error {
 	}
 	if len(errs) > 0 {
 		return p.escalate("plan", "check", nil, strings.Join(errs, "\n"))
+	}
+	if p.w.Draft && p.w.SkipRead {
+		return p.toDraft()
 	}
 	p.ps.Step = stBpRead
 	return nil
@@ -275,5 +280,139 @@ func (p *page) completeBlueprintRead() error {
 		return errors.Join(errors.New("find the accepted blueprint's blob id"), err)
 	}
 	p.w.Accepted = strings.TrimSpace(id)
+	if p.w.Draft {
+		return p.toDraft()
+	}
 	return p.accept()
+}
+
+// toDraft moves a drafting blueprint page onto its draft path and decides, once, whether it is a
+// section redraft. The decision is saved in work, since the page changes once the run writes it
+// and a resume must not decide again. A section redraft opens its section exchange with one
+// blocking finding per changed section, which gives the edits their claims under the edit
+// contract; any other page drafts whole.
+func (p *page) toDraft() error {
+	p.w.Got = nil
+	secs, err := p.changedSections()
+	if err != nil {
+		return err
+	}
+	if secs == nil {
+		p.ps.Step = stDraft
+		return nil
+	}
+	var fs []edits.Finding
+	for _, s := range secs {
+		fs = append(fs, edits.Finding{
+			N: len(fs) + 1, Seat: "blueprint", Location: s.Heading, Blocking: true,
+			Text:    "This section's blueprint entry changed, so the section must carry the entry as it now stands.",
+			Rewrite: "Rewrite this section only.",
+		})
+	}
+	p.w.Section = true
+	p.w.Ex = &exchange{Kind: exSection, Findings: fs}
+	p.w.Rec.findings(s2, fs)
+	p.ps.Step = stSection
+	return nil
+}
+
+// changedSections returns the blueprint sections a section redraft rewrites, or nil when the page
+// drafts whole. The page is a section redraft when its scope names sections and the page as it
+// stands, the start commit's page since the run has not written it yet, has every one of their
+// headings, cut by the headings of the start commit's blueprint. An added section or a renamed
+// heading drafts whole.
+func (p *page) changedSections() ([]blueprint.Section, error) {
+	sc := p.w.Scope
+	if sc == nil || sc.Kind != blueprint.ScopeScoped || len(sc.IDs) == 0 {
+		return nil, nil
+	}
+	in, err := p.blueprintInputs()
+	if err != nil {
+		return nil, err
+	}
+	text, ok, err := p.readFile(p.h.Page.Path)
+	if err != nil || !ok {
+		return nil, err
+	}
+	_, _, found := coverage.Regions(sectionHeadings(in.bp), []byte(text))
+	var out []blueprint.Section
+	for _, id := range sc.IDs {
+		i := slices.IndexFunc(in.bp.Sections, func(s blueprint.Section) bool { return s.ID == id })
+		if i < 0 || !found[i] {
+			return nil, nil
+		}
+		out = append(out, in.bp.Sections[i])
+	}
+	return out, nil
+}
+
+func sectionHeadings(bp *blueprint.Blueprint) []string {
+	out := make([]string, len(bp.Sections))
+	for i, s := range bp.Sections {
+		out[i] = s.Heading
+	}
+	return out
+}
+
+// sectionScope is the scope a section redraft's draft, review, and coherence renders carry: the
+// comma-joined ids of the changed sections. It is empty for any other page.
+func (p *page) sectionScope() string {
+	if !p.w.Section {
+		return ""
+	}
+	return strings.Join(p.w.Scope.IDs, ",")
+}
+
+// bound returns the region bound of the exchange's next answer, or nil for an unbounded one. In a
+// section redraft the section, redraft, and final exchanges are bounded to the changed sections,
+// cut by the start commit's blueprint. A gate-fix turn is never bounded, since a red can name a
+// line anywhere, and neither is the coherence fix.
+func (p *page) bound(ex *exchange) (*edits.Bound, error) {
+	if !p.w.Section || ex.GateFix {
+		return nil, nil
+	}
+	switch ex.Kind {
+	case exSection, exRedraft, exFinal:
+	default:
+		return nil, nil
+	}
+	in, err := p.blueprintInputs()
+	if err != nil {
+		return nil, err
+	}
+	b := &edits.Bound{Headings: sectionHeadings(in.bp)}
+	for _, s := range in.bp.Sections {
+		if slices.Contains(p.w.Scope.IDs, s.ID) {
+			b.Allowed = append(b.Allowed, s.Heading)
+		}
+	}
+	return b, nil
+}
+
+// draftingBlocks returns the blocks a drafting blueprint page's request carries after its prompt,
+// as stage 1's read does: the facts the blueprint places or cites as a cached part, and the
+// blueprint with its outline entry after it. A section redraft's draft request adds the scope
+// sentence and the page's change block. The reader reads as a reader, so it gets neither, and a
+// page that does not draft from a blueprint gets none.
+func (p *page) draftingBlocks(seat string) (cached []string, extra string, err error) {
+	if !p.blueprint || !p.w.Draft {
+		return nil, "", nil
+	}
+	switch seat {
+	case "draft", "structure", "editor", "fact", "coherence":
+	default:
+		return nil, "", nil
+	}
+	in, err := p.blueprintInputs()
+	if err != nil {
+		return nil, "", err
+	}
+	extra = assemble.BlueprintBlock(in.raw, in.entryJSON)
+	if seat == "draft" && p.w.Section {
+		extra += "\n\n" + scopeSentence(p.sectionScope())
+		if p.w.Change != "" {
+			extra += "\n\n" + p.w.Change
+		}
+	}
+	return []string{assemble.DraftingFactsBlock(in.view, p.r.facts)}, extra, nil
 }

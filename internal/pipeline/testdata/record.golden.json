@@ -104,5 +104,13 @@
   ],
   "warnings": [
     "plans/rotate-the-api-key.plan.yaml:32: links: target docs/guides/revoke-a-key.md is in the outline but not on disk yet, so its anchor is not checked"
+  ],
+  "writes": [
+    {
+      "gate_fix": false,
+      "kind": "",
+      "n": 1,
+      "step": "draft"
+    }
   ]
 }
