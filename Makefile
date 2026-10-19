@@ -2,7 +2,7 @@ BINARY := drafter
 PREFIX ?= $(HOME)/.local
 CLAUDE_DIR ?= $(HOME)/.claude
 
-.PHONY: build test vet lint chain-test prompts-parity install-test hook-test install check smoke clean
+.PHONY: build test vet lint chain-test prompts-parity install-test hook-test install check smoke live clean
 
 build:
 	go build -o $(BINARY) ./cmd/drafter
@@ -13,6 +13,7 @@ test:
 vet:
 	go vet ./...
 	go vet -tags smoke ./...
+	go vet -tags live ./...
 
 lint:
 	golangci-lint run ./...
@@ -56,6 +57,16 @@ check: vet lint test chain-test prompts-parity install-test hook-test
 # smoke spends real money; it is never part of check.
 smoke:
 	go test -tags smoke -count=1 -timeout 2h -run Live ./internal/smoke/
+
+# live drafts the fixture page twice against the real API and spends money; it is never part of
+# check. DRAFTER_LIVE_BASELINE is the meter's total at launch (drafter spend --since 2026-10-19
+# --json). A skipped test prints "--- SKIP" under -v while go test still prints ok, so the target
+# fails on one.
+live:
+	@out=$$(DRAFTER_LIVE=1 go test -tags live -count=1 -v -timeout 3h -run Live ./e2e/ 2>&1); rc=$$?; \
+	printf '%s\n' "$$out"; \
+	if [ $$rc -ne 0 ]; then exit $$rc; fi; \
+	if printf '%s\n' "$$out" | grep -q -e '--- SKIP'; then echo "live: a test skipped" >&2; exit 1; fi
 
 clean:
 	rm -f $(BINARY)
