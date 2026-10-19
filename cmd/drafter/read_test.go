@@ -227,7 +227,7 @@ func TestRealModuleRendersTheBlueprintSeat(t *testing.T) {
 		t.Fatal(err)
 	}
 	if out != string(golden) {
-		t.Error("the unscoped prompt differs from testdata/blueprint-prompt.golden.txt, the prompt as it was before scoped reads")
+		t.Error("the unscoped prompt differs from testdata/blueprint-prompt.golden.txt, the whole read's prompt")
 	}
 	if strings.Contains(out, "Change read.") {
 		t.Error("the unscoped prompt carries the change-read paragraph")
@@ -241,13 +241,25 @@ func TestRealModuleRendersTheBlueprintSeat(t *testing.T) {
 		t.Error("the scoped prompt does not start with the unscoped one")
 	}
 	for _, want := range []string{
-		"Change read.", "These sections changed: intro,steps.", "Already present:", `Verdict "fix" if any blocking finding exists`,
+		"Change read.", "Nit:", "Already present:",
+		"claim past its fact", "invented output", "handler that loops or dead-ends", "state no step supplies", "missing step",
+		"In a change read, this rule replaces the blocking rule above for order, pace, heading form, field placement, and a restating `use`: return each as a non-blocking finding starting \"Nit:\". A Nit never makes the verdict \"fix\".",
+		"if it's not very important, prefix it with something like \"Nit: \" to let the author know that it's just a point of polish that they could choose to ignore.", `Verdict "fix" if any blocking finding exists`,
 		"Sometimes you have to look at the whole file to be sure that the change actually makes sense",
 		"favor approving a CL once it is in a state where it definitely improves the overall code health",
 		"encourage the author to file a bug", "google.github.io/eng-practices/review/reviewer/standard.html",
 	} {
 		if !strings.Contains(strings.Join(strings.Fields(scoped), " "), want) {
 			t.Errorf("the scoped prompt lacks %q", want)
+		}
+	}
+	if strings.Contains(scoped, "These sections changed:") {
+		t.Error("the scoped prompt still names the changed sections, which the change block now carries")
+	}
+	registerSentence := "The register's page anatomy is read only for the introduction and closing section it requires for the page's type."
+	for name, text := range map[string]string{"unscoped": out, "scoped": scoped} {
+		if !strings.Contains(strings.Join(strings.Fields(text), " "), registerSentence) {
+			t.Errorf("the %s prompt lacks the register sentence", name)
 		}
 	}
 	if strings.Contains(scoped, "Scope. Only these sections") {
@@ -258,8 +270,11 @@ func TestRealModuleRendersTheBlueprintSeat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render with the page scope: %v", err)
 	}
-	if !strings.Contains(pageOnly, "Change read.") || !strings.Contains(pageOnly, "No section's own content changed") || strings.Contains(pageOnly, "These sections changed") {
-		t.Error("the page scope does not render the change read without section ids")
+	if !strings.Contains(pageOnly, "Change read.") || strings.Contains(pageOnly, "No section's own content changed") || strings.Contains(pageOnly, "These sections changed") {
+		t.Error("the page scope renders the change read with a scope sentence the change block now carries")
+	}
+	if pageOnly != scoped {
+		t.Error("the page-scope and section-scope prompts differ; the prompt cache needs them byte-identical")
 	}
 }
 

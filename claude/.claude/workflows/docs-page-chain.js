@@ -2256,10 +2256,12 @@ async function chain(p) {
  * plan, with the reads that stopped both real pilot pages (reader state, recovery, completeness)
  * and the reads a durable file adds. drafter appends the blueprint, its outline entry, and the
  * facts it places after this text, so the prompt names no file but the register and takes nothing
- * from the run's args. The bar is the chain's: any blocking finding means "fix". With `scope`, the
- * comma-separated section ids that changed since a revision, or "page" when no section's content
- * did, one paragraph turns the read into a change read: the blueprint is still read whole, but a
- * finding blocks only on what the change adds, alters, or causes.
+ * from the run's args. The bar is the chain's: any blocking finding means "fix". A truthy `scope`
+ * (the sections that changed since a revision, or "page") appends one paragraph that turns the read
+ * into a change read: the blueprint is still read whole, but a finding blocks only when the change
+ * makes the page wrong or leaves a reader stuck. The scope's value never reaches the text, since
+ * drafter's change block names the sections, so every scoped render is byte-identical and shares one
+ * prompt cache entry.
  * @param {string} [scope]
  * @returns {string}
  */
@@ -2291,7 +2293,9 @@ yourself.
 
 Read the section "## The page anatomies" of ${REGISTER}, by its exact heading. The introduction and
 the closing section it requires for this page's type are the second half of the same check as the
-introduction items below.
+introduction items below. The register's page anatomy is read only for the introduction and closing
+section it requires for the page's type. Its heading forms and other house rules govern prose, and the
+editor seat applies them; neither blueprint read returns a finding under one.
 
 Order, pace, and user goal. Block 1, the Red Hat peer review guide's "Structure Checklist"
 (https://redhat-documentation.github.io/peer-review/), the items that apply:
@@ -2345,20 +2349,27 @@ applies, as location, the item it fails and how, and in rewrite a suggestion for
 Verdict "fix" if any blocking finding exists; otherwise "ok".${scope ? `
 
 Change read. This read judges a change, as a code reviewer judges a pull request. The change block
-after the facts holds the diff of the blueprint since the earlier revision, the old and new text of
-each fact bullet that changed, and the outline entry before and after when it changed. ${scope === "page"
-    ? "No section's own content changed: the change is in the page-level fields, the order of the sections, a removed section, the outline entry, or a fact bullet cited only outside the sections."
-    : `These sections changed: ${scope}.`} Read the whole blueprint for context, as Google's code review
-standard asks ("Sometimes you have to look at the whole file to be sure that the change actually makes
-sense", https://google.github.io/eng-practices/review/reviewer/looking-for.html), and judge the change
-by the same standard: "favor approving a CL once it is in a state where it definitely improves the
-overall code health" (https://google.github.io/eng-practices/review/reviewer/standard.html). A
-finding blocks only for a defect in what the change adds or alters, or a defect the change causes
-elsewhere, such as a step whose \`requires\` the change leaves with no source, or a \`failure\` item
-whose step the change removes. Locate that second kind at the changed item that causes it. Every
-other defect is non-blocking: set blocking to false and start its finding with "Already present:".
-The standard sends an existing problem to a bug ("encourage the author to file a bug"), so report it
-and let it pass. A non-blocking finding never makes the verdict "fix".` : ""}`;
+after the facts opens by naming the sections the change touched or, for a page-level change, by
+saying that no section's own content changed. It then holds the diff of the blueprint since the
+earlier revision, the old and new text of each fact bullet that changed, and the outline entry before
+and after when it changed. Read the whole blueprint for context, as Google's code review standard asks
+("Sometimes you have to look at the whole file to be sure that the change actually makes sense",
+https://google.github.io/eng-practices/review/reviewer/looking-for.html), and judge the change by the
+same standard: "favor approving a CL once it is in a state where it definitely improves the overall
+code health" (https://google.github.io/eng-practices/review/reviewer/standard.html). A finding blocks
+only when the change makes the page wrong or leaves a reader stuck: a claim past its fact, invented
+output, a handler that loops or dead-ends, a state no step supplies, or a missing step. That covers a
+defect in what the change adds or alters and a defect the change causes elsewhere, such as a step
+whose \`requires\` the change leaves with no source, or a \`failure\` item whose step the change
+removes. Locate that second kind at the changed item that causes it. Order, pace, heading form, field
+placement, and a \`use\` that restates its fact are non-blocking, and their finding text starts "Nit:".
+The same standard says of a Nit: "if it's not very important, prefix it with something like "Nit: " to
+let the author know that it's just a point of polish that they could choose to ignore." In a change
+read, this rule replaces the blocking rule above for order, pace, heading form, field placement, and a
+restating \`use\`: return each as a non-blocking finding starting "Nit:". A Nit never makes the
+verdict "fix". Every other defect is non-blocking: set blocking to false and start its finding with
+"Already present:". The standard sends an existing problem to a bug ("encourage the author to file a
+bug"), so report it and let it pass. A non-blocking finding never makes the verdict "fix".` : ""}`;
 }
 
 // The back-half seats drafter renders prompts from: one function of the seat context object per
