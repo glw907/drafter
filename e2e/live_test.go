@@ -321,7 +321,7 @@ func TestLiveDraftFromBlueprint(t *testing.T) {
 
 	// Row 2: edit one sentence item, commit, and redraft only that section.
 	bp := p.read(liveBlueprint)
-	edited := strings.Replace(bp, "Add your items now.", "Add your items now, whenever you are ready.", 1)
+	edited := strings.Replace(bp, "Pick the items you want to count.", "Pick the items you want to count, and have them ready.", 1)
 	if edited == bp {
 		t.Fatal("the fixture blueprint lacks the sentence row 2 edits")
 	}

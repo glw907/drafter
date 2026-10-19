@@ -1,7 +1,7 @@
 {
   "edits": [
-    {"file": "page", "old": "Add your items now.", "new": "Add your items now, whenever you are ready."},
-    {"file": "brief", "old": "Add your items now.", "new": "Add your items now, whenever you are ready."}
+    {"file": "page", "old": "Pick the items you want to count.", "new": "Pick the items you want to count, and have them ready."},
+    {"file": "brief", "old": "Pick the items you want to count.", "new": "Pick the items you want to count, and have them ready."}
   ],
   "resolutions": [
     {"finding": 1, "status": "edited", "edits": [0, 1], "reason": "The section now carries the edited sentence."}

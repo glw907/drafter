@@ -39,7 +39,7 @@ The command ` + "`" + `tally count` + "`" + ` adds each item you name on the com
 
 The flag ` + "`" + `--by` + "`" + ` sets the amount each item adds, and the default is 1.
 
-Add your items now.
+Pick the items you want to count.
 
 ## Read the total
 
@@ -62,7 +62,7 @@ func tallyBriefJSON(t *testing.T, extra ...map[string]any) string {
 		{"text": "Tally keeps its count in a file named .tally in the current directory.", "id": "tally-state-file"},
 		{"text": "The command tally count adds each item you name on the command line to the total.", "id": "tally-count-cmd"},
 		{"text": "The flag --by sets the amount each item adds, and the default is 1.", "id": "tally-by-flag"},
-		{"text": "Add your items now.", "id": "no-claim"},
+		{"text": "Pick the items you want to count.", "id": "no-claim"},
 		{"text": "The command tally total prints the saved total.", "id": "tally-total-cmd"},
 		{"text": "The command tally reset deletes the count file.", "id": "tally-reset-cmd"},
 		{"text": "The file is named .tally.", "id": "tally-state-file"},
@@ -239,14 +239,14 @@ func TestDraftScopeFromTheLock(t *testing.T) {
 		f := newCLIFixture(t)
 		f.draft(tallyBriefJSON(t), "")
 		bp := f.read1(tallyBP)
-		f.write(tallyBP, strings.Replace(bp, "Add your items now.", "Add your items now, whenever you are ready.", 1))
+		f.write(tallyBP, strings.Replace(bp, "Pick the items you want to count.", "Pick the items you want to count, and have them ready.", 1))
 		f.commit("edit the sentence", tallyBP)
 		d := f.scope()
 		if want := []string{"add-items"}; !slices.Equal(sectionIDs(d), want) {
 			t.Errorf("IDs = %v, want %v", sectionIDs(d), want)
 		}
 		block := d.changes[tallyPage]
-		if !strings.Contains(block, "Blueprint file: "+tallyBP) || !strings.Contains(block, "whenever you are ready") {
+		if !strings.Contains(block, "Blueprint file: "+tallyBP) || !strings.Contains(block, "have them ready") {
 			t.Errorf("the change block should open its diff with the blueprint's path and hold the edit:\n%s", block)
 		}
 	})
@@ -254,7 +254,7 @@ func TestDraftScopeFromTheLock(t *testing.T) {
 	t.Run("a brief sentence in a third section widens the scope to it", func(t *testing.T) {
 		f := newCLIFixture(t)
 		// The sentence in "Add items" cites the shared fact, which the blueprint cites only from two other sections.
-		brief := tallyBriefJSON(t, map[string]any{"text": "Add your items now.", "id": []string{"tally-state-file"}})
+		brief := tallyBriefJSON(t, map[string]any{"text": "Pick the items you want to count.", "id": []string{"tally-state-file"}})
 		f.draft(brief, "")
 		f.editFact()
 		d := f.scope()
@@ -281,7 +281,7 @@ func TestDraftScopeFromTheLock(t *testing.T) {
 		f.git("rm", "-q", tallyBrief)
 		f.git("commit", "-q", "-m", "drop the brief, as a seeded page has none")
 		bp := f.read1(tallyBP)
-		f.write(tallyBP, strings.Replace(bp, "Add your items now.", "Add your items now, whenever you are ready.", 1))
+		f.write(tallyBP, strings.Replace(bp, "Pick the items you want to count.", "Pick the items you want to count, and have them ready.", 1))
 		f.commit("edit the sentence", tallyBP)
 		d := f.scope()
 		sc := d.scopes[tallyPage]

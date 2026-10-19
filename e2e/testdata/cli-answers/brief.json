@@ -6,7 +6,7 @@
     {"text": "Run `tally count` with the items you want to add.", "id": "tally-count-cmd"},
     {"text": "The command `tally count` adds each item you name on the command line to the total.", "id": "tally-count-cmd"},
     {"text": "The flag `--by` sets the amount each item adds, and the default is 1.", "id": "tally-by-flag"},
-    {"text": "Add your items now.", "id": "no-claim"},
+    {"text": "Pick the items you want to count.", "id": "no-claim"},
     {"text": "Run `tally total` in the same directory.", "id": "tally-total-cmd"},
     {"text": "The command `tally total` prints the saved total.", "id": "tally-total-cmd"},
     {"text": "The file is named .tally.", "id": "tally-state-file"},

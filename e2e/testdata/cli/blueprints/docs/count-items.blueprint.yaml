@@ -42,6 +42,11 @@ sections:
     opens: |
       Name each item on the command line.
     items:
+      - id: c-pace
+        kind: sentence
+        mode: verbatim
+        text: |
+          Pick the items you want to count.
       - id: s-count
         kind: step
         text: |
@@ -54,11 +59,6 @@ sections:
       - id: f-by
         kind: fact
         fact: tally-by-flag
-      - id: c-pace
-        kind: sentence
-        mode: verbatim
-        text: |
-          Add your items now.
   - id: read-the-total
     heading: Read the total
     why: |

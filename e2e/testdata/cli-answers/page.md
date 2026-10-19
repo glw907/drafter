@@ -10,13 +10,13 @@ Run every tally command in the directory that holds the count file.
 
 ## Add items
 
+Pick the items you want to count.
+
 Run `tally count` with the items you want to add.
 
 The command `tally count` adds each item you name on the command line to the total.
 
 The flag `--by` sets the amount each item adds, and the default is 1.
-
-Add your items now.
 
 ## Read the total
 

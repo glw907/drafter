@@ -5,7 +5,7 @@
     {"id": "s-count", "quote": "Run `tally count` with the items you want to add."},
     {"id": "f-count", "quote": "The command `tally count` adds each item you name on the command line to the total."},
     {"id": "f-by", "quote": "The flag `--by` sets the amount each item adds, and the default is 1."},
-    {"id": "c-pace", "quote": "Add your items now."},
+    {"id": "c-pace", "quote": "Pick the items you want to count."},
     {"id": "s-total", "quote": "Run `tally total` in the same directory."},
     {"id": "f-total", "quote": "The command `tally total` prints the saved total."},
     {"id": "f-state-again", "quote": "The file is named .tally."},

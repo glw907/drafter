@@ -23,8 +23,8 @@ const (
 	draftBrief = "blueprints/docs/count-items.brief.json"
 	draftLock  = "blueprints/drafted.lock"
 	draftFacts = "blueprints/facts/tally.md"
-	draftOld   = "Add your items now."
-	draftNew   = "Add your items now, whenever you are ready."
+	draftOld   = "Pick the items you want to count."
+	draftNew   = "Pick the items you want to count, and have them ready."
 )
 
 // draftStub is a scripted Messages API. It answers a request by the output schema the request
