@@ -63,6 +63,14 @@ type Facts struct {
 // Count returns the number of bullets that hold id, which Get hides when it is not exactly one.
 func (fs *Facts) Count(id string) int { return len(fs.byID[id]) }
 
+// IDs lists every id the store holds, in sorted order. A nil store holds none.
+func (fs *Facts) IDs() []string {
+	if fs == nil {
+		return nil
+	}
+	return slices.Sorted(maps.Keys(fs.byID))
+}
+
 // Cites reports whether a backticked token in prose is a fact citation: the store holds a bullet
 // with that id, or the token starts with the prefix, through its first colon, that every id in
 // the store shares. The second test lets a mistyped id through to the facts check as a missing

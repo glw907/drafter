@@ -1,6 +1,7 @@
 package blueprint
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -146,5 +147,87 @@ func TestCompare(t *testing.T) {
 				t.Errorf("Facts = %#v, want %#v (non-nil)", got.Facts, tt.want.Facts)
 			}
 		})
+	}
+}
+
+// TestCompareBulletsAndJoined covers the two lists the consistency rule reads: the facts whose
+// bullet changed anywhere in the store, and the facts the page cites now that it did not cite before.
+func TestCompareBulletsAndJoined(t *testing.T) {
+	edit := func(old, new string) string { return strings.Replace(sinceBase, old, new, 1) }
+	const itemEdit = "Do the first thing, carefully."
+	withItem := func(bp string) string { return strings.Replace(bp, "Do the first thing.", itemEdit, 1) }
+	revised := func(id, from, to string) string {
+		return strings.Replace(sinceFacts, "`"+id+"` "+from, "`"+id+"` "+to, 1)
+	}
+	tests := []struct {
+		name        string
+		bp          string
+		facts       string
+		wantBullets []string
+		wantJoined  []string
+	}{
+		{name: "an item edit citing nothing new", bp: withItem(sinceBase), facts: sinceFacts},
+		{name: "a fact added to a sentence", bp: edit("facts: [f:three]", "facts: [f:three, f:other]"), facts: sinceFacts, wantJoined: []string{"f:other"}},
+		{name: "a fact placed in a new item", bp: edit("      - id: first-step\n", "      - id: first-other\n        kind: fact\n        fact: f:other\n      - id: first-step\n"), facts: sinceFacts, wantJoined: []string{"f:other"}},
+		{name: "a new section placing a new fact", bp: sinceBase + "  - id: fourth\n    heading: Fourth\n    why: |\n      More.\n    opens: |\n      Also.\n    items:\n      - id: fourth-fact\n        kind: fact\n        fact: f:other\n", facts: sinceFacts, wantJoined: []string{"f:other"}},
+		{name: "a fact the page already cites, cited again", bp: edit("facts: [f:three]", "facts: [f:three, f:one]"), facts: sinceFacts},
+		{name: "a fact the framing cites, cited again in an item", bp: edit("facts: [f:three]", "facts: [f:three, f:frame]"), facts: sinceFacts},
+		{name: "a fact removed from a sentence", bp: edit("        facts: [f:three]\n", ""), facts: sinceFacts},
+		{name: "a section removed", bp: sinceBase[:strings.Index(sinceBase, "  - id: third")], facts: sinceFacts},
+		{name: "a framing edit citing a new fact", bp: edit("Background that cites `f:frame`.", "Background that cites `f:frame` and `f:other`."), facts: sinceFacts, wantJoined: []string{"f:other"}},
+		{name: "a cited bullet edited", bp: withItem(sinceBase), facts: revised("f:one", "One.", "One, revised."), wantBullets: []string{"f:one"}},
+		{name: "a bullet's tag changed", bp: withItem(sinceBase), facts: revised("f:two", "Two. [verified]", "Two. [external]"), wantBullets: []string{"f:two"}},
+		{name: "an uncited bullet edited", bp: withItem(sinceBase), facts: revised("f:other", "Other.", "Other, revised."), wantBullets: []string{"f:other"}},
+		{name: "a cited bullet removed from the store", bp: withItem(sinceBase), facts: strings.Replace(sinceFacts, "- `f:one` One. [verified]\n", "", 1), wantBullets: []string{"f:one"}},
+		{name: "a bullet edit and a new citation", bp: edit("facts: [f:three]", "facts: [f:three, f:other]"), facts: revised("f:one", "One.", "One, revised."), wantBullets: []string{"f:one"}, wantJoined: []string{"f:other"}},
+		{name: "a bullet edited and the fact newly cited", bp: edit("facts: [f:three]", "facts: [f:three, f:other]"), facts: revised("f:other", "Other.", "Other, revised."), wantBullets: []string{"f:other"}, wantJoined: []string{"f:other"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Compare("a.blueprint.yaml", sinceRev(sinceBase, sinceFacts, &sinceEntry), sinceRev(tt.bp, tt.facts, &sinceEntry))
+			if got.Kind != ScopeScoped {
+				t.Fatalf("kind = %s, want scoped", got.Kind)
+			}
+			if got.Bullets == nil || !slices.Equal(got.Bullets, append([]string{}, tt.wantBullets...)) {
+				t.Errorf("Bullets = %#v, want %#v (non-nil)", got.Bullets, tt.wantBullets)
+			}
+			if got.Joined == nil || !slices.Equal(got.Joined, append([]string{}, tt.wantJoined...)) {
+				t.Errorf("Joined = %#v, want %#v (non-nil)", got.Joined, tt.wantJoined)
+			}
+		})
+	}
+}
+
+// TestCompareWithoutAFactsStore checks that a project with no store still gets non-nil lists.
+func TestCompareWithoutAFactsStore(t *testing.T) {
+	old := Revision{Blueprint: []byte(sinceBase), Entry: &sinceEntry}
+	cur := Revision{Blueprint: []byte(strings.Replace(sinceBase, "Do the first thing.", "Do it.", 1)), Entry: &sinceEntry}
+	got := Compare("a.blueprint.yaml", old, cur)
+	if got.Kind != ScopeScoped || got.Bullets == nil || got.Joined == nil {
+		t.Errorf("Compare = %+v, want scoped with non-nil Bullets and Joined", got)
+	}
+}
+
+// TestScopeKeepsEmptyListsAcrossJSON checks that an empty Bullets and Joined survive state.json as
+// empty, not nil, since nil marks a scope recorded before the fields existed.
+func TestScopeKeepsEmptyListsAcrossJSON(t *testing.T) {
+	in := Scope{Kind: ScopeScoped, Facts: []string{}, Bullets: []string{}, Joined: []string{}}
+	data, err := json.Marshal(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out Scope
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Facts == nil || out.Bullets == nil || out.Joined == nil {
+		t.Errorf("round trip of %s gave %+v, want every list non-nil", data, out)
+	}
+	var before Scope
+	if err := json.Unmarshal([]byte(`{"kind":"scoped","facts":[]}`), &before); err != nil {
+		t.Fatal(err)
+	}
+	if before.Bullets != nil || before.Joined != nil {
+		t.Errorf("a state from before F2 decoded to %+v, want nil lists", before)
 	}
 }
