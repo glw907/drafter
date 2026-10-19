@@ -46,6 +46,33 @@ func TestBlueprintSettingsLayer(t *testing.T) {
 	}
 }
 
+func TestBriefPathSetting(t *testing.T) {
+	sb := newSandbox(t)
+	writeFile(t, sb.project(), "mode = \"batch\"\n")
+	c, err := Load(sb.root, Flags{})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if r := row(t, c, "blueprints.brief_path"); r.From != "unset" || c.Blueprints.BriefPath != "" {
+		t.Errorf("unset brief_path row = %+v, value %q", r, c.Blueprints.BriefPath)
+	}
+
+	sb = newSandbox(t)
+	sb.ignoreLocal(t)
+	writeFile(t, sb.project(), "[blueprints]\nbrief_path = \"notes/{dir}/{name}.json\"\n")
+	writeFile(t, sb.local(), "[blueprints]\nbrief_path = \"briefs/{dir}/{name}.json\"\n")
+	c, err = Load(sb.root, Flags{})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.Blueprints.BriefPath != "briefs/{dir}/{name}.json" {
+		t.Errorf("brief_path = %q, want the local layer's", c.Blueprints.BriefPath)
+	}
+	if r := row(t, c, "blueprints.brief_path"); r.From != "drafter.local.toml" || r.Value != "briefs/{dir}/{name}.json" {
+		t.Errorf("brief_path row = %+v", r)
+	}
+}
+
 func TestFactsDirDefaultsToTheBlueprintRoot(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -97,6 +124,9 @@ func TestBlueprintSettingRefusals(t *testing.T) {
 		{"absolute root", "project", "[blueprints]\nroot = \"/tmp/b\"\n", "blueprints.root must be a path inside the project, relative to its root, not \"/tmp/b\""},
 		{"outline climbs out", "project", "[blueprints]\noutline = \"../o.yaml\"\n", "blueprints.outline must be a path inside the project, relative to its root, not \"../o.yaml\""},
 		{"unknown key", "project", "[blueprints]\nfolder = \"b\"\n", "unknown key blueprints.folder"},
+		{"brief path without {name}", "project", "[blueprints]\nbrief_path = \"notes/{dir}/brief.json\"\n", "blueprints.brief_path must contain {name}, so each page has its own brief, not \"notes/{dir}/brief.json\""},
+		{"brief path climbs out", "project", "[blueprints]\nbrief_path = \"../notes/{name}.json\"\n", "blueprints.brief_path must be a path inside the project, relative to its root, not \"../notes/{name}.json\""},
+		{"absolute brief path", "project", "[blueprints]\nbrief_path = \"/notes/{name}.json\"\n", "blueprints.brief_path must be a path inside the project, relative to its root, not \"/notes/{name}.json\""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

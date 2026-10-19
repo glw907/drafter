@@ -595,7 +595,8 @@ error and the command that resumes the run. The resume submits no request and wr
 ## The brief
 
 A brief is the file that maps a page's sentences to the facts they rest on. `drafter page` writes
-it beside the page's blueprint: `blueprints/docs/guide.brief.json` for `docs/guide.md`. Commit it
+it beside the page's blueprint: `blueprints/docs/guide.brief.json` for `docs/guide.md`, unless
+`blueprints.brief_path` names another place (see [Configuration](configuration.md)). Commit it
 with the page.
 
 ```json

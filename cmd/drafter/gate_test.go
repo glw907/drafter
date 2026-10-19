@@ -232,6 +232,18 @@ func TestProvenanceGateCleanPrintsTheCount(t *testing.T) {
 	}
 }
 
+func TestProvenanceGateFindsTheBriefAtTheTemplatePath(t *testing.T) {
+	root := gateProject(t, map[string]string{
+		"docs/guide.md":                provPage,
+		"notes/briefs/docs/guide.json": provBrief,
+		"drafter.toml":                 "[blueprints]\nbrief_path = \"notes/briefs/{dir}/{name}.json\"\n",
+	})
+	out, errs, code := gateRun(t, gatePageArg(root, "docs/guide.md")...)
+	if code != 0 || out != "provenance: docs/guide.md: 1 sentences (cited 1, no-claim 0)\n" || errs != "0 errors, 0 warnings\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want the count line from the template's brief", code, out, errs)
+	}
+}
+
 func TestProvenanceGateFindings(t *testing.T) {
 	facts := readCatalog(t, "facts/facts.md")
 	candidate := strings.Replace(facts, "Source: `src/rotate.go`. [verified]", "Source: `src/rotate.go`. [candidate]", 1)

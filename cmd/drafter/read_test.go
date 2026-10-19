@@ -185,6 +185,30 @@ func TestBlueprintHandoffs(t *testing.T) {
 	}
 }
 
+func TestBlueprintHandoffsTakeTheBriefPathTemplate(t *testing.T) {
+	root, c := readProject(t)
+	head, err := gitText(root, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Blueprints.BriefPath = "notes/briefs/{dir}/{name}.json"
+	hs, err := blueprintHandoffs(c, root, head, []string{filepath.Join(root, "blueprints/docs/a.blueprint.yaml")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hs[0].Page.Brief != "notes/briefs/docs/a.json" {
+		t.Errorf("Page.Brief = %q, want the template's path", hs[0].Page.Brief)
+	}
+	var ctx struct {
+		Resolved struct {
+			Pages []map[string]any `json:"pages"`
+		} `json:"resolved"`
+	}
+	if err := json.Unmarshal(hs[0].Context, &ctx); err != nil || ctx.Resolved.Pages[0]["brief"] != "notes/briefs/docs/a.json" {
+		t.Errorf("context brief = %v, %v", ctx.Resolved.Pages, err)
+	}
+}
+
 // TestRealModuleRendersTheBlueprintSeat loads the shipped prompts module the way drafter loads it
 // for a read, with the host a read's handoff builds and no chain args, and renders the seat.
 func TestRealModuleRendersTheBlueprintSeat(t *testing.T) {

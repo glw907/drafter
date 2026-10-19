@@ -98,11 +98,14 @@ type Facts struct {
 
 // Blueprints holds the blueprint-tree settings. Root and Outline are slash paths relative to the
 // project root, not absolute: the path rule that maps a page to its blueprint works on
-// repository-relative paths.
+// repository-relative paths. BriefPath is the template for a page's brief path, with {dir} and
+// {name} for the page's directory base name and file name; empty puts the brief beside the
+// blueprint.
 type Blueprints struct {
-	Root     string
-	Required bool
-	Outline  string
+	Root      string
+	Required  bool
+	Outline   string
+	BriefPath string
 }
 
 // Flags holds the only two settings that have command-line flags.

@@ -590,3 +590,19 @@ func TestConfigOutsideGitTree(t *testing.T) {
 		t.Errorf("exit %d, stdout %q, stderr %q", r.code, r.stdout, r.stderr)
 	}
 }
+
+func TestConfigPrintsTheBriefPath(t *testing.T) {
+	p := newCfgProject(t)
+	p.user(t, completeUser)
+	proj := filepath.Join(p.dir, "drafter.toml")
+	base, err := os.ReadFile(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, proj, string(base)+"\n[blueprints]\nbrief_path = \"notes/{dir}/{name}.json\"\n")
+
+	r := p.config(t, nil)
+	if r.code != 0 || !strings.Contains(r.stdout, "blueprints.brief_path = notes/{dir}/{name}.json  (drafter.toml)") {
+		t.Errorf("exit %d, stdout %q, stderr %q; want the brief_path row from drafter.toml", r.code, r.stdout, r.stderr)
+	}
+}

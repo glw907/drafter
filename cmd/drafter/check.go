@@ -67,6 +67,7 @@ func projectFor(rootFlag string) (blueprint.Project, error) {
 		Outline:       path.Clean(cfg.Blueprints.Outline),
 		FactsDir:      cfg.Facts.Dir,
 		Required:      cfg.Blueprints.Required,
+		BriefPath:     cfg.Blueprints.BriefPath,
 	}, nil
 }
 

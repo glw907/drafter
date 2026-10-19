@@ -90,6 +90,14 @@ func (l *layer) checkBlueprints() error {
 			return l.fail(p.key, "must be a path inside the project, relative to its root, not %q", *p.v)
 		}
 	}
+	if t := b.BriefPath; t != nil {
+		if !strings.Contains(*t, "{name}") {
+			return l.fail("blueprints.brief_path", "must contain {name}, so each page has its own brief, not %q", *t)
+		}
+		if !filepath.IsLocal(strings.NewReplacer("{dir}", "x", "{name}", "x").Replace(*t)) {
+			return l.fail("blueprints.brief_path", "must be a path inside the project, relative to its root, not %q", *t)
+		}
+	}
 	return nil
 }
 

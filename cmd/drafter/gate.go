@@ -156,7 +156,7 @@ func gateBlueprint(p blueprint.Project, bp string) ([]plan.Finding, error) {
 // back from a red gate, where a line that names the page would make foreign red read as the
 // page's own.
 func gateProvenance(p blueprint.Project, page, bp string) ([]plan.Finding, string, error) {
-	briefRel := blueprint.BriefPath(p.BlueprintRoot, page)
+	briefRel := blueprint.BriefPath(p.BlueprintRoot, p.BriefPath, page)
 	brief, err := os.ReadFile(filepath.Join(p.Root, filepath.FromSlash(briefRel)))
 	if os.IsNotExist(err) {
 		return nil, "no brief for " + page + "; provenance check skipped\n", nil

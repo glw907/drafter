@@ -155,6 +155,7 @@ func (c *Config) apply(l *layer) {
 		put(c, l, "blueprints.root", &c.Blueprints.Root, b.Root)
 		put(c, l, "blueprints.required", &c.Blueprints.Required, b.Required)
 		put(c, l, "blueprints.outline", &c.Blueprints.Outline, b.Outline)
+		put(c, l, "blueprints.brief_path", &c.Blueprints.BriefPath, b.BriefPath)
 	}
 	for track, sections := range f.Register {
 		c.Register[track] = sections
