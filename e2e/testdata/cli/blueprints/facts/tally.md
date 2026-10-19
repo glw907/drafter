@@ -10,3 +10,5 @@
 - `tally-count-quiet` The command `tally count` prints nothing. Source: `main.go:33-40` (`runCount`). [verified]
 - `tally-by-int` The flag --by takes a whole number. Source: `main.go:36` (`Int`). [verified]
 - `tally-total-empty` The command `tally total` prints 0 when the .tally file does not exist. Source: `main.go:42-48` (`readTotal`). [verified]
+- `tally-count-example` Separate the items you name on the command line with spaces, as in `tally count apples pears`, which adds 2 to the total. Source: `main.go:33-39` (`NArg`). [verified]
+- `tally-total-example` After `tally count apples pears` on a new count, the command `tally total` prints 2. Source: `main.go:38-46` (`readTotal`). [verified]

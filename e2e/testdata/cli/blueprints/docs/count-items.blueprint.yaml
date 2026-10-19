@@ -66,6 +66,9 @@ sections:
       - id: f-count
         kind: fact
         fact: tally-count-cmd
+      - id: f-example
+        kind: fact
+        fact: tally-count-example
       - id: f-creates
         kind: fact
         fact: tally-count-creates
@@ -86,6 +89,9 @@ sections:
       - id: f-total
         kind: fact
         fact: tally-total-cmd
+      - id: f-output
+        kind: fact
+        fact: tally-total-example
       - id: f-empty
         kind: fact
         fact: tally-total-empty
