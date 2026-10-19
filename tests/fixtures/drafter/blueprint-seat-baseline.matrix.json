@@ -1,0 +1,64 @@
+{
+  "cases": [
+    {
+      "context": {
+        "afterFinalRead": false,
+        "facts": false,
+        "findings": "",
+        "inputs": {},
+        "narrow": null,
+        "page": {
+          "job": "Do A.\n",
+          "path": "docs/a.md"
+        },
+        "round": 1,
+        "scope": "",
+        "turn": 0,
+        "where": ""
+      },
+      "name": "blueprint/whole",
+      "seat": "blueprint"
+    },
+    {
+      "context": {
+        "afterFinalRead": false,
+        "facts": false,
+        "findings": "",
+        "inputs": {},
+        "narrow": null,
+        "page": {
+          "job": "Do A.\n",
+          "path": "docs/a.md"
+        },
+        "round": 1,
+        "scope": "intro,steps",
+        "turn": 0,
+        "where": ""
+      },
+      "name": "blueprint/change",
+      "seat": "blueprint"
+    }
+  ],
+  "host": {
+    "args": {},
+    "resolved": {
+      "pages": [
+        {
+          "anatomy": "Task guide",
+          "brief": "blueprints/docs/a.brief.json",
+          "covers": [
+            "A."
+          ],
+          "figure": false,
+          "job": "Do A.\n",
+          "outOfScope": [],
+          "pageType": "task guide",
+          "path": "docs/a.md",
+          "slug": "a",
+          "standard": "google",
+          "title": "Page A"
+        }
+      ]
+    }
+  }
+}
