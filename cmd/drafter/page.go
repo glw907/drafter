@@ -95,15 +95,19 @@ func runPage(cmd *cobra.Command, args []string, f *pageFlags) error {
 	if err != nil {
 		return exitError{code: exitCannotRun, msg: err.Error()}
 	}
+	resumeArgs := args
+	if f.workflowRun != "" {
+		resumeArgs = []string{"--workflow-run", f.workflowRun}
+	}
 	client := batch.New(batch.Options{Key: k, BaseURL: c.APIBaseURL, WorkspaceID: c.WorkspaceID})
 	s, err := pipeline.Run(cmd.Context(), pipeline.Options{
 		Config: c, Handoffs: handoffs, API: client, Resume: f.resume, DryRun: f.dryRun,
-		Version: version(), Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr(),
+		Version: version(), Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr(), ResumeArgs: resumeArgs,
 	})
 	if err != nil {
 		msg := err.Error()
 		if s.RunID != "" {
-			msg += "; resume with drafter page --resume " + s.RunID
+			msg += "; resume with " + pipeline.ResumeCommand("drafter page", c.Mode == "sync", s.RunID, resumeArgs)
 		}
 		return exitError{code: exitCannotRun, msg: msg}
 	}
@@ -220,12 +224,35 @@ func writeSummaryText(w io.Writer, c *config.Config, s pipeline.Summary, dry boo
 			fmt.Fprintf(&b, " $%.4f", p.Cost)
 		}
 		b.WriteString("\n")
+		writeFindings(&b, p)
 	}
 	if s.Stop != "" {
 		fmt.Fprintf(&b, "stopped: %s; resume with: %s\n", s.Stop, s.ResumeLine)
 	}
 	_, err := io.WriteString(w, b.String())
 	return err
+}
+
+// writeFindings prints a page's findings, warnings, and escalation detail under its line, one per
+// line, each finding marked blocking or non-blocking.
+func writeFindings(b *strings.Builder, p pipeline.PageResult) {
+	for _, f := range p.Findings {
+		mark := "non-blocking"
+		if f.Blocking {
+			mark = "blocking"
+		}
+		if f.Location != "" {
+			fmt.Fprintf(b, "  %s: %s: %s\n", mark, f.Location, f.Text)
+			continue
+		}
+		fmt.Fprintf(b, "  %s: %s\n", mark, f.Text)
+	}
+	for _, w := range p.Warnings {
+		fmt.Fprintf(b, "  warning: %s\n", w)
+	}
+	if p.Detail != "" {
+		fmt.Fprintf(b, "  escalation: %s\n", p.Detail)
+	}
 }
 
 // scopeText describes what a read of a page was limited to.

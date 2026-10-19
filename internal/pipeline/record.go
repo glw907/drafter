@@ -114,6 +114,17 @@ func (r *record) alreadyPresent() int {
 	return n
 }
 
+// blueprintFindings lists the blueprint read's findings for the summary, nil when it made none.
+func (r *record) blueprintFindings() []FindingResult {
+	var out []FindingResult
+	for _, f := range r.Findings {
+		if f.Seat == "blueprint" {
+			out = append(out, FindingResult{Location: f.Location, Text: f.Text, Blocking: f.Blocking})
+		}
+	}
+	return out
+}
+
 func (r *record) verdict(stage, seat, v string) {
 	r.Verdicts = append(r.Verdicts, verdictRecord{Stage: stage, Seat: seat, Verdict: v})
 }

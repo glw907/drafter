@@ -67,6 +67,9 @@ type Options struct {
 	// Command names the command that started the run, for the resume hint; "drafter page" when
 	// empty.
 	Command string
+	// ResumeArgs are the arguments the resume hint repeats after the run ID: the blueprints or
+	// handoff files as given, or --workflow-run and its path.
+	ResumeArgs []string
 }
 
 // command is the command a stopped run is resumed with.
@@ -94,6 +97,20 @@ type PageResult struct {
 	// or unplaced, and AlreadyPresent the non-blocking findings of the blueprint read that say so.
 	Demoted        int `json:"demoted,omitempty"`
 	AlreadyPresent int `json:"already_present,omitempty"`
+	// Findings are the blueprint read's findings, blocking or not, in the order the read gave them.
+	Findings []FindingResult `json:"findings,omitempty"`
+	// Warnings are the record's warnings: the blueprint check's warnings and the conflicts a
+	// change read set aside.
+	Warnings []string `json:"warnings,omitempty"`
+	// Detail is what an escalation says beyond its rule, such as the conflicts that blocked.
+	Detail string `json:"detail,omitempty"`
+}
+
+// FindingResult is one finding of a page's blueprint read.
+type FindingResult struct {
+	Location string `json:"location"`
+	Text     string `json:"text"`
+	Blocking bool   `json:"blocking"`
 }
 
 // Estimate is one request of a dry run.
@@ -179,8 +196,9 @@ func (r *runner) summary() Summary {
 	for _, p := range r.pages {
 		res := PageResult{Path: p.h.Page.Path, Status: p.ps.Status, Scope: p.w.Scope}
 		if p.w.Rec.Escalation != nil {
-			res.Rule = p.w.Rec.Escalation.Rule
+			res.Rule, res.Detail = p.w.Rec.Escalation.Rule, p.w.Rec.Escalation.Detail
 		}
+		res.Findings, res.Warnings = p.w.Rec.blueprintFindings(), p.w.Rec.Warnings
 		res.Demoted, res.AlreadyPresent = p.w.Demoted, p.w.Rec.alreadyPresent()
 		res.Cost, _ = r.led.PageSpend(r.state.RunID, p.h.Page.Path)
 		if p.ps.Status == StatusAccepted {
@@ -189,9 +207,41 @@ func (r *runner) summary() Summary {
 		s.Pages = append(s.Pages, res)
 	}
 	if r.stop != "" {
-		s.ResumeLine = r.command() + " --resume " + r.state.RunID
+		s.ResumeLine = r.resumeCommand()
 	}
 	return s
+}
+
+// resumeCommand is the command that continues the stopped run.
+func (r *runner) resumeCommand() string {
+	return ResumeCommand(r.command(), r.cfg.Mode == "sync", r.state.RunID, r.o.ResumeArgs)
+}
+
+// ResumeCommand is the command line that continues a stopped run: the sync flag when the run's mode
+// is sync, since a resume under another mode fails the configuration check, then args as the
+// command was given them.
+func ResumeCommand(command string, sync bool, runID string, args []string) string {
+	var b strings.Builder
+	b.WriteString(command)
+	if sync {
+		b.WriteString(" --sync")
+	}
+	b.WriteString(" --resume " + runID)
+	for _, a := range args {
+		b.WriteString(" " + shellWord(a))
+	}
+	return b.String()
+}
+
+// shellWord quotes a for a POSIX shell when it holds a character the shell would split or expand.
+func shellWord(a string) string {
+	safe := func(c rune) bool {
+		return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("_./:@%+=,-", c)
+	}
+	if a != "" && !strings.ContainsFunc(a, func(c rune) bool { return !safe(c) }) {
+		return a
+	}
+	return "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
 }
 
 // halt stops the run, resumable. The first reason wins.
@@ -303,7 +353,7 @@ func (r *runner) loop(ctx context.Context) error {
 // finish writes the end state of a run that did not stop.
 func (r *runner) finish() error {
 	if r.stop != "" {
-		r.warnf("stopped: %s; resume with: %s --resume %s", r.stop, r.command(), r.state.RunID)
+		r.warnf("stopped: %s; resume with: %s", r.stop, r.resumeCommand())
 	}
 	return r.save()
 }

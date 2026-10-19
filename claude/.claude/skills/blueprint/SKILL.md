@@ -14,10 +14,12 @@ Find the page's blueprint by the path rule in [Layout](format.md#layout). Read t
 ## Pick the case
 
 1. **A code change alters documented behavior.** Update the fact bullet for the behavior. Run `drafter refs <fact-id>` before you correct a fact: it lists every item on every page that places or cites it. Fix each placement the new fact makes wrong. Run `drafter check`, then commit the facts, the blueprints, and the code together. The change is not done until the blueprints match.
-2. **You notice a deficiency while reading.** Fix the blueprint, not the page. Choose the row of [the edit catalog](format.md#the-edit-catalog) that matches what you want to do, and make the change it names. Use the item kinds in [Items](format.md#items). When the deficiency is a wrong fact, run `drafter refs <fact-id>` before you correct it, then fix each placement the corrected fact makes wrong. A caution about something that can go wrong is a `failure` item with a handler, not a `sentence`: use the "Add a failure case" row of [the edit catalog](format.md#the-edit-catalog).
+2. **You notice a deficiency while reading.** Fix the blueprint, not the page. Choose the row of [the edit catalog](format.md#the-edit-catalog) that matches what you want to do, and make the change it names. Use the item kinds in [Items](format.md#items). When the deficiency is a wrong fact, run `drafter refs <fact-id>` before you correct it, then fix each placement the corrected fact makes wrong. A `failure` item is for a symptom whose handler the facts supply: a step, or a handoff that gives the reader a next action, citing the fact (see the `handler` row in [What `drafter check` checks](format.md#what-drafter-check-checks)). When no fact gives the reader a route, use the "Add a caveat" row of [the edit catalog](format.md#the-edit-catalog) and say in the report that the case has no handler.
 3. **A page is missing.** Follow [new-page.md](new-page.md).
 
 If no catalog row fits, stop and say so in your report. Do not invent an edit.
+
+When a request conflicts with a fact, or asks for content a section already carries, make the smaller edit the catalog allows. Say in the report what was asked and why the edit is smaller, naming the fact id or section id.
 
 ## Edit
 
@@ -30,9 +32,27 @@ If no catalog row fits, stop and say so in your report. Do not invent an edit.
 
 ## Check
 
-For each item the edit adds or changes, walk [Check what you add](format.md#check-what-you-add) before `drafter check` and the commit. Run `drafter check` after every blueprint edit and fix each error before you commit. [What `drafter check` checks](format.md#what-drafter-check-checks) lists the checks, the severities, and the exit codes. To check one file, name it: `drafter check <blueprint>`.
+For each item the edit adds or changes, walk [Check what you add](format.md#check-what-you-add) before `drafter check` and the commit. Run `drafter check` after every blueprint edit and fix each error before you commit. [What `drafter check` checks](format.md#what-drafter-check-checks) lists the checks, the severities, and the exit codes. To check one file, name it: `drafter check <blueprint>`. A run that names a blueprint skips the facts store, so its `store` warnings are not yours to chase.
 
 When a fact changes, `drafter refs` is the lookup: [Find where a fact is used](format.md#find-where-a-fact-is-used).
+
+## Read
+
+Before the first edit, note `git rev-parse HEAD` as the base. Every read uses that base. Run `drafter check <blueprint>`, commit, then read as a separate command: `drafter read --sync --since <base> <blueprint>`. A read of an uncommitted tree prints "nothing changed" and judges nothing. The read judges the change as a code reviewer judges a pull request; [What `drafter read` does with a blueprint](format.md#what-drafter-read-does-with-a-blueprint) says what blocks and what returns as a "Nit:". It prints each finding with its location and whether it blocks.
+
+Fix every blocking finding, and any Nits you choose, in one batch. Run `drafter check <blueprint>`, commit, and read again. Polish goes before a read, never after an accepted one: once a read accepts, make no further edit, Nits included, because an edit after the last read is a change no read saw. Stop at an accept or after the third read. Findings that start "Already present:" are older defects and stay out of the edit.
+
+| The read ends with | Do |
+|---|---|
+| Exit 0, no blocking finding printed, and no "nothing changed" line | Accepted. Stop. |
+| Exit 0 with a blocking finding printed, or exit 1 with the blueprint read's findings | Fix and read again. |
+| Exit 1 from a consistency escalation | Fix the conflict the change caused and read again. |
+| Exit 1 escalated on rule `cap`, or exit 3 naming `cycle cap` or `spend limit` | Stop reading, commit, and report the stop to the user. |
+| Any other exit 3 | Run `drafter read --sync --resume <run-id> <blueprint>` once. It counts as the same read. |
+| Exit 2 naming the key | Skip the reads and say so in the report. |
+| Exit 2 for a dirty tree, an unresolved `--since`, or config | Fix the cause and rerun. It isn't a read. |
+
+When blocking findings remain after the third read, add one empty commit (`git commit --allow-empty`) whose message lists each by location, and list them to the user in the final report.
 
 ## Page prose is off limits
 

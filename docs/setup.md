@@ -88,9 +88,9 @@ cycle_ceiling = 160
 
 `page_cap` is the most one page may cost, in US dollars, and `cycle_ceiling` is the most all runs
 may cost in one billing cycle. Before each submission, drafter reserves the stage's worst case:
-the counted input plus every request's `max_tokens` at the output price. A stage that would cross
-the page cap escalates its page. A stage that would cross the ceiling stops the run, and you can
-resume it.
+the counted input, priced at the higher of the input and five-minute cache-write rates, plus
+every request's `max_tokens` at the output price. A stage that would cross the page cap escalates
+its page. A stage that would cross the ceiling stops the run, and you can resume it.
 
 Set `billing_cycle_day` to the day your credit cycle starts. The ceiling resets at 00:00 UTC on
 that day. See [Configuration reference](configuration.md) for how the caps combine across layers.

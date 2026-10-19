@@ -2,9 +2,11 @@ package pipeline
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/glw907/drafter/internal/batch"
 	"github.com/glw907/drafter/internal/blueprint"
 )
 
@@ -58,29 +60,31 @@ func TestScopeReachesTheBlueprintPrompt(t *testing.T) {
 	if len(reqs) != 2 {
 		t.Fatalf("%d blueprint requests, want 2", len(reqs))
 	}
-	var scoped, whole string
+	var scoped, whole batch.Message
 	for _, r := range reqs {
-		if strings.Contains(userText(r), "Scope: ") {
-			scoped = userText(r)
+		m := r.Messages[len(r.Messages)-1]
+		if strings.Contains(m.Text, "These sections changed:") {
+			scoped = m
 		} else {
-			whole = userText(r)
+			whole = m
 		}
 	}
-	if !strings.Contains(scoped, "Scope: intro,steps") {
-		t.Errorf("no request carries the scope line:\n%s", scoped)
+	if want := "=== end outline entry ===\n\nThese sections changed: intro,steps.\n\n" + changeBlockA; !strings.Contains(scoped.Text, want) {
+		t.Errorf("the change block, opened by the scope sentence, does not follow the outline entry:\n%s", scoped.Text)
 	}
-	if strings.Contains(whole, "=== blueprint diff ===") || whole == "" {
-		t.Errorf("the whole page's request is %q, want no change block", whole)
+	if strings.Contains(whole.Text, "=== blueprint diff ===") || !strings.Contains(whole.Text, "=== blueprint ===") {
+		t.Errorf("the whole page's third block is %q, want the blueprint and no change block", whole.Text)
 	}
-	prompt, data, ok := strings.Cut(scoped, "=== blueprint ===")
-	if !ok || strings.Contains(prompt, "blueprint diff") {
-		t.Errorf("the change block is in the prompt, not the data:\n%s", scoped)
-	}
-	if end, at := strings.Index(data, "=== end facts ==="), strings.Index(data, "\n\n"+changeBlockA); end < 0 || at < end {
-		t.Errorf("the change block, byte for byte, does not follow the facts block:\n%s", data)
-	}
-	if !strings.Contains(scoped, "apart from the change block") {
-		t.Error("the blueprint block still says it is everything the reader reads")
+	for _, m := range []batch.Message{scoped, whole} {
+		if len(m.Cached) != 2 {
+			t.Fatalf("%d cached blocks, want 2", len(m.Cached))
+		}
+		if strings.Contains(m.Cached[0], "These sections changed") || strings.Contains(m.Cached[0], "=== blueprint ===") || strings.Contains(m.Cached[0], "blueprint diff") {
+			t.Errorf("the first block holds the blueprint or the change:\n%s", m.Cached[0])
+		}
+		if !strings.Contains(m.Cached[1], "=== facts placed or cited ===") || !strings.Contains(m.Cached[1], "apart from the change block") {
+			t.Errorf("the second block is not the facts block:\n%s", m.Cached[1])
+		}
 	}
 	got := statusPage(s, pageB)
 	if got.Scope == nil || got.Scope.Kind != blueprint.ScopeScoped || got.Scope.Facts == nil || len(got.Scope.Facts) != 1 || got.Scope.Facts[0] != "lumen-key-ttl" {
@@ -103,7 +107,7 @@ func TestOutlineOnlyChangeRendersTheChangeRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	reqs := requestsFor(h, "s1", "blueprint")
-	if len(reqs) != 1 || !strings.Contains(userText(reqs[0]), "Scope: page") || !strings.Contains(userText(reqs[0]), "=== outline entry change ===") {
+	if len(reqs) != 1 || !strings.Contains(userText(reqs[0]), "=== end outline entry ===\n\nNo section's own content changed: the change is in the page-level fields, the order of the sections, a removed section, the outline entry, or a fact bullet cited only outside the sections.\n\n=== outline entry change ===") {
 		t.Errorf("requests = %d, want one with scope page and the entry change", len(reqs))
 	}
 }
@@ -122,11 +126,40 @@ func TestScopedStateWithoutFactsReadsWhole(t *testing.T) {
 		t.Fatal(err)
 	}
 	reqs := requestsFor(h, "s1", "blueprint")
-	if len(reqs) != 1 || strings.Contains(userText(reqs[0]), "Scope:") || strings.Contains(userText(reqs[0]), "blueprint diff") {
+	if len(reqs) != 1 || strings.Contains(userText(reqs[0]), "These sections changed") || strings.Contains(userText(reqs[0]), "No section's own content changed") || strings.Contains(userText(reqs[0]), "blueprint diff") {
 		t.Errorf("a scoped state with no facts sent the change read")
 	}
 	if statusOf(s, pageA) != StatusEscalated || h.record(s.RunID, pageA).Escalation.Seat != "consistency" {
 		t.Errorf("status %s, want escalated on consistency", statusOf(s, pageA))
+	}
+}
+
+// TestChangeReadsShareTheirFirstBlocks checks that two change reads of one blueprint, with
+// different scopes and an added citation in the change, send byte-identical cached blocks. On the
+// fake module this proves the assembler's split only: the real prompt must not name the scope.
+func TestChangeReadsShareTheirFirstBlocks(t *testing.T) {
+	read := func(scope blueprint.Scope, change string) batch.Message {
+		h := newBlueprintHarness(t, withPages("a"))
+		o := h.options()
+		o.Since = h.head()
+		o.Scopes = map[string]blueprint.Scope{pageA: scope}
+		o.Changes = map[string]string{pageA: change}
+		if _, err := Run(context.Background(), o); err != nil {
+			t.Fatal(err)
+		}
+		reqs := requestsFor(h, "s1", "blueprint")
+		if len(reqs) != 1 {
+			t.Fatalf("%d blueprint requests, want 1", len(reqs))
+		}
+		return reqs[0].Messages[len(reqs[0].Messages)-1]
+	}
+	one := read(scopedFacts([]string{"intro"}, "lumen-key-ttl"), changeBlockA)
+	two := read(scopedFacts([]string{"steps", "rotate"}, "lumen-key-ttl", "lumen-grace"), changeBlockA+"\n\n=== changed facts ===\n- lumen-grace\n  was: x\n  now: y\n=== end changed facts ===")
+	if len(one.Cached) != 2 || !slices.Equal(one.Cached, two.Cached) {
+		t.Errorf("cached blocks differ between the reads:\n%q\n%q", one.Cached, two.Cached)
+	}
+	if one.Text == two.Text {
+		t.Error("the third blocks are equal, want them to carry each read's scope and change")
 	}
 }
 

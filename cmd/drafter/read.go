@@ -56,6 +56,12 @@ only on a conflict that touches a fact the change touched. A page with no earlie
 diff against is read as a whole. A change read writes no drafted.lock entry. A resume takes no
 --since: the run recorded each page's scope.
 
+The output has one line per blueprint with its verdict, scope, and cost. Under it, one line per
+finding of the blueprint read, marked blocking or non-blocking, then one per warning and the
+detail of an escalation, so a fix can start from the output. With --json each page carries
+these as findings (location, text, blocking), warnings, and detail, left out when empty. A
+stopped run prints the command that resumes it, with the blueprints.
+
 The exit status is 0 when every blueprint was accepted, 1 when any was set aside, 2 when the run
 could not start or hit an error, and 3 when the run stopped and can be resumed, which outranks 1.`,
 		Args: func(cmd *cobra.Command, args []string) error {
@@ -135,12 +141,12 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 	client := batch.New(batch.Options{Key: k, BaseURL: c.APIBaseURL, WorkspaceID: c.WorkspaceID})
 	s, err := pipeline.Run(cmd.Context(), pipeline.Options{
 		Config: c, Handoffs: handoffs, API: client, Resume: f.resume, DryRun: f.dryRun, Since: since, Scopes: scopes, Changes: changes,
-		Version: version(), Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr(), Command: "drafter read",
+		Version: version(), Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr(), Command: "drafter read", ResumeArgs: args,
 	})
 	if err != nil {
 		msg := err.Error()
 		if s.RunID != "" {
-			msg += "; resume with drafter read --resume " + s.RunID
+			msg += "; resume with " + pipeline.ResumeCommand("drafter read", c.Mode == "sync", s.RunID, args)
 		}
 		return cannot(errors.New(msg))
 	}
