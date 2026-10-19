@@ -8,16 +8,16 @@ introduction:
     The reader has tally installed and runs commands in a terminal.
   notCovered: |
     Installing tally.
-  facts: [tally-state-file]
 framing:
   readers: |
     A developer with tally installed who wants a running count.
   placeInDocSet: |
     The only task guide in the set.
   introPlan: |
-    Open on the task and say what the page covers.
+    Open on the task and name what the page covers, which is adding items and reading the total. Say what the reader needs first, which is tally installed and a terminal in the directory they count in. Say what the page leaves out, which is installing tally.
 orderReason: |
-  The reader learns where the count lives, then adds items, then reads the total.
+  The reader learns where the count lives, then adds items, then reads the total, then finds the readme.
+preconditions: [tally-installed]
 sections:
   - id: before-you-begin
     heading: Before you begin
@@ -29,6 +29,12 @@ sections:
       - id: f-state
         kind: fact
         fact: tally-state-file
+      - id: c-dir
+        kind: sentence
+        mode: claim
+        text: |
+          Run every tally command in the directory that holds the count file.
+        facts: [tally-state-file]
   - id: add-items
     heading: Add items
     why: |
@@ -36,6 +42,12 @@ sections:
     opens: |
       Name each item on the command line.
     items:
+      - id: s-count
+        kind: step
+        text: |
+          Run `tally count` with the items you want to add.
+        requires: [tally-installed]
+        produces: [counted]
       - id: f-count
         kind: fact
         fact: tally-count-cmd
@@ -46,7 +58,7 @@ sections:
         kind: sentence
         mode: claim
         text: |
-          Add items one at a time so that each one is counted.
+          Name all of the items in a single command.
   - id: read-the-total
     heading: Read the total
     why: |
@@ -54,14 +66,29 @@ sections:
     opens: |
       Print the total to check your count.
     items:
+      - id: s-total
+        kind: step
+        text: |
+          Run `tally total` in the same directory.
+        requires: [counted]
+        produces: [total-read]
       - id: f-total
         kind: fact
         fact: tally-total-cmd
-      - id: f-reset
-        kind: fact
-        fact: tally-reset-cmd
       - id: f-state-again
         kind: fact
         fact: tally-state-file
         use: |
           Only the file's name.
+  - id: see-also
+    heading: See also
+    why: |
+      A task guide closes by pointing the reader to related pages.
+    opens: |
+      The readme covers the rest of tally.
+    items:
+      - id: l-readme
+        kind: link
+        target: ../README.md
+        text: |
+          the tally readme

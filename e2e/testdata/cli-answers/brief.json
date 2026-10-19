@@ -2,11 +2,14 @@
   "sentences": [
     {"text": "Tally counts the items you name.", "id": "no-claim"},
     {"text": "Tally keeps its count in a file named .tally in the current directory.", "id": "tally-state-file"},
+    {"text": "Run every tally command in the directory that holds the count file.", "id": "tally-state-file"},
+    {"text": "Run `tally count` with the items you want to add.", "id": "tally-count-cmd"},
     {"text": "The command `tally count` adds one for each item you name on the command line.", "id": "tally-count-cmd"},
     {"text": "The flag `--by` sets the amount each item adds, and the default is 1.", "id": "tally-by-flag"},
-    {"text": "Add items one at a time so that each one is counted.", "id": "no-claim"},
+    {"text": "Name all of the items in a single command.", "id": "no-claim"},
+    {"text": "Run `tally total` in the same directory.", "id": "tally-total-cmd"},
     {"text": "The command `tally total` prints the saved total.", "id": "tally-total-cmd"},
-    {"text": "The command `tally reset` deletes the count file.", "id": "tally-reset-cmd"},
-    {"text": "The file is named .tally.", "id": "tally-state-file"}
+    {"text": "The file is named .tally.", "id": "tally-state-file"},
+    {"text": "For the rest of tally, see [the tally readme](../README.md).", "id": "no-claim"}
   ]
 }

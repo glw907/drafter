@@ -191,7 +191,7 @@ func TestBlueprintHandoffsCarryTheDraftingInputs(t *testing.T) {
 	f.commit("add an exemplar", tallyBP)
 	committed := f.rev("HEAD")
 	// A fact the working tree cites and the start commit does not must not reach the inputs.
-	f.write(tallyBP, strings.Replace(f.read1(tallyBP), "kind: fact\n        fact: tally-reset-cmd", "kind: fact\n        fact: tally-reset-cmd\n      - id: f-extra\n        kind: fact\n        fact: tally-by-flag", 1))
+	f.write(tallyBP, strings.Replace(f.read1(tallyBP), "fact: tally-total-cmd", "fact: tally-total-cmd\n      - id: f-extra\n        kind: fact\n        fact: tally-reset-cmd", 1))
 	c, err := config.Load(f.root, config.Flags{})
 	if err != nil {
 		t.Fatal(err)
@@ -204,7 +204,7 @@ func TestBlueprintHandoffsCarryTheDraftingInputs(t *testing.T) {
 	if in.PageType != "task guide" {
 		t.Errorf("PageType = %q", in.PageType)
 	}
-	want := []string{"tally-by-flag", "tally-count-cmd", "tally-reset-cmd", "tally-state-file", "tally-total-cmd"}
+	want := []string{"tally-by-flag", "tally-count-cmd", "tally-state-file", "tally-total-cmd"}
 	if !slices.Equal(in.FactIDs, want) {
 		t.Errorf("FactIDs = %v, want %v from the start commit's bytes", in.FactIDs, want)
 	}

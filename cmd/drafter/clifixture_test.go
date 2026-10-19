@@ -128,10 +128,17 @@ func (f *cliFixture) read(args ...string) (code int, stdout, stderr string) {
 }
 
 // TestReadDryRunRequestGolden pins the count_tokens bodies that drafter read --dry-run sends for the
-// fixture blueprint. The golden was captured before the drafting pass touched the pipeline or the
-// handoff builder, so a later change that moves the blueprint read's bytes fails here.
+// fixture blueprint as it stood when the golden was captured, frozen in testdata so the fixture can
+// grow. The golden was captured before the drafting pass touched the pipeline or the handoff
+// builder, so a later change that moves the blueprint read's bytes fails here.
 func TestReadDryRunRequestGolden(t *testing.T) {
 	f := newCLIFixture(t)
+	frozen, err := os.ReadFile(filepath.Join("testdata", "read-golden.blueprint.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.write(tallyBP, string(frozen))
+	f.commit("freeze the blueprint the golden was captured on", tallyBP)
 	if code, out, errOut := f.read("--dry-run", f.blueprint()); code != 0 {
 		t.Fatalf("read --dry-run exit %d\n%s%s", code, out, errOut)
 	}
