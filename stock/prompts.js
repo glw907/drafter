@@ -586,7 +586,8 @@ Step 2. Answer Part V's open-ended questions:
   Thinking of other people you know who might get this document:
     What about the document might work well for them?
     What about the document might cause them problems?
-Return your answer to the second question as paraphrase, and the other answers in summary.
+Return your answer to the second question as paraphrase, and the other answers in summary. Keep
+the paraphrase to one short paragraph and the summary to about 200 words, then end the answer.
 
 Step 3 follows in the next turn.`;
 }
