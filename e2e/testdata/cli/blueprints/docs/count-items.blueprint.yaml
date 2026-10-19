@@ -59,6 +59,18 @@ sections:
       - id: f-by
         kind: fact
         fact: tally-by-flag
+      - id: f-by-int
+        kind: fact
+        fact: tally-by-int
+      - id: f-args
+        kind: fact
+        fact: tally-count-args
+      - id: f-creates
+        kind: fact
+        fact: tally-count-creates
+      - id: f-quiet
+        kind: fact
+        fact: tally-count-quiet
   - id: read-the-total
     heading: Read the total
     why: |
@@ -75,6 +87,9 @@ sections:
       - id: f-total
         kind: fact
         fact: tally-total-cmd
+      - id: f-empty
+        kind: fact
+        fact: tally-total-empty
       - id: f-state-again
         kind: fact
         fact: tally-state-file

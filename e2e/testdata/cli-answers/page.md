@@ -18,11 +18,21 @@ The command `tally count` adds each item you name on the command line to the tot
 
 The flag `--by` sets the amount each item adds, and the default is 1.
 
+The flag `--by` takes a whole number.
+
+The command `tally count` counts the arguments after it and never reads their names.
+
+The command `tally count` creates the .tally file the first time it runs.
+
+The command `tally count` prints nothing.
+
 ## Read the total
 
 Run `tally total` in the same directory.
 
 The command `tally total` prints the saved total.
+
+The command `tally total` prints 0 when the .tally file does not exist.
 
 The file is named .tally.
 
