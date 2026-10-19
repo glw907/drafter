@@ -689,7 +689,12 @@ func (p *page) afterScoped(seats []string) error {
 // stageCoherence asks a section redraft's coherence read: the whole page, with the changed
 // sections named. The retest after the coherence fix is told the findings the fix declined.
 func (p *page) stageCoherence(ctx context.Context) (*stage, error) {
-	c := p.context(prompts.Round1)
+	// The retest renders at round 2, which is how the stock prompt tells it from the first read.
+	round := prompts.Round1
+	if p.w.CoherenceRetest {
+		round = prompts.Round2
+	}
+	c := p.context(round)
 	c.Scope = p.sectionScope()
 	prompt, err := p.render("coherence", c)
 	if err != nil {
