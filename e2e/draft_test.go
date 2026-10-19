@@ -23,8 +23,8 @@ const (
 	draftBrief = "blueprints/docs/count-items.brief.json"
 	draftLock  = "blueprints/drafted.lock"
 	draftFacts = "blueprints/facts/tally.md"
-	draftOld   = "Name all of the items in a single command."
-	draftNew   = "Name all of the items in a single command, and spell each one the way you want it counted."
+	draftOld   = "Separate the items with spaces."
+	draftNew   = "Separate the items with spaces, and quote any item that holds a space."
 )
 
 // draftStub is a scripted Messages API. It answers a request by the output schema the request

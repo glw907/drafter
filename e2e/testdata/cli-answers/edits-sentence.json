@@ -1,7 +1,7 @@
 {
   "edits": [
-    {"file": "page", "old": "Name all of the items in a single command.", "new": "Name all of the items in a single command, and spell each one the way you want it counted."},
-    {"file": "brief", "old": "Name all of the items in a single command.", "new": "Name all of the items in a single command, and spell each one the way you want it counted."}
+    {"file": "page", "old": "Separate the items with spaces.", "new": "Separate the items with spaces, and quote any item that holds a space."},
+    {"file": "brief", "old": "Separate the items with spaces.", "new": "Separate the items with spaces, and quote any item that holds a space."}
   ],
   "resolutions": [
     {"finding": 1, "status": "edited", "edits": [0, 1], "reason": "The section now carries the edited sentence."}

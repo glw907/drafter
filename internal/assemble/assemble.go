@@ -129,6 +129,13 @@ func inputBlocks(ctx context.Context, in Input, seat config.Seat) ([]string, err
 	if err != nil {
 		return nil, err
 	}
+	// The page and brief are the run's own output, untracked until someone commits them, and a
+	// seat that reviews them must see them.
+	for _, p := range []string{in.Page, in.Brief} {
+		if p != "" {
+			r.tracked[p] = true
+		}
+	}
 	switch in.Answer {
 	case AnswerReader1:
 		return r.pageBlocks(in.Page)

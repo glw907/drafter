@@ -56,9 +56,9 @@ sections:
         fact: tally-by-flag
       - id: c-pace
         kind: sentence
-        mode: claim
+        mode: verbatim
         text: |
-          Name all of the items in a single command.
+          Separate the items with spaces.
   - id: read-the-total
     heading: Read the total
     why: |

@@ -116,6 +116,19 @@ func TestFilesNamedInPrompt(t *testing.T) {
 	}
 }
 
+func TestThePageAndBriefAreInlinedWhileUntracked(t *testing.T) {
+	f := newFixture(t)
+	in := f.input(f.config(), "Review untracked.txt against docs/outline.md and docs/guide.md.")
+	if got := requestText(t, in); strings.Contains(got, "UNTRACKED-CONTENT") {
+		t.Fatal("a file that is not the page was inlined while untracked")
+	}
+	in.Page = "untracked.txt"
+	got := requestText(t, in)
+	if !strings.Contains(got, "UNTRACKED-CONTENT") || !strings.Contains(got, "=== file: untracked.txt ===") {
+		t.Errorf("the page under review, untracked, was not inlined:\n%s", got)
+	}
+}
+
 func TestFileNamedTwiceInlinesOnce(t *testing.T) {
 	f := newFixture(t)
 	prompt := "Read docs/outline.md and " + filepath.Join(f.root, "docs", "outline.md") + " again."

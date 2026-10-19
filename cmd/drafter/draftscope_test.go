@@ -35,11 +35,11 @@ Run every tally command in the directory that holds the count file.
 
 Run ` + "`" + `tally count` + "`" + ` with the items you want to add.
 
-The command ` + "`" + `tally count` + "`" + ` adds one for each item you name on the command line.
+The command ` + "`" + `tally count` + "`" + ` adds each item you name on the command line to the total.
 
 The flag ` + "`" + `--by` + "`" + ` sets the amount each item adds, and the default is 1.
 
-Name all of the items in a single command.
+Separate the items with spaces.
 
 ## Read the total
 
@@ -60,9 +60,9 @@ func tallyBriefJSON(t *testing.T, extra ...map[string]any) string {
 	sentences := []map[string]any{
 		{"text": "Tally counts the items you name.", "id": "no-claim"},
 		{"text": "Tally keeps its count in a file named .tally in the current directory.", "id": "tally-state-file"},
-		{"text": "The command tally count adds one for each item you name on the command line.", "id": "tally-count-cmd"},
+		{"text": "The command tally count adds each item you name on the command line to the total.", "id": "tally-count-cmd"},
 		{"text": "The flag --by sets the amount each item adds, and the default is 1.", "id": "tally-by-flag"},
-		{"text": "Name all of the items in a single command.", "id": "no-claim"},
+		{"text": "Separate the items with spaces.", "id": "no-claim"},
 		{"text": "The command tally total prints the saved total.", "id": "tally-total-cmd"},
 		{"text": "The command tally reset deletes the count file.", "id": "tally-reset-cmd"},
 		{"text": "The file is named .tally.", "id": "tally-state-file"},
@@ -239,14 +239,14 @@ func TestDraftScopeFromTheLock(t *testing.T) {
 		f := newCLIFixture(t)
 		f.draft(tallyBriefJSON(t), "")
 		bp := f.read1(tallyBP)
-		f.write(tallyBP, strings.Replace(bp, "Name all of the items in a single command.", "Name all of the items in a single command, and check each name.", 1))
+		f.write(tallyBP, strings.Replace(bp, "Separate the items with spaces.", "Separate the items with spaces, and check each item.", 1))
 		f.commit("edit the sentence", tallyBP)
 		d := f.scope()
 		if want := []string{"add-items"}; !slices.Equal(sectionIDs(d), want) {
 			t.Errorf("IDs = %v, want %v", sectionIDs(d), want)
 		}
 		block := d.changes[tallyPage]
-		if !strings.Contains(block, "Blueprint file: "+tallyBP) || !strings.Contains(block, "check each name") {
+		if !strings.Contains(block, "Blueprint file: "+tallyBP) || !strings.Contains(block, "check each item") {
 			t.Errorf("the change block should open its diff with the blueprint's path and hold the edit:\n%s", block)
 		}
 	})
@@ -254,7 +254,7 @@ func TestDraftScopeFromTheLock(t *testing.T) {
 	t.Run("a brief sentence in a third section widens the scope to it", func(t *testing.T) {
 		f := newCLIFixture(t)
 		// The sentence in "Add items" cites the shared fact, which the blueprint cites only from two other sections.
-		brief := tallyBriefJSON(t, map[string]any{"text": "Name all of the items in a single command.", "id": []string{"tally-state-file"}})
+		brief := tallyBriefJSON(t, map[string]any{"text": "Separate the items with spaces.", "id": []string{"tally-state-file"}})
 		f.draft(brief, "")
 		f.editFact()
 		d := f.scope()
@@ -281,7 +281,7 @@ func TestDraftScopeFromTheLock(t *testing.T) {
 		f.git("rm", "-q", tallyBrief)
 		f.git("commit", "-q", "-m", "drop the brief, as a seeded page has none")
 		bp := f.read1(tallyBP)
-		f.write(tallyBP, strings.Replace(bp, "Name all of the items in a single command.", "Name all of the items in a single command, and check each name.", 1))
+		f.write(tallyBP, strings.Replace(bp, "Separate the items with spaces.", "Separate the items with spaces, and check each item.", 1))
 		f.commit("edit the sentence", tallyBP)
 		d := f.scope()
 		sc := d.scopes[tallyPage]
