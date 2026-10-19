@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -257,7 +258,8 @@ func TestBlueprintRequestContents(t *testing.T) {
 	if len(reqs) != 1 {
 		t.Fatalf("blueprint requests = %d", len(reqs))
 	}
-	text := userText(reqs[0])
+	m := reqs[0].Messages[len(reqs[0].Messages)-1]
+	text := strings.Join(append(slices.Clone(m.Cached), m.Text), "\n\n")
 	raw := h.read(bpA)
 	if n := strings.Count(text, strings.TrimRight(raw, "\n")); n != 1 {
 		t.Errorf("the blueprint's bytes appear %d times, want once", n)

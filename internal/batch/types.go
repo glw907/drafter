@@ -36,10 +36,14 @@ type Options struct {
 	WallTime time.Duration
 }
 
-// Message is one conversation turn. Role is "user" or "assistant".
+// Message is one conversation turn. Role is "user" or "assistant". Cached holds leading parts of
+// a user turn, each sent as its own text block marked ephemeral for the five-minute prompt cache,
+// ahead of the block that holds Text. The cache key covers the bytes up to each marked block, so
+// a part must be byte-stable across the requests that share it.
 type Message struct {
-	Role string
-	Text string
+	Role   string
+	Cached []string `json:",omitempty"`
+	Text   string
 }
 
 // Request is one Messages request, shared by both modes. Schema is the answer's JSON Schema;

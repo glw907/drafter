@@ -138,19 +138,21 @@ func (p *page) stageBlueprintRead(ctx context.Context) (*stage, error) {
 			}
 		default:
 			c := p.context(prompts.Round1)
-			extra := assemble.BlueprintBlock(in.view, in.raw, in.entryJSON, p.r.facts)
+			extra := assemble.BlueprintBlock(in.raw, in.entryJSON)
 			if p.changeRead() {
 				c.Scope = "page"
 				if len(p.w.Scope.IDs) > 0 {
 					c.Scope = strings.Join(p.w.Scope.IDs, ",")
 				}
-				extra += "\n\n" + p.w.Change
+				extra += "\n\n" + scopeSentence(c.Scope) + "\n\n" + p.w.Change
 			}
 			prompt, err := p.render(seat, c)
 			if err != nil {
 				return nil, err
 			}
-			req, err = p.buildInput(ctx, s1, seat, assemble.Input{Answer: assemble.AnswerRead, Prompt: prompt, Extra: extra})
+			req, err = p.buildInput(ctx, s1, seat, assemble.Input{Answer: assemble.AnswerRead, Prompt: prompt,
+				Cached: []string{assemble.FactsBlock(in.view, p.r.facts)}, Extra: extra,
+			})
 			if err != nil {
 				return nil, err
 			}
@@ -158,6 +160,16 @@ func (p *page) stageBlueprintRead(ctx context.Context) (*stage, error) {
 		reqs = append(reqs, req)
 	}
 	return &stage{page: p, name: s1, reqs: reqs}, nil
+}
+
+// scopeSentence is the sentence that opens a change block: it names the changed sections, or for
+// scope "page" says the change lies outside them. It sits in the change block, not the prompt, so
+// the cached blocks stay byte-stable across a session's reads.
+func scopeSentence(scope string) string {
+	if scope == "page" {
+		return "No section's own content changed: the change is in the page-level fields, the order of the sections, a removed section, the outline entry, or a fact bullet cited only outside the sections."
+	}
+	return "These sections changed: " + scope + "."
 }
 
 // untouched reports whether a consistency conflict, between the facts ids and with, lies wholly

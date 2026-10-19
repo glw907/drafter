@@ -103,9 +103,10 @@ func loadPrices(t *testing.T) config.Prices {
 
 func near(a, b float64) bool { return math.Abs(a-b) < 1e-12 }
 
-// The page cap is checked against input plus max_tokens at the output price. With plain-s
-// (input 4, output 16 per million): 1,000,000 input tokens cost 4; 500,000 output tokens cost 8,
-// so the worst case is 12; 250,000 output tokens cost 4, so the worst case is 8.
+// The page cap is checked against input at the higher of the input and five-minute-write rates
+// plus max_tokens at the output price. With plain-s (input 4, write 5, output 16 per million):
+// 1,000,000 input tokens cost 5; 500,000 output tokens cost 8, so the worst case is 13; 250,000
+// output tokens cost 4, so the worst case is 9.
 func TestWorstThroughReserve(t *testing.T) {
 	prices := loadPrices(t)
 	tests := []struct {
@@ -114,8 +115,8 @@ func TestWorstThroughReserve(t *testing.T) {
 		wantWorst float64
 		wantErr   error
 	}{
-		{"input fits, worst case does not", 500_000, 12, ErrPageCap},
-		{"clean twin", 250_000, 8, nil},
+		{"input fits, worst case does not", 500_000, 13, ErrPageCap},
+		{"clean twin", 250_000, 9, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -456,12 +457,15 @@ func TestWorstFunc(t *testing.T) {
 		batchMode bool
 		want      float64
 	}{
-		{"sync", "plain-s", 1_000_000, 500_000, false, 12},
-		{"batch", "plain-s", 1_000_000, 500_000, true, 6},
-		// haiku-s, 200,000 input is over the threshold: (200000*2 + 10000*8) / 1e6 = 0.48.
-		{"tier", "haiku-s", 200_000, 10_000, false, 0.48},
-		// 100,000 input is not: (100000*1 + 10000*5) / 1e6 = 0.15.
-		{"at the threshold", "haiku-s", 100_000, 10_000, false, 0.15},
+		{"sync", "plain-s", 1_000_000, 500_000, false, 13},
+		{"batch", "plain-s", 1_000_000, 500_000, true, 6.5},
+		// haiku-s, 200,000 input is over the threshold, where the write rate 2.5 beats input 2:
+		// (200000*2.5 + 10000*8) / 1e6 = 0.58.
+		{"tier", "haiku-s", 200_000, 10_000, false, 0.58},
+		// 100,000 input is not, and write 1.25 beats input 1: (100000*1.25 + 10000*5) / 1e6 = 0.175.
+		{"at the threshold", "haiku-s", 100_000, 10_000, false, 0.175},
+		// An input rate above the write rate stays: 100,000 at 6 and 1,000 output at 16 is 0.616.
+		{"input rate higher", "dear-s", 100_000, 1_000, false, 0.616},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
