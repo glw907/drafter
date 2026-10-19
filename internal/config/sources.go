@@ -14,7 +14,7 @@ var settingKeys = []string{
 	"pages_in_flight", "retries.gate_fix", "retries.edit_contract",
 	"gate.command", "gate.index_link_command", "gate.protocol", "gate.lane",
 	"gate.section_pattern", "gate.failure_pattern",
-	"prompts", "seats", "facts.dir", "facts.bullet_format", "inline_files",
+	"prompts", "require_prompts", "seats", "facts.dir", "facts.bullet_format", "inline_files",
 	"blueprints.root", "blueprints.required", "blueprints.outline",
 }
 
@@ -24,6 +24,10 @@ var settingKeys = []string{
 func (c *Config) Sources() []Source {
 	var rows []Source
 	for _, key := range settingKeys {
+		if key == "prompts" {
+			rows = append(rows, c.moduleRow())
+			continue
+		}
 		rows = append(rows, c.row(key))
 	}
 	for _, key := range slices.Sorted(maps.Keys(c.src)) {

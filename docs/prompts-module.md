@@ -7,6 +7,36 @@ you need no Node installation to run drafter. Name the file in the `prompts` set
 The prompts are code, not templates. A builder can branch on the page type, the round, and the
 findings of an earlier read, and it can compute text from any of them.
 
+## The stock module
+
+When `prompts` is unset, drafter runs the stock module that ships in its binary. `drafter config`
+shows it as `drafter:prompts.js` with a short hash. A run copies the module into its run
+directory, so a resume after an upgrade uses the module the run started with.
+
+The stock module defines one seat, `blueprint`, which `drafter read` renders. It defines no
+`draft`, `structure`, `editor`, `fact`, or `reader` seat until drafter's stock seat prompts land.
+A run that needs a seat the module lacks refuses before it spends anything, and the error names
+the missing seats. `drafter page` on the stock module refuses this way. Set `prompts` to run it.
+
+### Name a file or a section in a prompt
+
+A prompt can name a file by path, and drafter inlines the file into the seat's request. Two more
+tokens work in any prompt:
+
+- `drafter:<name>` names a file embedded in drafter, such as `drafter:anatomies.md`. drafter
+  inlines it as a file block labeled with the token. An unknown name inlines as `not inlined: no
+  drafter file <name>`.
+- `<path>#<slug>` names one section of a file. The path is a tracked file, a file that
+  `inline_files` allows, or a `drafter:` name. drafter inlines the section that starts at the
+  heading whose GitHub-style slug is `<slug>` and runs to the next heading of the same or a higher
+  level. A slug that no heading has inlines as `no excerpt: no heading <slug>`.
+
+The slug is the same one `drafter check` uses for `#anchor` links. The size limit applies to the
+excerpt, not the whole file, so a section of a large file can fit when the file would not.
+
+A project can refuse the stock module with `require_prompts = true` in `drafter.toml`. See
+[Configuration](configuration.md).
+
 ## What the module returns
 
 The module runs as the body of an async function. It returns an object that maps seat names to

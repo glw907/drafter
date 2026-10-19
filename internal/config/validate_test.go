@@ -39,7 +39,14 @@ func TestValidate(t *testing.T) {
 		{"money passes without gate.command", ScopeMoney, func(c *Config) { c.Gate.Command = "" }, ""},
 		{"money passes without seats", ScopeMoney, func(c *Config) { c.Seat = nil }, ""},
 		{"run names missing gate.command", ScopeRun, func(c *Config) { c.Gate.Command = "" }, "gate.command is not set"},
-		{"run names missing prompts", ScopeRun, func(c *Config) { c.Prompts = "" }, "prompts is not set"},
+		{"run passes with prompts unset", ScopeRun, func(c *Config) { c.Prompts = "" }, ""},
+		{
+			"run refuses the stock module under require_prompts", ScopeRun,
+			func(c *Config) { c.Prompts, c.RequirePrompts = "", true },
+			"prompts is not set, and require_prompts in drafter.toml refuses the stock module",
+		},
+		{"require_prompts passes with prompts set", ScopeRun, func(c *Config) { c.RequirePrompts = true }, ""},
+		{"money ignores require_prompts", ScopeMoney, func(c *Config) { c.Prompts, c.RequirePrompts = "", true }, ""},
 		{"run still requires the caps", ScopeRun, func(c *Config) { c.CycleCeiling = 0 }, "cycle_ceiling is not set"},
 		{
 			"run names a seat whose model has no price", ScopeRun,

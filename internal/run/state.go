@@ -37,6 +37,9 @@ type State struct {
 type Input struct {
 	Name string `json:"name"`
 	Hash string `json:"hash"`
+	// Source names where the copy came from, for the prompts module. A state written before the
+	// field existed has none.
+	Source string `json:"source,omitempty"`
 }
 
 // PageState is one page's progress in a run.

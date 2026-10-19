@@ -132,7 +132,13 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 		if st != nil {
 			return cannot(fmt.Errorf("none of the blueprints is in run %s", f.resume))
 		}
-		return writeReadSummary(out, c, pipeline.Summary{Pages: skipped}, f.dryRun)
+		s := pipeline.Summary{Pages: skipped}
+		if name, src, err := c.Module(); err == nil {
+			s.Prompts, s.PromptsHash = name, config.ShortHash(src)
+		} else {
+			s.Prompts = c.ModuleName()
+		}
+		return writeReadSummary(out, c, s, f.dryRun)
 	}
 	k, err := key.Resolve(c)
 	if err != nil {

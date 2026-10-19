@@ -135,7 +135,7 @@ func TestBlueprintCommands(t *testing.T) {
 
 	t.Run("read refuses to start when the prompts lack the blueprint seat", func(t *testing.T) {
 		r := runEnv(t, p.dir, p.env, "read", "--dry-run", "blueprints/docs/guides/rotate-the-api-key.blueprint.yaml")
-		if r.code != 2 || !strings.Contains(r.stderr, `no seat "blueprint"`) {
+		if r.code != 2 || !strings.Contains(r.stderr, "no seat blueprint") {
 			t.Errorf("exit %d, stderr %q, want 2 naming the blueprint seat", r.code, r.stderr)
 		}
 	})
