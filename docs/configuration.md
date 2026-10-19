@@ -287,7 +287,7 @@ the failing lines of a red log. drafter uses the two to attribute each failing s
 | `seats` | project, local | Every seat. | None. |
 | `seat.<name>.agent` | project, local | Unset. | None. |
 | `seat.<name>.model` | project, local | `claude-opus-5-5` | None. |
-| `seat.<name>.effort` | project, local | `high` for `draft`, `low` for `coverage` and `consistency`, `medium` for the rest. | None. |
+| `seat.<name>.effort` | project, local | `high` for `draft`, `low` for `reader`, `coverage`, and `consistency`, `medium` for the rest. | None. |
 | `seat.<name>.max_tokens` | project, local | `64000` for `draft`, `32000` for the rest. | None. |
 | `seat.<name>.inputs` | project, local | None. | None. |
 

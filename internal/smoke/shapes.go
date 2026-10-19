@@ -43,7 +43,7 @@ var seatAnswers = []struct {
 	{"structure", assemble.AnswerRead, "medium"},
 	{"editor", assemble.AnswerRead, "medium"},
 	{"fact", assemble.AnswerRead, "medium"},
-	{"reader", assemble.AnswerReader1, "medium"},
+	{"reader", assemble.AnswerReader1, "low"},
 	{"coverage", assemble.AnswerCoverage, "low"},
 	{"consistency", assemble.AnswerConsistency, "low"},
 	{"blueprint", assemble.AnswerRead, "medium"},

@@ -18,6 +18,7 @@ Return your answer to the second question as paraphrase, and the other answers i
 the paraphrase to two sentences and the summary to five sentences. Put every point that needs more
 room in friction, one short entry each, so that summary stays short. Write each field as plain
 text on one line, with no line breaks and no lists inside a string, and no double quote
-characters: describe a quotation in words.
+characters: describe a quotation in words. Return only the JSON object. Each of paraphrase and
+summary is one paragraph of plain sentences. Close each string, then the object.
 
 Step 3 follows in the next turn.
