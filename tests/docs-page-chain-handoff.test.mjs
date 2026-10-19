@@ -334,9 +334,9 @@ async function seatsFor(withOutline) {
   return { half, host, r, seats: r.out, wt: r.wt, home: r.home };
 }
 
-check("DRAFTER_HOST: the script returns the six seats and calls no agent", async () => {
+check("DRAFTER_HOST: the script returns the seven seats and calls no agent", async () => {
   const { r, seats } = await seatsFor(true);
-  assert.deepEqual(Object.keys(seats).sort(), ["blueprint", "draft", "editor", "fact", "reader", "structure"]);
+  assert.deepEqual(Object.keys(seats).sort(), ["blueprint", "coherence", "draft", "editor", "fact", "reader", "structure"]);
   assert.deepEqual(r.calls, []);
   for (const f of Object.values(seats)) assert.equal(typeof f, "function");
 });
