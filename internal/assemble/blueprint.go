@@ -7,18 +7,16 @@ import (
 	"github.com/glw907/drafter/internal/plan"
 )
 
-// BlueprintBlock builds the block the blueprint read appends to its prompt: the blueprint's
-// bytes, the page's outline entry, and the bullet of each fact the blueprint places or cites. The
-// facts are those placedFacts finds on view, the blueprint's projection onto a plan, so a fact
-// the blueprint leaves out is not sent. facts may be nil, which lists ids alone.
+// FactsBlock builds the block the blueprint read sends second: the bullet of each fact the
+// blueprint places or cites. The facts are those placedFacts finds on view, the blueprint's
+// projection onto a plan, so a fact the blueprint leaves out is not sent. facts may be nil, which
+// lists ids alone. The block opens by naming what follows it, because it precedes the blueprint.
 //
 // The block states its own delimiters and none of them is a "=== file:" line, so the request's
 // file inlining never reads it as a path.
-func BlueprintBlock(view *plan.Plan, blueprint, entry []byte, facts *plan.Facts) string {
+func FactsBlock(view *plan.Plan, facts *plan.Facts) string {
 	var b strings.Builder
-	b.WriteString("The blueprint, its outline entry, and the facts it places or cites follow. They are everything you read, apart from the change block when one follows them.\n\n")
-	fmt.Fprintf(&b, "=== blueprint ===\n%s\n=== end blueprint ===\n\n", strings.TrimRight(string(blueprint), "\n"))
-	fmt.Fprintf(&b, "=== outline entry ===\n%s\n=== end outline entry ===\n\n", strings.TrimRight(string(entry), "\n"))
+	b.WriteString("The facts the blueprint places or cites, then the blueprint and its outline entry, follow. They are everything you read, apart from the change block when one follows them.\n\n")
 	b.WriteString("=== facts placed or cited ===\n")
 	ids := placedFacts(view)
 	for _, id := range ids {
@@ -37,6 +35,14 @@ func BlueprintBlock(view *plan.Plan, blueprint, entry []byte, facts *plan.Facts)
 	}
 	b.WriteString("=== end facts ===")
 	return b.String()
+}
+
+// BlueprintBlock builds the block the blueprint read sends third, ahead of any change block: the
+// blueprint's bytes and the page's outline entry. Its delimiters, like FactsBlock's, are never a
+// "=== file:" line.
+func BlueprintBlock(blueprint, entry []byte) string {
+	return fmt.Sprintf("=== blueprint ===\n%s\n=== end blueprint ===\n\n=== outline entry ===\n%s\n=== end outline entry ===",
+		strings.TrimRight(string(blueprint), "\n"), strings.TrimRight(string(entry), "\n"))
 }
 
 func lookup(facts *plan.Facts, id string) (plan.Fact, bool) {

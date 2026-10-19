@@ -49,8 +49,12 @@ type Input struct {
 	FactIDs  []string
 	Declined []edits.DeclinedFinding
 	CustomID string
-	// Extra is a block drafter built itself, sent after the inlined files and never scanned for
-	// paths to inline.
+	// Cached holds blocks drafter built itself, never scanned for paths to inline. When there
+	// are any, the user turn's first cached part is the note, the prompt, and the inlined files,
+	// and each block here follows as its own cached part.
+	Cached []string
+	// Extra is a block drafter built itself, sent after the inlined files and any Cached blocks
+	// and never scanned for paths to inline.
 	Extra string
 }
 
@@ -88,6 +92,11 @@ func Build(ctx context.Context, in Input) (batch.Request, error) {
 		return batch.Request{}, err
 	}
 	parts = append(parts, blocks...)
+	msg := batch.Message{Role: "user"}
+	if len(in.Cached) > 0 {
+		msg.Cached = append([]string{strings.Join(parts, "\n\n")}, in.Cached...)
+		parts = nil
+	}
 	if in.Extra != "" {
 		parts = append(parts, in.Extra)
 	}
@@ -97,7 +106,8 @@ func Build(ctx context.Context, in Input) (batch.Request, error) {
 	parts = append(parts, contract)
 
 	msgs := append([]batch.Message(nil), in.History...)
-	msgs = append(msgs, batch.Message{Role: "user", Text: strings.Join(parts, "\n\n")})
+	msg.Text = strings.Join(parts, "\n\n")
+	msgs = append(msgs, msg)
 	return batch.Request{
 		CustomID:  in.CustomID,
 		Model:     seat.Model,
