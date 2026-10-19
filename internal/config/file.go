@@ -28,6 +28,7 @@ type file struct {
 	Retries         *retriesFile         `toml:"retries"`
 	Gate            *gateFile            `toml:"gate"`
 	Prompts         *string              `toml:"prompts"`
+	RequirePrompts  *bool                `toml:"require_prompts"`
 	Seats           *[]string            `toml:"seats"`
 	Seat            map[string]*seatFile `toml:"seat"`
 	Facts           *factsFile           `toml:"facts"`

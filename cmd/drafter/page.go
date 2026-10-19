@@ -196,6 +196,7 @@ func writeSummaryText(w io.Writer, c *config.Config, s pipeline.Summary, dry boo
 	var b strings.Builder
 	date, from := c.PricesDate()
 	fmt.Fprintf(&b, "prices: %s (%s)\n", date, from)
+	fmt.Fprintf(&b, "prompts: %s %s\n", s.Prompts, s.PromptsHash)
 	if dry {
 		for _, e := range s.Estimates {
 			fmt.Fprintf(&b, "%s: %d input tokens, max_tokens %d, worst case $%.4f\n", e.Seat, e.Tokens, e.MaxTokens, e.Worst)

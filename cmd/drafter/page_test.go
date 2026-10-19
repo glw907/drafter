@@ -63,10 +63,10 @@ func TestSummaryPrintsFindings(t *testing.T) {
 		Detail:   "lumen-key-ttl conflicts with lumen-grace: they disagree",
 	}
 	var text, js bytes.Buffer
-	if err := writeSummaryText(&text, c, pipeline.Summary{Pages: []pipeline.PageResult{page}}, false); err != nil {
+	if err := writeSummaryText(&text, c, pipeline.Summary{Prompts: "drafter:prompts.js", PromptsHash: "sha256:0123456789ab", Pages: []pipeline.PageResult{page}}, false); err != nil {
 		t.Fatal(err)
 	}
-	want := "prices: 2026-10-18 (default)\ndocs/a.md: escalated (plan) $0.2500\n" +
+	want := "prices: 2026-10-18 (default)\nprompts: drafter:prompts.js sha256:0123456789ab\ndocs/a.md: escalated (plan) $0.2500\n" +
 		"  blocking: rotate: A step the page needs is missing.\n" +
 		"  non-blocking: intro: Nit: the opening repeats the title.\n" +
 		"  non-blocking: Already present: the page has no summary.\n" +

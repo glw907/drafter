@@ -37,6 +37,7 @@ var allowedIn = map[string]uint8{
 	"retries":           inAny,
 	"gate":              inProject | inLocal,
 	"prompts":           inProject | inLocal,
+	"require_prompts":   inProject,
 	"seats":             inProject | inLocal,
 	"seat":              inProject | inLocal,
 	"facts":             inProject | inLocal,

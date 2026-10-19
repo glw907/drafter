@@ -136,6 +136,38 @@ type Summary struct {
 	EstimateStage string `json:"estimate_stage,omitempty"`
 	// EstimateTotal is the stage's worst case in US dollars.
 	EstimateTotal float64 `json:"estimate_total,omitempty"`
+	// Prompts names the prompts module the run used and PromptsHash is its short hash. For a run
+	// that copied its inputs, both come from the run's copy, so a resumed run reports the module
+	// it started with.
+	Prompts     string `json:"prompts"`
+	PromptsHash string `json:"prompts_hash"`
+}
+
+// promptsReport returns the module's name and short hash for a Summary. A run that copied its
+// inputs reports the copy recorded in its state; a dry run copies nothing and reports the
+// config's module.
+func (r *runner) promptsReport() (name, hash string) {
+	if in, ok := r.state.Inputs["prompts"]; ok {
+		name = in.Source
+		if name == "" {
+			name = "prompts.js (run copy)"
+		}
+		return name, shortHash(in.Hash)
+	}
+	name, src, err := r.o.Config.Module()
+	if err != nil {
+		return r.o.Config.ModuleName(), ""
+	}
+	return name, config.ShortHash(src)
+}
+
+// shortHash trims a full "sha256:<hex>" hash to the 12 digits a report shows.
+func shortHash(full string) string {
+	const n = len("sha256:") + 12
+	if len(full) > n {
+		return full[:n]
+	}
+	return full
 }
 
 // runner holds one run.
@@ -193,6 +225,7 @@ func (r *runner) warnf(format string, a ...any) {
 // summary reports every page's state.
 func (r *runner) summary() Summary {
 	s := Summary{RunID: r.state.RunID, Stop: r.stop}
+	s.Prompts, s.PromptsHash = r.promptsReport()
 	for _, p := range r.pages {
 		res := PageResult{Path: p.h.Page.Path, Status: p.ps.Status, Scope: p.w.Scope}
 		if p.w.Rec.Escalation != nil {
