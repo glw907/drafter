@@ -589,7 +589,8 @@ Step 2. Answer Part V's open-ended questions:
 Return your answer to the second question as paraphrase, and the other answers in summary. Keep
 the paraphrase to two sentences and the summary to five sentences. Put every point that needs more
 room in friction, one short entry each, so that summary stays short. Write each field as plain
-text on one line, with no line breaks and no lists inside a string.
+text on one line, with no line breaks and no lists inside a string, and no double quote
+characters: describe a quotation in words.
 
 Step 3 follows in the next turn.`;
 }
