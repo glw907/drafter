@@ -675,7 +675,7 @@ func TestReadSince(t *testing.T) {
 			t.Fatalf("exit %d, want 3 for a stopped run\nstdout %s\nstderr %s", code, out, errOut)
 		}
 		fields := strings.Fields(strings.TrimSpace(out[strings.Index(out, "resume with:"):]))
-		id := fields[len(fields)-1]
+		id := fields[slices.Index(fields, "--resume")+1]
 		p.stub.mu.Lock()
 		p.stub.failFrom, p.stub.bodies = 0, nil
 		p.stub.mu.Unlock()
