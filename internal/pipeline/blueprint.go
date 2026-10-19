@@ -56,10 +56,11 @@ func EntryJSON(e blueprint.Page) ([]byte, error) {
 	}, "", "  ")
 }
 
-// changeRead reports whether the page's read judges a change: its comparison is scoped and carries
-// the facts it touched. A scoped state from before Scope.Facts existed reads as whole.
+// changeRead reports whether the page's read judges a change: its read scope is scoped and
+// carries the facts it touched. A scoped state from before Scope.Facts existed reads as whole.
 func (p *page) changeRead() bool {
-	return p.w.Scope != nil && p.w.Scope.Kind == blueprint.ScopeScoped && p.w.Scope.Facts != nil
+	sc := p.w.readScope()
+	return sc != nil && sc.Kind == blueprint.ScopeScoped && sc.Facts != nil
 }
 
 // blueprintInputs loads the page's blueprint and outline at the start commit and runs the
@@ -146,10 +147,11 @@ func (p *page) stageBlueprintRead(ctx context.Context) (*stage, error) {
 			extra := assemble.BlueprintBlock(in.raw, in.entryJSON)
 			if p.changeRead() {
 				c.Scope = "page"
-				if len(p.w.Scope.IDs) > 0 {
-					c.Scope = strings.Join(p.w.Scope.IDs, ",")
+				if ids := p.w.readScope().IDs; len(ids) > 0 {
+					c.Scope = strings.Join(ids, ",")
 				}
-				extra += "\n\n" + scopeSentence(c.Scope) + "\n\n" + p.w.Change
+				c.Findings = p.w.Bar
+				extra += "\n\n" + scopeSentence(c.Scope) + "\n\n" + p.w.readChange()
 			}
 			prompt, err := p.render(seat, c)
 			if err != nil {
@@ -192,7 +194,7 @@ func (p *page) untouched(in *bpInputs, ids []string, with string) bool {
 	if !p.changeRead() || p.r.facts == nil || len(ids) == 0 {
 		return false
 	}
-	sc := p.w.Scope
+	sc := p.w.readScope()
 	for _, id := range ids {
 		if p.r.facts.Count(id) == 0 {
 			return false
@@ -231,6 +233,9 @@ func (p *page) completeBlueprintRead() error {
 	p.w.Rec.addFriction("blueprint", a.Friction)
 	fs := a.findings("blueprint", 0)
 	p.w.Rec.findings(s1, fs)
+	// Set before the consistency branch, so a page escalated on a conflict still records the
+	// findings of a whole read that blocked.
+	p.w.WholeBlocked = a.Verdict == "fix" && !p.changeRead()
 	if raw, ok := p.w.Got["consistency"]; ok {
 		var c consistencyAnswer
 		if err := decodeAnswer(raw, &c); err != nil {
