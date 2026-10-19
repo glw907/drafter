@@ -307,6 +307,11 @@ introduction:
     Nothing.
   notCovered: |
     Other things.
+framing:
+  readers: |
+    A reader doing the thing.
+  introPlan: |
+    Open on the task and say what the page covers.
 orderReason: |
   The steps run in order.
 sections:

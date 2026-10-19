@@ -140,6 +140,8 @@ framing:
     A developer who has the tool installed.
   background: |
     The tool exposes one function.
+  introPlan: |
+    Open on the task and say what the page covers.
 orderReason: |
   The page has one section, so the order is that section.
 sections:

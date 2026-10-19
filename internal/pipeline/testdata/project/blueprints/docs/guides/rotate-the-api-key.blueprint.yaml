@@ -12,6 +12,8 @@ introduction:
 framing:
   readers: |
     A site owner on a 90-day rotation schedule, who knows `lumen-key-ttl`.
+  introPlan: |
+    Open on the task and say what the page covers.
 orderReason: |
   The new key must be live before the old key retires, so creation comes first.
 preconditions: [key-exists]

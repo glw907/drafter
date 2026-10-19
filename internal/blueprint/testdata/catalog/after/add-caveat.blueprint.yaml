@@ -14,6 +14,8 @@ framing:
     An operator who rotates keys on a schedule. The page leans on `f:aaaaaa` for the two-key model.
   background: |
     Keys are long-lived, and the service accepts any key it holds.
+  introPlan: |
+    Open on the task and say what the page covers.
 orderReason: |
   The page runs in the order a reader acts: prepare, rotate, then verify.
 preconditions: [service-access]

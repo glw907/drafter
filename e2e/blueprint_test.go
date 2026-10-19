@@ -33,6 +33,11 @@ introduction:
   notCovered: |
     Revoking a key.
   facts: [f:aaaaaa]
+framing:
+  readers: |
+    A site owner rotating a key.
+  introPlan: |
+    Open on the task and say what the page covers.
 orderReason: |
   The page has one section.
 sections:
