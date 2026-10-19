@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"github.com/glw907/drafter/internal/plan"
+	"github.com/glw907/drafter/stock"
 )
 
 // Names of the checks this package adds to plan's, carried in Finding.Check.
@@ -24,6 +25,7 @@ const (
 	checkTypes      = "types"
 	checkLock       = "lock"
 	checkConvention = "convention"
+	checkFraming    = "framing"
 )
 
 // sectionRef matches a [[section-id]] reference in prose.
@@ -62,6 +64,7 @@ func (p Project) Check(named []string) ([]plan.Finding, error) {
 	for _, rel := range files {
 		c.blueprint(rel)
 	}
+	c.outlineChecks()
 	if len(named) == 0 {
 		c.pairing()
 		c.convention()
@@ -135,9 +138,24 @@ func (c *projectCheck) blueprintData(rel string, data []byte) (*Blueprint, Page)
 	c.findings = append(c.findings, plan.Check(rel, View(b, entry, c.l.facts), opts)...)
 	c.references(rel, b)
 	c.sections(rel, b)
+	c.framing(rel, b)
 	c.handlers(rel, b, entry.Title)
 	c.pageType(entry)
 	return b, entry
+}
+
+// framing requires the framing record to plan the page's introduction. The decoder does not, so a
+// converted blueprint decodes and this check names what is left to write.
+func (c *projectCheck) framing(file string, b *Blueprint) {
+	switch {
+	case b.Lines["framing"] == 0:
+		c.add(file, 1, plan.SeverityError, checkFraming,
+			"the blueprint has no framing, so it plans no introduction", "add framing with an introPlan")
+	case b.Framing.IntroPlan == "":
+		c.add(file, b.Lines["framing"], plan.SeverityError, checkFraming,
+			"framing has no introPlan, so the blueprint plans no introduction",
+			"add framing.introPlan: who arrives, what they know, why they read, and what the page covers and leaves out")
+	}
 }
 
 // sections requires a why on every section and an Only or Omit opening on every use.
@@ -288,7 +306,8 @@ func (c *projectCheck) pageType(entry Page) {
 			"declare the type under types, or use a declared one")
 	case decl.Anatomy == "" && !c.usedTypes[decl.Name]:
 		c.add(c.Outline, cmp.Or(decl.Line, 1), plan.SeverityError, checkTypes,
-			fmt.Sprintf("the type %q names no anatomy", decl.Name), "set anatomy to the name of a register anatomy entry, such as Task guide")
+			fmt.Sprintf("the type %q names no anatomy", decl.Name),
+			"set anatomy to a stock anatomy, one of "+strings.Join(stock.Anatomies, ", ")+", or to an entry in the register of the track that holds the type's pages")
 	}
 	c.usedTypes[entry.Type] = true
 }
