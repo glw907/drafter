@@ -10,6 +10,8 @@
     {"id": "f-creates", "quote": "The command `tally count` creates the .tally file the first time it runs."},
     {"id": "f-quiet", "quote": "The command `tally count` prints nothing."},
     {"id": "f-empty", "quote": "The command `tally total` prints 0 when the .tally file does not exist."},
+    {"id": "x-empty", "quote": "If `tally total` prints 0 although you counted items, you are in the wrong directory."},
+    {"id": "h-dir", "quote": "Run `tally total` in the directory where you ran `tally count`."},
     {"id": "c-pace", "quote": "Pick the items you want to count."},
     {"id": "s-total", "quote": "Run `tally total` in the same directory."},
     {"id": "f-total", "quote": "The command `tally total` prints the saved total."},

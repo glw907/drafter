@@ -34,6 +34,10 @@ The command `tally total` prints the saved total.
 
 The command `tally total` prints 0 when the .tally file does not exist.
 
+If `tally total` prints 0 although you counted items, you are in the wrong directory.
+
+Run `tally total` in the directory where you ran `tally count`.
+
 The file is named .tally.
 
 ## See also

@@ -14,6 +14,8 @@
     {"text": "Run `tally total` in the same directory.", "id": "tally-total-cmd"},
     {"text": "The command `tally total` prints the saved total.", "id": "tally-total-cmd"},
     {"text": "The command `tally total` prints 0 when the .tally file does not exist.", "id": "tally-total-empty"},
+    {"text": "If `tally total` prints 0 although you counted items, you are in the wrong directory.", "id": ["tally-total-empty", "tally-state-file"]},
+    {"text": "Run `tally total` in the directory where you ran `tally count`.", "id": ["tally-total-cmd", "tally-count-cmd"]},
     {"text": "The file is named .tally.", "id": "tally-state-file"},
     {"text": "For the rest of tally, see [the tally readme](../README.md).", "id": "no-claim"}
   ]

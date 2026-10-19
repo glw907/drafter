@@ -84,12 +84,24 @@ sections:
           Run `tally total` in the same directory.
         requires: [counted]
         produces: [total-read]
+        canFail: true
       - id: f-total
         kind: fact
         fact: tally-total-cmd
       - id: f-empty
         kind: fact
         fact: tally-total-empty
+      - id: x-empty
+        kind: failure
+        from: s-total
+        symptom: |
+          `tally total` prints 0 although you counted items.
+        handledBy: h-dir
+        facts: [tally-total-empty, tally-state-file]
+      - id: h-dir
+        kind: handoff
+        text: |
+          Run `tally total` in the directory where you ran `tally count`.
       - id: f-state-again
         kind: fact
         fact: tally-state-file
