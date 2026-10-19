@@ -223,11 +223,7 @@ func walkAnchors(src []byte, heading func(Heading), anchor func(string)) {
 		case *ast.Heading:
 			var b strings.Builder
 			headingText(n, body, &b)
-			line := skipped + 1
-			if n.Lines().Len() > 0 {
-				line += bytes.Count(body[:n.Lines().At(0).Start], []byte("\n"))
-			}
-			heading(Heading{Level: n.Level, Line: line, Slug: sl.slug(b.String())})
+			heading(Heading{Level: n.Level, Line: skipped + headingLine(n, body), Slug: sl.slug(b.String())})
 		case *ast.RawHTML:
 			addElements(n.Segments.Value(body))
 		case *ast.HTMLBlock:
@@ -238,6 +234,33 @@ func walkAnchors(src []byte, heading func(Heading), anchor func(string)) {
 		}
 		return ast.WalkContinue, nil
 	})
+}
+
+// emptyATX matches the line of an ATX heading with no text, capturing its hashes.
+var emptyATX = regexp.MustCompile(`^ {0,3}(#{1,6})[ \t]*(?:#+[ \t]*)?$`)
+
+// headingLine returns the 1-based line of n in src. goldmark gives an ATX heading with no text no
+// source lines, so its line is the first empty-heading line of its level after the last block
+// before it that has any.
+func headingLine(n *ast.Heading, src []byte) int {
+	if n.Lines().Len() > 0 {
+		return 1 + bytes.Count(src[:n.Lines().At(0).Start], []byte("\n"))
+	}
+	from := 0
+	for p := n.PreviousSibling(); p != nil; p = p.PreviousSibling() {
+		if l := p.Lines(); l != nil && l.Len() > 0 {
+			from = l.At(l.Len() - 1).Stop
+			break
+		}
+	}
+	line := 1 + bytes.Count(src[:from], []byte("\n"))
+	for text := range strings.SplitSeq(string(src[from:]), "\n") {
+		if m := emptyATX.FindStringSubmatch(text); m != nil && len(m[1]) == n.Level {
+			return line
+		}
+		line++
+	}
+	return line
 }
 
 // withoutFrontMatter drops a leading --- block, which the parse would otherwise read as a

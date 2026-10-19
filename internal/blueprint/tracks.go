@@ -139,6 +139,9 @@ type registerFile struct {
 }
 
 func (c *projectCheck) readRegister(rel string) registerFile {
+	if !filepath.IsLocal(rel) {
+		return registerFile{err: fmt.Errorf("%s is not a path inside the repository", rel)}
+	}
 	data, err := os.ReadFile(c.abs(rel))
 	if err != nil {
 		return registerFile{err: err}

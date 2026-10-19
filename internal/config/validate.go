@@ -12,8 +12,8 @@ const (
 	// ScopeMoney requires workspace_id, page_cap, and cycle_ceiling. It serves commands that
 	// resolve money settings outside a project.
 	ScopeMoney Scope = iota + 1
-	// ScopeRun adds gate.command, the require_prompts guard, and, for each running seat, its model, effort,
-	// max_tokens, and a price entry for its model.
+	// ScopeRun adds gate.command, the require_prompts guard, and, for each running seat, its
+	// model, effort, max_tokens, and a price entry for its model.
 	ScopeRun
 )
 

@@ -44,6 +44,15 @@
 - [ ] **#5** Read `blueprints.root` from `drafter.toml` in the page hook `#improvement` `#drafter` *(2026-10-18)*
   The hook checks only the conventional `blueprints/` root. `bin/.local/bin/drafter-page-hook`
 
+- [ ] **#15** Label a resumed run's missing-seat error from the run copy `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  On a resume, `loadModules` names the module and picks the stock hint from the current config, not the run's copy, so a stock run resumed after `prompts` is set reads `other.js` with no stock hint. The label is error text only. It could read `state.Inputs["prompts"].Source`. `internal/pipeline/start.go`
+
+- [ ] **#16** Skip fenced code when reading a register's `## The page anatomies` entries `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  A heading or bold-lead bullet inside a code fence under that section counts as an anatomy entry. Low risk. `internal/blueprint/tracks.go`
+
+- [ ] **#17** Make the stock read's anatomy slug match drafter's slugger for non-ASCII names `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  `slug` in `stock/prompts.js` handles only ASCII names, so a non-ASCII anatomy name with no register builds a `drafter:anatomies.md#` token that may not resolve. Every stock name is ASCII today. `stock/prompts.js`
+
 ## Done
 
 - [x] **#12** Stop a base-only fact conflict from escalating a change read `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18 → 2026-10-18)*

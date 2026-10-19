@@ -14,8 +14,7 @@ shows it as `drafter:prompts.js` with a short hash. A run copies the module into
 directory, so a resume after an upgrade uses the module the run started with.
 
 The stock module defines one seat, `blueprint`, which `drafter read` renders. It defines no
-`draft`, `structure`, `editor`, `fact`, or `reader` seat until drafter's stock seat prompts land.
-A run that needs a seat the module lacks refuses before it spends anything, and the error names
+`draft`, `structure`, `editor`, `fact`, or `reader` seat. A run that needs a seat the module lacks refuses before it spends anything, and the error names
 the missing seats. `drafter page` on the stock module refuses this way. Set `prompts` to run it.
 
 ### Name a file or a section in a prompt
@@ -31,8 +30,9 @@ tokens work in any prompt:
   heading whose GitHub-style slug is `<slug>` and runs to the next heading of the same or a higher
   level. A slug that no heading has inlines as `no excerpt: no heading <slug>`.
 
-The slug is the same one `drafter check` uses for `#anchor` links. The size limit applies to the
-excerpt, not the whole file, so a section of a large file can fit when the file would not.
+The slug is the same one `drafter check` uses for `#anchor` links. drafter inlines
+a file or section of at most 256 KiB. The limit applies to the excerpt, not the whole file, so a
+section of a large file can fit when the file would not.
 
 A project can refuse the stock module with `require_prompts = true` in `drafter.toml`. See
 [Configuration](configuration.md).

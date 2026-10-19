@@ -4,10 +4,10 @@ An anatomy is the shape a page type follows: its sections in order, what its int
 covers, and how it closes. Each type in `outline.yaml` names one in its `anatomy` field. drafter
 ships the five anatomies on this page, and a type can name any of them with no other setup.
 
-Each anatomy paraphrases one template from [The Good Docs Project](https://thegooddocsproject.dev/),
-templates release v1.6.0, and links to it. The template gives the sections and their order. It
-never supplies the wording of a page's introduction: you reason each introduction fresh, as
-[Introductions](introductions.md) describes.
+Each anatomy paraphrases one template from [The Good Docs Project](https://thegooddocsproject.dev/)
+and links to it. The templates come from release v1.6.0. A template gives the sections and their
+order. It never supplies the wording of a page's introduction. Write each introduction for the
+page's own readers, as [Introductions](introductions.md) describes.
 
 The blueprint read checks a blueprint's introduction and closing section against its anatomy. The
 other parts of an anatomy guide the plan and the prose, and no read returns a finding under them.
@@ -37,8 +37,8 @@ The sections follow in this order:
 2. Use cases: the situations where the concept applies and what the reader gains from it.
 3. Comparison (optional): how the concept compares with alternatives, often as a table.
 
-Closing section: related resources (optional), the task guides, other concepts, and outside pages
-a reader goes to next.
+Closing section (optional): related resources. It links to the task guides, other concepts, and
+outside pages a reader goes to next.
 
 ## Task guide
 
@@ -58,7 +58,7 @@ The sections follow in this order:
    code sample or screenshot, and the result the reader sees. A step with parts uses substeps.
 3. Subtasks (optional): a large task splits into subtasks, each with its own steps.
 
-Closing section: see also, links to related task guides, concepts, reference entries, and
+Closing section: see also. It links to related task guides, concepts, reference entries, and
 troubleshooting.
 
 ## Tutorial
@@ -82,8 +82,8 @@ The sections follow in this order:
    the result the reader sees.
 4. Summary: what the reader learned, as a short list.
 
-Closing section: next steps, links to related tutorials, task guides, or other pages a reader can
-take on next.
+Closing section: next steps. It links to related tutorials, task guides, or other pages a reader
+can take on next.
 
 ## Reference entry
 
@@ -106,13 +106,12 @@ The sections follow in this order:
 2. Commands (optional): each command's name, what it does, its arguments and whether each is
    required, and an example.
 
-Closing section: none. A reference entry ends with its last entry, since the reader came for one
-detail and leaves once they have it.
+Closing section: none. The reader came for one detail, so the entry ends with its last item.
 
 ## Troubleshooting page
 
 A troubleshooting page helps a reader who hit a problem find its cause and fix it. It's organized
-by symptom, the thing the reader sees, since that is what they arrive knowing. Template:
+by symptom. The symptom is what the reader sees, and it's all they know on arrival. Template:
 [Troubleshooting](https://gitlab.com/tgdp/templates/-/blob/v1.6.0/troubleshooting/template_troubleshooting.md)
 (v1.6.0).
 
@@ -125,4 +124,5 @@ The sections follow in this order, one group per symptom:
 2. For each cause of the symptom, the cause, then the solution or workaround, then what the reader
    sees once it works.
 
-Closing section: more information, links to other pages that can help a reader solve the problem.
+Closing section: more information. It links to other pages that can help a reader solve the
+problem.

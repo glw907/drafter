@@ -76,7 +76,7 @@ func sectionBlock(label string, src []byte, slug string) string {
 	lines := strings.Split(string(src), "\n")
 	end := len(lines)
 	for _, h := range heads[at+1:] {
-		if h.Level <= heads[at].Level {
+		if h.Level <= heads[at].Level && h.Line > heads[at].Line {
 			end = h.Line - 1
 			break
 		}

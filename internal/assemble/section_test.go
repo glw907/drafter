@@ -16,7 +16,8 @@ func TestSectionTokens(t *testing.T) {
 	f.write(t, filepath.Join(f.root, "docs", "register.md"), sectionDoc)
 	f.write(t, filepath.Join(f.root, "docs", "huge.md"), "# Huge\n\n## Small\n\nSMALL-BODY\n\n## Filler\n\n"+strings.Repeat("x", 300<<10)+"\n")
 	f.write(t, filepath.Join(f.root, "docs", "untracked-register.md"), "## Hidden\n\nHIDDEN-BODY\n")
-	f.git(t, "add", "docs/register.md", "docs/huge.md")
+	f.write(t, filepath.Join(f.root, "docs", "empty.md"), "## Alpha\n\nALPHA-BODY\n\n##\n\nAFTER-BODY\n")
+	f.git(t, "add", "docs/register.md", "docs/huge.md", "docs/empty.md")
 
 	tests := []struct {
 		name   string
@@ -42,6 +43,8 @@ func TestSectionTokens(t *testing.T) {
 			[]string{"SMALL-BODY"}, []string{"not inlined: 3"}},
 		{"a section over the limit does not", "Read docs/huge.md#filler now.",
 			[]string{"not inlined: 307"}, []string{"xxxxxxxx"}},
+		{"a bare heading ends the section without a panic", "Read docs/empty.md#alpha now.",
+			[]string{"ALPHA-BODY"}, []string{"AFTER-BODY"}},
 		{"an untracked path's section stays out", "Read docs/untracked-register.md#hidden now.",
 			nil, []string{"HIDDEN-BODY"}},
 	}

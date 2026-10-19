@@ -85,10 +85,12 @@ drafter checks each layer as it loads it and stops at the first problem, naming 
 
 Some problems show up only when a command needs the missing setting. `drafter config` and
 `drafter page` require `workspace_id`, `page_cap`, and `cycle_ceiling`. Inside a project, they also
-require `gate.command`, `prompts`, and, for each seat that runs, the seat's `model`, `effort`,
-`max_tokens`, and a `prices.models` entry for its model. Each of these has a stock default, so a
-new project can run with no gate, seat, or prompts settings. The `consistency` seat is required only when `facts.dir` is set. drafter lists every
-missing setting in one error.
+require `gate.command` and, for each seat that runs, the seat's `model`, `effort`, `max_tokens`,
+and a `prices.models` entry for its model. Each of these has a stock default, so a new project can
+leave them unset. `prompts` is optional too, but the stock prompts module defines only the
+`blueprint` seat, so `drafter page` needs a `prompts` module that defines the others; see
+[The prompts module](prompts-module.md). The `consistency` seat is required only when `facts.dir`
+is set. drafter lists every missing setting in one error.
 
 A project that doesn't want the stock prompts module sets `require_prompts = true` in
 `drafter.toml`. With it set and `prompts` unset, `drafter config`, `drafter page`, and

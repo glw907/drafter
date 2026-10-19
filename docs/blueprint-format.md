@@ -109,7 +109,8 @@ fact. The narration of how the planning session moved against an older plan belo
 message, not here.
 
 The decoder doesn't require `introPlan`, so a converted blueprint still decodes. `drafter convert`
-lists `framing.introPlan` among the choices it leaves to you, and the check holds the line. For
+lists `framing.introPlan` among the choices it leaves to you, and `drafter check` reports it as an
+error until you fill it in. For
 what a good plan for the introduction answers, see the
 [introductions reference](../stock/introductions.md).
 
@@ -224,7 +225,7 @@ stock name. With `tracks`, it reports the same anatomy as an error.
 ### tracks
 
 A track groups the pages one kind of reader uses. An outline with no `tracks`, or with `tracks: []`,
-checks as it did before tracks existed. Each entry of `tracks` has these fields.
+skips the track checks, and an anatomy that isn't a stock name warns instead of failing. Each entry of `tracks` has these fields.
 
 | Field | Required | Holds |
 |---|---|---|
@@ -235,7 +236,7 @@ checks as it did before tracks existed. Each entry of `tracks` has these fields.
 | `register` | no | The repository path of a register file that adds anatomy entries. |
 
 A glob matches a page path segment by segment, as Go's `path.Match` does, except that a `**`
-segment matches any number of segments, none included. `docs/**` matches every page under `docs`,
+segment matches zero or more segments. `docs/**` matches every page under `docs`,
 and `docs/**/*.md` matches `docs/a.md` and `docs/a/b.md`.
 
 With `tracks` declared, `drafter check` reports these states.

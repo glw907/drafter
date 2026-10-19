@@ -2,13 +2,12 @@
 
 Every page opens with an introduction and ends with the closing section its type calls for. This
 page gives the questions you answer before you write an introduction, and where the background a
-reader lacks goes. It doesn't give wording to fill in: you reason each introduction fresh from the
-page's own readers.
+reader lacks goes. It doesn't give wording to fill in. Write each introduction for the page's own readers.
 
 A blueprint plans its introduction in `framing.introPlan`, which `drafter check` requires. The
 blueprint read grades that plan against what the page's sections deliver and against the
-introduction its anatomy requires ([Stock anatomies](anatomies.md)). Each rule below names its
-source.
+introduction its anatomy requires. [Stock anatomies](anatomies.md) lists those parts. Each rule
+below names its source.
 
 ## Start from the reader
 
@@ -18,15 +17,14 @@ answers in `framing.readers`.
 - **Who arrives at the page?** Name each role that reads it. Google's technical writing course
   starts here: "Begin by identifying your audience's role(s)."
   Source: [Google Technical Writing One, Audience](https://developers.google.com/tech-writing/one/audience).
-- **What do they already know?** What a page owes its reader is the gap between what the task
-  needs and what the reader already knows, so a page gives the reader what they need and don't
-  already have.
+- **What do they already know?** A page owes its reader only what they lack for the task. Name
+  what each reader already brings, so the page can skip it.
   Source: [Google Technical Writing One, Audience](https://developers.google.com/tech-writing/one/audience).
 - **Why are they reading?** Name the goal each reader brings to the page. The introduction starts
   from that goal, and the page's scope follows from it.
   Source: [Google Technical Writing One, Documents](https://developers.google.com/tech-writing/one/documents).
 
-A page can serve more than one reader, since an audience can hold several roles. When readers
+A page can serve more than one reader. When readers
 arrive with different goals, the introduction names each goal, so each reader learns early
 whether the page serves them.
 Source: [Google Technical Writing One, Audience](https://developers.google.com/tech-writing/one/audience)
@@ -92,7 +90,7 @@ who lacks it, and in one of two forms:
 - A `sentence` or `reason` item in the section that needs it, citing the facts it rests on, when a
   sentence or two is enough.
 
-Don't explain what the page's readers already know: it's the part of the gap they've closed.
+Don't explain what the page's readers already know.
 Source: [Google Technical Writing One, Audience](https://developers.google.com/tech-writing/one/audience).
 
 `framing.background` stays your planning note about what the page rests on. It is never drafted as
