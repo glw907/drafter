@@ -1,0 +1,29 @@
+version: 1
+types:
+  - name: concept
+    anatomy: Concept page
+  - name: task guide
+    anatomy: Task guide
+  - name: reference
+    anatomy: Reference entry
+pages:
+  - path: README.md
+    managed: false
+  - path: docs/count-items.md
+    slug: count-items
+    title: Count items with tally
+    type: task guide
+    job: |
+      Count a list of items with tally and read the total.
+    covers:
+      - Add items to the count.
+      - Read the saved total.
+    outOfScope:
+      - Installing tally.
+tracks:
+  - name: cli-docs
+    reader: |
+      A developer who runs command-line tools and has tally installed.
+    standard: google
+    paths:
+      - docs/**

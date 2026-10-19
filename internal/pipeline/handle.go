@@ -52,8 +52,10 @@ func (p *page) stepSeats() []string {
 		return []string{"consistency"}
 	case stCoverage:
 		return []string{"coverage"}
-	case stDraft, stGateFix, stRedraft, stFinalRedraft:
+	case stDraft, stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix:
 		return []string{"draft"}
+	case stCoherence:
+		return []string{"coherence"}
 	case stRound1:
 		var out []string
 		for _, s := range reviewSeats {
@@ -212,7 +214,7 @@ func (p *page) validate(seat, text string) error {
 		if !json.Valid([]byte(a.Brief)) {
 			return errors.New("the brief is not JSON")
 		}
-	case stGateFix, stRedraft, stFinalRedraft:
+	case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix:
 		var a edits.Answer
 		return decodeAnswer(text, &a)
 	case stCoverage:
@@ -248,8 +250,10 @@ func (p *page) complete(ctx context.Context) error {
 		return p.completeConsistency()
 	case stDraft:
 		return p.completeDraft(ctx)
-	case stGateFix, stRedraft, stFinalRedraft:
+	case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix:
 		return p.completeExchange(ctx)
+	case stCoherence:
+		return p.completeCoherence()
 	case stCoverage:
 		return p.completeCoverage()
 	case stRound1:
@@ -311,7 +315,7 @@ func (p *page) completeDraft(ctx context.Context) error {
 	p.w.DraftHist = append(slices.Clone(p.w.Sent["draft"]), batch.Message{Role: "assistant", Text: p.w.Got["draft"]})
 	p.w.Got = nil
 	p.w.PendingGate = exDraft
-	if err := p.writeFiles(a.Page, a.Brief); err != nil {
+	if err := p.writeFiles(a.Page, a.Brief, nil); err != nil {
 		return err
 	}
 	return p.gateStep(ctx, exDraft)
@@ -357,7 +361,7 @@ func (p *page) completeReader() error {
 	p.w.Rec.verdict(s7, "reader", a.Verdict)
 	p.w.Rec.addFriction("reader", a.Friction)
 	if a.Verdict == "ok" {
-		return p.accept()
+		return p.reviewed()
 	}
 	fs := a.findings("reader", 0)
 	p.w.Rec.findings(s7, fs)
@@ -375,6 +379,45 @@ func (p *page) completeReader() error {
 	return nil
 }
 
+// reviewed ends a page whose review has passed. A section redraft goes on to the coherence read,
+// which reads the whole page once its changed sections are in; any other page accepts.
+func (p *page) reviewed() error {
+	if !p.w.Section {
+		return p.accept()
+	}
+	p.w.Got = nil
+	p.ps.Step = stCoherence
+	return nil
+}
+
+// completeCoherence acts on the coherence read. An ok accepts the page. A first fix opens an
+// exchange on the read's findings, with no region bound, since a finding may lie anywhere; a fix on
+// the retest after that exchange escalates.
+func (p *page) completeCoherence() error {
+	a, err := parseRead(p.w.Got["coherence"])
+	if err != nil {
+		return err
+	}
+	p.w.Rec.verdict(s8, "coherence", a.Verdict)
+	p.w.Rec.addFriction("coherence", a.Friction)
+	if a.Verdict == "ok" {
+		return p.accept()
+	}
+	fs := a.findings("coherence", 0)
+	p.w.Rec.findings(s8, fs)
+	if p.w.CoherenceRetest {
+		var ns []int
+		for _, f := range fs {
+			ns = append(ns, f.N)
+		}
+		return p.escalate("coherence", "coherence", ns, "the coherence retest returned fix")
+	}
+	p.w.Ex = &exchange{Kind: exCoherence, Findings: fs}
+	p.w.Got = nil
+	p.ps.Step = stCoherenceFix
+	return nil
+}
+
 // completeExchange applies an edit-contract answer, or sends its refusal back.
 func (p *page) completeExchange(ctx context.Context) error {
 	ex := p.w.Ex
@@ -389,7 +432,11 @@ func (p *page) completeExchange(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	ap, err := edits.Apply(pageText, briefText, ex.Findings, ex.Resolutions, ans)
+	b, err := p.bound(ex)
+	if err != nil {
+		return err
+	}
+	ap, err := edits.Apply(pageText, briefText, ex.Findings, ex.Resolutions, ans, b)
 	if ref, ok := errors.AsType[*edits.Refusal](err); ok {
 		return p.refused(ex, ref, briefText)
 	} else if err != nil {
@@ -399,7 +446,7 @@ func (p *page) completeExchange(ctx context.Context) error {
 	p.w.Rec.resolutions(exchangeStage(ex.Kind), ex.Resolutions)
 	if ap.Page != pageText || ap.Brief != briefText {
 		p.w.PendingGate = ex.Kind
-		if err := p.writeFiles(ap.Page, ap.Brief); err != nil {
+		if err := p.writeFiles(ap.Page, ap.Brief, ex); err != nil {
 			return err
 		}
 	}

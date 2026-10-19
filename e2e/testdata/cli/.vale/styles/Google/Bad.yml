@@ -1,0 +1,5 @@
+extends: existence
+message: "avoid '%s'"
+level: error
+tokens:
+  - foobarbaz

@@ -64,6 +64,13 @@ type Options struct {
 	// judges beside the blueprint. It is recorded in the pages' state, so a resume sends the same
 	// bytes.
 	Changes map[string]string
+	// Draft makes the run draft its blueprint pages after the blueprint read accepts them. Without
+	// it a blueprint page ends at the read, as under drafter read.
+	Draft bool
+	// SkipRead holds the blueprint pages, keyed by page path, whose blueprint read is skipped
+	// because the lock's accepted id already matches the blueprint. Both Draft and SkipRead are
+	// recorded in the pages' state, so a resume needs neither.
+	SkipRead map[string]bool
 	// Command names the command that started the run, for the resume hint; "drafter page" when
 	// empty.
 	Command string

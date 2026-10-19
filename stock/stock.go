@@ -29,6 +29,18 @@ var Anatomies = []string{
 	"Troubleshooting page",
 }
 
+//go:embed google-description.md
+var googleDescription []byte
+
+//go:embed google-tells.md
+var googleTells []byte
+
+//go:embed google-rubric.md
+var googleRubric []byte
+
+//go:embed google-corpus.md
+var googleCorpus []byte
+
 // Files returns the embedded file name holds, for the "drafter:" prompt token.
 func Files(name string) ([]byte, bool) {
 	switch name {
@@ -38,6 +50,14 @@ func Files(name string) ([]byte, bool) {
 		return anatomies, true
 	case "introductions.md":
 		return introductions, true
+	case "google-description.md":
+		return googleDescription, true
+	case "google-tells.md":
+		return googleTells, true
+	case "google-rubric.md":
+		return googleRubric, true
+	case "google-corpus.md":
+		return googleCorpus, true
 	}
 	return nil, false
 }

@@ -27,16 +27,23 @@ type pageFlags struct {
 func newPageCmd() *cobra.Command {
 	var f pageFlags
 	cmd := &cobra.Command{
-		Use:   "page [flags] [handoff-file...]",
+		Use:   "page [flags] [handoff-file | blueprint | page]...",
 		Short: "Run planned pages through the drafting pipeline",
 		Long: `Take each handoff file's page through the pipeline: plan check, draft, gate, coverage,
 review reads, redraft, and the final reader. The handoffs come from files, or from a chain's
 Workflow run file with --workflow-run. The command spends on the API key the configuration names
 and never commits.
 
+An argument that ends in .blueprint.yaml is a blueprint, and one that ends in .md is a page,
+mapped to its blueprint. The command reads each blueprint, drafts the page from it, and records
+the page in drafted.lock when it is accepted. A page whose blueprint, facts, and outline entry
+match its lock entry is not run, and the command says it is up to date. After a blueprint change,
+only the sections the change touched are redrafted, and a read of the whole page for coherence
+follows. Give handoff files or blueprints and pages, not both.
+
 --dry-run assembles the first stage's requests, counts their tokens, prints each request's size
 and the stage's worst-case cost, and submits nothing. --resume continues a stopped run; give the
-same handoffs again.
+same arguments again.
 
 The exit status is 0 when every page was accepted, 1 when any page escalated, 2 when the run could
 not start or hit an error, and 3 when the run stopped and can be resumed, which outranks 1.`,
@@ -76,7 +83,27 @@ func dryExitCode(s pipeline.Summary) int {
 	return 0
 }
 
+// isBlueprintArg reports whether a page argument names a blueprint or a page, as opposed to a
+// handoff file.
+func isBlueprintArg(a string) bool {
+	return strings.HasSuffix(a, ".blueprint.yaml") || strings.HasSuffix(a, ".md")
+}
+
 func runPage(cmd *cobra.Command, args []string, f *pageFlags) error {
+	bp := 0
+	for _, a := range args {
+		if isBlueprintArg(a) {
+			bp++
+		}
+	}
+	switch {
+	case bp > 0 && bp < len(args):
+		return usageError(cmd, "give handoff files, or blueprints and pages, not both")
+	case bp > 0 && f.workflowRun != "":
+		return usageError(cmd, "give blueprints and pages or --workflow-run, not both")
+	case bp > 0:
+		return runPageBlueprints(cmd, args, f)
+	}
 	handoffs, err := readHandoffs(cmd, args, f)
 	if err != nil {
 		return err
@@ -111,17 +138,21 @@ func runPage(cmd *cobra.Command, args []string, f *pageFlags) error {
 		}
 		return exitError{code: exitCannotRun, msg: msg}
 	}
-	out := cmd.OutOrStdout()
-	if c.Output == "json" {
-		err = writeSummaryJSON(out, c, s)
-	} else {
-		err = writeSummaryText(out, c, s, f.dryRun)
-	}
-	if err != nil {
+	return finishPage(cmd, c, s, f.dryRun)
+}
+
+// finishPage prints a run's summary and returns the exit status it earns.
+func finishPage(cmd *cobra.Command, c *config.Config, s pipeline.Summary, dry bool) error {
+	if err := writeReadSummary(cmd.OutOrStdout(), c, s, dry); err != nil {
 		return err
 	}
+	return pageExit(s, dry)
+}
+
+// pageExit is the exit status of a run whose summary has been printed.
+func pageExit(s pipeline.Summary, dry bool) error {
 	code := exitCodeFor(s)
-	if f.dryRun {
+	if dry {
 		code = dryExitCode(s)
 	}
 	if code != 0 {

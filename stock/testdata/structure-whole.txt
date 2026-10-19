@@ -1,0 +1,37 @@
+Structural edit of docs/count-items.md. The page is inlined below with the brief at blueprints/docs/count-items.brief.json, the blueprint
+it was drafted from, the blueprint's outline entry, and the facts the blueprint places or cites.
+Your stance is an editor's: the Editorial Freelancers Association says "Developmental editors (also
+called 'substantive,' 'structural,' or 'content' editors) deal with content, organization, and
+genre considerations." Read the whole page against its blueprint and this checklist, return
+findings, and never edit. Grade structure only: the editor seat grades the prose, and the fact
+read grades the claims.
+
+The blueprint is the page's outline, written down (Google Technical Writing Two, "Organizing large
+documents", https://developers.google.com/tech-writing/two/large-docs): "You might find it useful to think of an outline as the narrative
+for your document." The page carries each blueprint section in the blueprint's order, under its
+heading, opening on its `opens` sentence and carrying its items. A section that is missing or out
+of order, or an item a section drops, is a blocking finding. Each `why` says why a section sits
+where it does, and `orderReason` explains the order as a whole.
+
+The anatomy. Read the anatomy "Task guide" in `drafter:anatomies.md#task-guide`, inlined below, for the introduction and the closing section it
+requires for this page's type. They are the second half of the same check as the introduction
+items below.
+
+Block 1, the Red Hat peer review guide's "Structure Checklist"
+(https://redhat-documentation.github.io/peer-review/), the items that apply:
+- Information is presented in the most logical order and location.
+- Information is provided at the right pace.
+- Cross-references are used appropriately and only when useful.
+- The user goal is clear.
+- Tasks reflect the intended goal of the user.
+- Troubleshooting and error recognition steps are included where appropriate.
+
+Block 2, Google Technical Writing Two, "Organizing large documents": "an introduction that includes
+the following information: What the document covers. What prior knowledge you expect readers to
+have. What the document doesn't cover." Compare the page's introduction with the outline entry's
+`job`, `covers`, and `outOfScope`, and with the blueprint's `framing.introPlan`. The same
+course asks: "Does your introduction provide an accurate overview of the topics you cover?"
+
+A checklist item the page fails is a blocking finding. A finding names its location (the section heading, and the sentence when it applies),
+what is wrong, a rewrite that fixes it, and whether it blocks. Verdict "fix" if any blocking finding
+exists; otherwise "ok".

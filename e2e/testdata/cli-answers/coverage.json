@@ -1,0 +1,21 @@
+{
+  "items": [
+    {"id": "f-state", "quote": "Tally keeps its count in a file named .tally in the current directory."},
+    {"id": "c-dir", "quote": "Run every tally command in the same directory."},
+    {"id": "s-reset", "quote": "To start from zero, run `tally reset` first."},
+    {"id": "f-reset", "quote": "The command `tally reset` deletes the count file."},
+    {"id": "s-count", "quote": "Run `tally count` with the items you want to add."},
+    {"id": "f-count", "quote": "The command `tally count` adds each item you name on the command line to the total."},
+    {"id": "f-creates", "quote": "The command `tally count` creates the .tally file the first time it runs."},
+    {"id": "f-empty", "quote": "The command `tally total` prints 0 when the .tally file does not exist."},
+    {"id": "x-empty", "quote": "If `tally total` prints 0 although you counted items, you are in the wrong directory."},
+    {"id": "h-dir", "quote": "Run `tally total` in the directory where you ran `tally count`."},
+    {"id": "c-pace", "quote": "Pick the items you want to count."},
+    {"id": "f-example", "quote": "Separate the items you name on the command line with spaces, as in `tally count apples pears`, which adds 2 to the total."},
+    {"id": "f-output", "quote": "After `tally count apples pears` on a new count, the command `tally total` prints 2."},
+    {"id": "s-total", "quote": "Run `tally total` in the same directory."},
+    {"id": "f-total", "quote": "The command `tally total` prints the saved total."},
+    {"id": "f-state-again", "quote": "The file is named .tally."},
+    {"id": "l-readme", "quote": "For the rest of tally, see [the tally readme](../README.md)."}
+  ]
+}

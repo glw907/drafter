@@ -1,0 +1,10 @@
+{
+  "edits": [
+    {"file": "page", "old": "in a file named .tally in the current directory.", "new": "in a file named .tally in the directory where you run it."},
+    {"file": "brief", "old": "in a file named .tally in the current directory.", "new": "in a file named .tally in the directory where you run it."}
+  ],
+  "resolutions": [
+    {"finding": 1, "status": "edited", "edits": [0, 1], "reason": "The fact now says where the file is."},
+    {"finding": 2, "status": "declined", "edits": [], "reason": "This section names the file and not its location."}
+  ]
+}

@@ -25,6 +25,11 @@ const (
 	stFinalRedraft = "finalredraft"
 	stScoped       = "scoped"
 	stDone         = "done"
+	// A section redraft's own steps: the section exchange in place of the draft, and the coherence
+	// read and its fix exchange at the point the page would otherwise accept.
+	stSection      = "section"
+	stCoherence    = "coherence"
+	stCoherenceFix = "coherencefix"
 )
 
 // Stage tokens in a custom_id, the spec's stage numbers.
@@ -36,14 +41,19 @@ const (
 	s5 = "s5"
 	s6 = "s6"
 	s7 = "s7"
+	s8 = "s8"
 )
 
 // Exchange kinds. A draft exchange is the gate-fix conversation after the draft; a redraft
-// exchange answers round 1's findings; a final exchange answers the final reader's.
+// exchange answers round 1's findings; a final exchange answers the final reader's. A section
+// exchange redrafts a section redraft's changed sections, and a coherence exchange answers the
+// coherence read's findings.
 const (
-	exDraft   = "draft"
-	exRedraft = "redraft"
-	exFinal   = "final"
+	exDraft     = "draft"
+	exRedraft   = "redraft"
+	exFinal     = "final"
+	exSection   = "section"
+	exCoherence = "coherence"
 )
 
 // exchange is one edit-contract conversation: the turns so far, every numbered finding it
@@ -54,6 +64,9 @@ type exchange struct {
 	Findings    []edits.Finding    `json:"findings,omitempty"`
 	Resolutions []edits.Resolution `json:"resolutions,omitempty"`
 	Turn        string             `json:"turn"`
+	// GateFix says a red gate has reopened the exchange. Every later turn of it answers gate
+	// findings or a refusal of them, so it stays set, and no region bound applies to those turns.
+	GateFix bool `json:"gate_fix,omitempty"`
 }
 
 // coverageState is where a coverage check stands: its phase (initial, redraft, or final), the
@@ -130,6 +143,15 @@ type work struct {
 	// rule reported as a warning, already present or unplaced.
 	Change  string `json:"change,omitempty"`
 	Demoted int    `json:"demoted,omitempty"`
+	// Draft says the page drafts after its blueprint read, and SkipRead that the read is skipped.
+	// A state saved before drafting existed decodes both as false: a read, not a draft.
+	Draft    bool `json:"draft,omitempty"`
+	SkipRead bool `json:"skip_read,omitempty"`
+	// Section says the page is a section redraft, decided once when it reached its draft path,
+	// since the page changes after the first write. CoherenceRetest says the coherence read is the
+	// retest after its fix.
+	Section         bool `json:"section,omitempty"`
+	CoherenceRetest bool `json:"coherence_retest,omitempty"`
 }
 
 // readerState is the final reader's two-turn conversation.

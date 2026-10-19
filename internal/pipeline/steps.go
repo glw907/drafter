@@ -103,11 +103,20 @@ func (p *page) baselineFor(stage string) string {
 	return ""
 }
 
-// build assembles one request and remembers its turns, which an answer extends into history.
+// build assembles one request and remembers its turns, which an answer extends into history. The
+// first turn of a drafting blueprint page's request carries the blueprint blocks; a later turn
+// has them in its history.
 func (p *page) build(ctx context.Context, stage, seat string, a assemble.Answer, prompt string, hist []batch.Message, declined []edits.DeclinedFinding) (batch.Request, error) {
-	return p.buildInput(ctx, stage, seat, assemble.Input{
+	in := assemble.Input{
 		Answer: a, Prompt: prompt, History: hist, Facts: p.r.facts, FactIDs: p.h.Inputs.FactIDs, Declined: declined,
-	})
+	}
+	if len(hist) == 0 {
+		var err error
+		if in.Cached, in.Extra, err = p.draftingBlocks(seat); err != nil {
+			return batch.Request{}, err
+		}
+	}
+	return p.buildInput(ctx, stage, seat, in)
 }
 
 // buildInput completes in with the page's own fields and assembles it as build does.
@@ -147,8 +156,10 @@ func (p *page) advance(ctx context.Context) (*stage, error) {
 			stg, err = p.stageConsistency(ctx)
 		case stDraft:
 			stg, err = p.stageDraft(ctx)
-		case stGateFix, stRedraft, stFinalRedraft:
+		case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix:
 			stg, err = p.stageExchange(ctx)
+		case stCoherence:
+			stg, err = p.stageCoherence(ctx)
 		case stCoverage:
 			stg, err = p.doCoverage(ctx)
 		case stRound1:
@@ -207,24 +218,34 @@ func (p *page) stageDraft(ctx context.Context) (*stage, error) {
 	return &stage{page: p, name: s2, reqs: []batch.Request{req}}, nil
 }
 
-// exchangeStage names the stage token of an edit exchange.
+// exchangeStage names the stage token of an edit exchange. A section exchange takes the place of
+// the draft, so it shares the draft's stage.
 func exchangeStage(kind string) string {
 	switch kind {
 	case exRedraft:
 		return s5
 	case exFinal:
 		return s7
+	case exCoherence:
+		return s8
 	}
 	return s2
 }
 
+// stageExchange asks the exchange's next turn. The first turn renders the draft seat with the
+// findings: at round 1 for a section exchange, which takes the place of the draft. A bounded turn
+// closes with the sentence that says how to resolve a finding the bound puts out of reach.
 func (p *page) stageExchange(ctx context.Context) (*stage, error) {
 	ex := p.w.Ex
 	prompt := ex.Turn
 	if prompt == "" {
 		c := p.context(prompts.Round2)
 		c.Findings = edits.Render(ex.Findings)
-		if ex.Kind == exFinal {
+		c.Scope = p.sectionScope()
+		switch ex.Kind {
+		case exSection:
+			c.Round = prompts.Round1
+		case exFinal:
 			c.Round, c.AfterFinalRead = prompts.RoundFinal, true
 		}
 		var err error
@@ -232,10 +253,19 @@ func (p *page) stageExchange(ctx context.Context) (*stage, error) {
 			return nil, err
 		}
 	}
+	b, err := p.bound(ex)
+	if err != nil {
+		return nil, err
+	}
 	name := exchangeStage(ex.Kind)
 	req, err := p.build(ctx, name, "draft", assemble.AnswerEdits, prompt, ex.History, nil)
 	if err != nil {
 		return nil, err
+	}
+	if b != nil {
+		last := &req.Messages[len(req.Messages)-1]
+		last.Text += "\n\n" + edits.BoundInstructions()
+		p.w.Sent["draft"] = req.Messages
 	}
 	return &stage{page: p, name: name, reqs: []batch.Request{req}}, nil
 }
@@ -281,15 +311,18 @@ func coverageStage(phase string) string {
 		return s5
 	case covFinal:
 		return s7
+	case covCoherence:
+		return s8
 	}
 	return s3
 }
 
 // The phases of a coverage check.
 const (
-	covInitial = "initial"
-	covRedraft = "redraft"
-	covFinal   = "final"
+	covInitial   = "initial"
+	covRedraft   = "redraft"
+	covFinal     = "final"
+	covCoherence = "coherence"
 )
 
 // toCoverage moves the page to a fresh coverage check.
@@ -317,6 +350,13 @@ func (p *page) afterCoverage() error {
 		}
 		p.w.Got = nil
 		p.ps.Step = stRound2
+	case covCoherence:
+		if len(cov.Misses) > 0 {
+			return p.escalate("coherence", "coverage", nil, missSummary(cov.Misses))
+		}
+		p.w.CoherenceRetest = true
+		p.w.Got = nil
+		p.ps.Step = stCoherence
 	default:
 		if len(cov.Misses) > 0 {
 			return p.escalate("fix after the reader redraft", "coverage", nil, missSummary(cov.Misses))
@@ -369,7 +409,9 @@ func (p *page) stageRound1(ctx context.Context) (*stage, error) {
 	}
 	var reqs []batch.Request
 	for _, seat := range todo {
-		prompt, err := p.render(seat, p.context(prompts.Round1))
+		c := p.context(prompts.Round1)
+		c.Scope = p.sectionScope()
+		prompt, err := p.render(seat, c)
 		if err != nil {
 			return nil, err
 		}
@@ -505,6 +547,7 @@ func (p *page) stageRound2(ctx context.Context) (*stage, error) {
 	var reqs []batch.Request
 	for _, seat := range todo {
 		c := p.context(prompts.Round2)
+		c.Scope = p.sectionScope()
 		c.Narrow = marshalRaw(map[string]json.RawMessage{
 			"baseline": marshalRaw(p.w.Baseline), "own": json.RawMessage(p.w.Round1[seat]),
 		})
@@ -558,7 +601,7 @@ func (p *page) afterRound2(seats []string) error {
 // stageReader asks the final reader's first turn, or its second turn with the job.
 func (p *page) stageReader(ctx context.Context) (*stage, error) {
 	if !p.runs("reader") {
-		return nil, p.accept()
+		return nil, p.reviewed()
 	}
 	round := prompts.Round1
 	if p.w.Reader.Retest {
@@ -641,4 +684,29 @@ func (p *page) afterScoped(seats []string) error {
 	p.w.Reader = readerState{Retest: true}
 	p.ps.Step = stReader1
 	return nil
+}
+
+// stageCoherence asks a section redraft's coherence read: the whole page, with the changed
+// sections named. The retest after the coherence fix is told the findings the fix declined.
+func (p *page) stageCoherence(ctx context.Context) (*stage, error) {
+	// The retest renders at round 2, which is how the stock prompt tells it from the first read.
+	round := prompts.Round1
+	if p.w.CoherenceRetest {
+		round = prompts.Round2
+	}
+	c := p.context(round)
+	c.Scope = p.sectionScope()
+	prompt, err := p.render("coherence", c)
+	if err != nil {
+		return nil, err
+	}
+	var declined []edits.DeclinedFinding
+	if p.w.CoherenceRetest {
+		declined = p.declinedFor("coherence")
+	}
+	req, err := p.build(ctx, s8, "coherence", assemble.AnswerRead, prompt, nil, declined)
+	if err != nil {
+		return nil, err
+	}
+	return &stage{page: p, name: s8, reqs: []batch.Request{req}}, nil
 }

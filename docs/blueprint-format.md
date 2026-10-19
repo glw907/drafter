@@ -322,6 +322,12 @@ committed at `HEAD`, holds no `page` id, and neither file has uncommitted change
 named blueprint before it writes anything, and the first one that doesn't qualify stops the call with
 the page and the fix. The entry it writes keeps `accepted`.
 
+`drafter page` writes a page's entry when it accepts the page. The entry holds the page as written,
+the blueprint as committed at the run's start, and the section hashes of the written page. The
+entry's `accepted` id changes only when the page's blueprint read covered the whole blueprint:
+then `accepted` becomes that blueprint's id. A scoped or skipped read leaves it alone. See
+[What `drafter page` does with a blueprint](#what-drafter-page-does-with-a-blueprint).
+
 ## What `drafter check` checks
 
 `drafter check [--root dir] [--json] [<blueprint>...]` validates every blueprint under the
@@ -534,3 +540,127 @@ applies the register to prose.
 `drafter read` prints each finding under its page with its location and whether it blocks, and
 prints the record's warnings and any escalation detail. `--json` carries the same as fields of the
 page.
+
+## What `drafter page` does with a blueprint
+
+`drafter page` drafts a page from its blueprint. Name the page (`docs/x.md`) or its blueprint
+(`blueprints/docs/x.blueprint.yaml`). An argument that ends in `.blueprint.yaml` is a blueprint,
+one that ends in `.md` is a page, and anything else is a [handoff file](handoff.md). Give one kind
+of argument, not a mix, and don't combine blueprints with `--workflow-run`.
+
+A run starts on a clean worktree and reads every input from the commit it starts at: the blueprint,
+the outline, the facts, the page, and its brief. For each page it first decides what to run, by
+comparing the blueprint with the entry in `drafted.lock`.
+
+| The page | The run |
+|---|---|
+| Has no entry, or an entry with only `accepted`, or no committed page | Drafts the page whole. |
+| Matches its entry: blueprint, facts, and outline entry all unchanged | Isn't run. The command prints `up to date with drafted.lock`, spends nothing, and needs no API key, Vale, or `drafter` on `PATH`. |
+| Changed in its structure: a section added, removed, or reordered, or a page-level field changed | Drafts the page whole, after a read of the change. |
+| Changed in some sections, and has no brief at the start commit | Drafts the page whole, because a section redraft can't cover sentences the brief doesn't list. |
+| Changed in some sections, and a changed fact is cited by a sentence in the page's preamble | Drafts the page whole. |
+| Changed in some sections | Redrafts those sections. |
+
+A changed fact bullet counts for every section that cites it, in the blueprint or in the page's
+brief. The redraft may edit only the changed sections. drafter refuses an edit outside them or on
+a heading. The review reads are narrowed to the same sections. A read of the whole page for
+coherence follows, and its findings, like a gate fix, can change any section. drafter declines a
+finding whose fix lies outside the changed sections, and gives that as the reason.
+
+When the entry's `accepted` id equals the blueprint at the start commit, the blueprint read is
+skipped. That happens after a change to a fact alone.
+
+To tell what changed, drafter needs the outline entry and the facts the earlier draft saw. The
+lock names no commit. drafter walks the history of `drafted.lock` to the commit that introduced
+the page's current entry, and reads the outline entry and the facts from that commit's parent. A
+`drafter read` that rewrites only `accepted` doesn't move the commit. The walk stops at a lock it
+can't decode.
+
+On the stock prompts module, a page whose outline declares tracks must match exactly one, and the
+track must name the `google` standard. A project module is not checked.
+
+### What the run writes
+
+A run writes the page and its brief, and, when it ends with every page decided, the lock. It never
+commits. Commit the page, the brief, and `drafted.lock` together, with nothing committed between
+them and the run's start. If a fact or outline edit is committed on its own after the run starts,
+the next run may not see it. drafter warns and names the files when it finds one.
+
+A run that stopped writes no lock entry, because its pages aren't final. Resume it with
+`drafter page --resume <id>` and the same arguments, and the resume writes the entries of the
+pages accepted before and after the stop. If you discard a stopped run's pages instead, run again.
+If the lock can't be written after the run finished, the command prints the run's summary, then the
+error and the command that resumes the run. The resume submits no request and writes the lock.
+
+## The brief
+
+A brief is the file that maps a page's sentences to the facts they rest on. `drafter page` writes
+it beside the page's blueprint: `blueprints/docs/guide.brief.json` for `docs/guide.md`. Commit it
+with the page.
+
+```json
+{
+  "sentences": [
+    {"text": "Rotating a key needs the admin role.", "id": "f:bbbbbb"},
+    {"text": "The check returns the id of the key that signed.", "id": ["f:cccccc", "f:aaaaaa"]},
+    {"text": "Here is how the rotation works.", "id": "no-claim"}
+  ]
+}
+```
+
+The brief is a JSON object with a `sentences` array, one entry for each sentence of the page's
+prose, in page order. Other fields are ignored. Each entry has these fields:
+
+| Field | Value |
+|---|---|
+| `text` | The sentence as the page has it. Emphasis and code marks don't need to match. |
+| `id` | The bare string `no-claim`, one fact id, or a non-empty list of fact ids. |
+
+A fact id is any string without whitespace or a backtick. A list never holds `no-claim`.
+
+### What `drafter gate` checks in a brief
+
+The stock gate runs the provenance check on a page that has a blueprint, after the blueprint
+checks. A page with a blueprint and no brief prints `no brief for <page>; provenance check
+skipped`. The check reads the brief, the page, the facts store, and the blueprint's `fact` items,
+and every defect it finds is an error. It prints each as `file:line: error: provenance: message
+(fix)`. A defect in a sentence cites the brief, at the line that holds the sentence, and a defect
+in page text cites the page.
+
+The check denies by default. It reports:
+
+- **A shape defect.** The brief isn't valid JSON, isn't an object, or has no `sentences` array.
+  The check stops there.
+- **An unclassified sentence.** The `text` is empty, the `id` is missing or isn't a string or a
+  list of strings, the list is empty, a list holds `no-claim`, or an id has whitespace or a
+  backtick.
+- **An id that doesn't resolve.** Each id must name exactly one bullet in the facts store, and the
+  bullet's tag must be `verified`, `external`, or `vendor`. A `candidate`, `rejected`, or
+  `docs-drift` bullet, or a bullet whose tag doesn't parse, can't be cited. When the project sets
+  no `facts.dir`, every cited id is a defect.
+- **A token no cited fact holds.** The check pulls these from a cited sentence: dates, versions,
+  numerals, paths and URLs, commands, flags, and code names. Each must appear in at least one cited
+  bullet. A numeral or version must appear in the bullet's claim, the text before its `Source:`
+  part. Any other token may also appear in the bullet's source pointers.
+- **A `no-claim` sentence that states a token.** A sentence that names a command or a number cites
+  the fact that states it.
+- **A sentence that isn't on the page, or page text that isn't a sentence.** The page's prose is
+  the page less its front matter, fenced code, HTML comments, `details` and `summary` tags,
+  images, and heading lines. Each brief sentence must occur in it, and nothing but Markdown
+  punctuation may be left over. An empty `sentences` array on a page with prose reports the prose
+  as unclassified page text.
+- **A fact item no sentence cites.** Each `fact` item of the blueprint must be cited by at least
+  one sentence. `drafter page` checks that the sentence sits in the item's section.
+
+A command is a code span that begins with a known command-line tool and has at least one more word.
+The known tools are `git`, `go`, `make`, `npm`, `npx`, `pnpm`, `yarn`, `node`, `curl`, `docker`,
+`python`, `pip`, and `cargo`, and the first word of every code span of two or more words in a fact's
+claim. A project's own tool is read as a command once a fact states it.
+
+When the check passes, the gate prints `provenance: <page>: N sentences (cited X, no-claim Y)`,
+after the other output. The gate holds that line back when the gate fails, so a failure in the
+store alone isn't read as a defect in the page.
+
+The check reads tokens, not meaning. A sentence that contradicts its fact with the fact's own
+tokens passes, and so do a spelled-out number, a unit, a short flag, a bare filename in prose, and
+a snippet in a code span. A reviewer who reads the brief beside the page owns those.

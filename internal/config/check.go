@@ -9,9 +9,11 @@ import (
 	"strings"
 )
 
-// seatNames are the eight seats a configuration may name. A default run lists the first seven;
-// the blueprint seat runs only under drafter read, which validates it itself.
-var seatNames = []string{"draft", "structure", "editor", "fact", "reader", "coverage", "consistency", "blueprint"}
+// seatNames are the nine seats a configuration may name. A default run lists the first seven;
+// the blueprint seat runs under drafter read and drafter page on a blueprint, and the coherence
+// seat runs on every section redraft. Neither is governed by seats, so each command validates the
+// seat itself.
+var seatNames = []string{"draft", "structure", "editor", "fact", "reader", "coverage", "consistency", "blueprint", "coherence"}
 
 // defaultSeats are the seats a run lists when no layer sets seats.
 var defaultSeats = seatNames[:7]

@@ -8,12 +8,15 @@ import (
 	"io"
 	"maps"
 	"os"
+	"os/exec"
+	"path"
 	"slices"
 	"strings"
 
 	"github.com/glw907/drafter/internal/config"
 	"github.com/glw907/drafter/internal/plan"
 	"github.com/glw907/drafter/internal/prompts"
+	"github.com/glw907/drafter/stock"
 	"github.com/spf13/cobra"
 )
 
@@ -85,6 +88,7 @@ func runCheckPrompts(cmd *cobra.Command, f *checkPromptsFlags) error {
 	modulePath := f.module
 	var src []byte
 	var err error
+	var stockRoot string
 	if f.module != "" {
 		if src, err = os.ReadFile(f.module); err != nil {
 			return cannot("read module: %v", err)
@@ -103,6 +107,9 @@ func runCheckPrompts(cmd *cobra.Command, f *checkPromptsFlags) error {
 		}
 		if modulePath, src, err = c.Module(); err != nil {
 			return cannot("%v", err)
+		}
+		if c.Prompts == "" {
+			stockRoot = root
 		}
 	}
 	raw, err := os.ReadFile(f.matrix)
@@ -136,6 +143,12 @@ func runCheckPrompts(cmd *cobra.Command, f *checkPromptsFlags) error {
 		return exitError{code: exitCannotRun, msg: err.Error()}
 	}
 
+	var tracked map[string]bool
+	if stockRoot != "" {
+		if tracked, err = trackedPaths(stockRoot); err != nil {
+			return cannot("%v", err)
+		}
+	}
 	results := make([]promptResult, 0, len(m.Cases))
 	seen := make(map[string]bool, len(m.Cases))
 	for _, c := range m.Cases {
@@ -146,6 +159,10 @@ func runCheckPrompts(cmd *cobra.Command, f *checkPromptsFlags) error {
 			r.Failures = append(r.Failures, promptFailure{"render", err.Error()})
 		} else {
 			r.Failures = append(r.Failures, containment(c.Seat, c.Context, out)...)
+			if tracked != nil {
+				r.Failures = append(r.Failures, stockPaths(c.Context, out, tracked)...)
+				r.Failures = append(r.Failures, stockNames(out)...)
+			}
 			if expect != nil {
 				want, ok := expect[c.Name]
 				switch {
@@ -246,6 +263,80 @@ func containment(seat string, c prompts.Context, out string) []promptFailure {
 		for _, x := range narrow.Own.Findings {
 			if x.Finding != "" && !strings.Contains(out, x.Finding) {
 				fs = append(fs, promptFailure{"findings", fmt.Sprintf("prompt does not contain narrow.own finding %q", x.Finding)})
+			}
+		}
+	}
+	return fs
+}
+
+// stockDenylist holds the strings, matched without regard to case, that the stock module's
+// renderings must not contain: each belongs to one project's tooling, not to a prompt every
+// project receives.
+var stockDenylist = []string{
+	"cairn", "docs/internal", "docs-register", "sveltekit", "cloudflare", "wrangler", "glw907",
+	"npm run check:", "option-map",
+}
+
+// stockNames fails once for each denylisted string that out holds.
+func stockNames(out string) []promptFailure {
+	var fs []promptFailure
+	lower := strings.ToLower(out)
+	for _, s := range stockDenylist {
+		if strings.Contains(lower, s) {
+			fs = append(fs, promptFailure{"names", fmt.Sprintf("prompt contains %q, which the stock module must not name", s)})
+		}
+	}
+	return fs
+}
+
+// trackedPaths lists the files git tracks under root, and their directories, by slash path.
+func trackedPaths(root string) (map[string]bool, error) {
+	out, err := exec.Command("git", "-C", root, "ls-files", "-z").Output()
+	if err != nil {
+		return nil, fmt.Errorf("list the files git tracks: %w", err)
+	}
+	set := map[string]bool{}
+	for p := range strings.SplitSeq(string(out), "\x00") {
+		for p != "" && p != "." {
+			set[p] = true
+			p = path.Dir(p)
+		}
+	}
+	return set, nil
+}
+
+// stockPaths fails each path-shaped token of out that does not resolve. The tokens split as
+// assemble splits them. The context's page.path and page.brief are the run's own outputs, so
+// they are exempt.
+func stockPaths(c prompts.Context, out string, tracked map[string]bool) []promptFailure {
+	var page struct {
+		Path  string `json:"path"`
+		Brief string `json:"brief"`
+	}
+	_ = json.Unmarshal(c.Page, &page)
+	var fs []promptFailure
+	seen := map[string]bool{}
+	for tok := range strings.FieldsFuncSeq(out, func(r rune) bool {
+		return r == ' ' || r == '\t' || r == '\n' || r == '\r' || strings.ContainsRune("`'\"()[]<>,", r)
+	}) {
+		tok = strings.TrimRight(tok, ".,;:")
+		tok, _, _ = strings.Cut(tok, "#")
+		if seen[tok] {
+			continue
+		}
+		seen[tok] = true
+		name, isStock := strings.CutPrefix(tok, "drafter:")
+		switch {
+		case isStock:
+			if _, ok := stock.Files(name); !ok {
+				fs = append(fs, promptFailure{"path", fmt.Sprintf("prompt names %q, which is not a stock file", tok)})
+			}
+		case strings.Contains(tok, "/") && !strings.Contains(tok, "://"):
+			if tok == page.Path || tok == page.Brief {
+				continue
+			}
+			if !tracked[strings.TrimSuffix(tok, "/")] {
+				fs = append(fs, promptFailure{"path", fmt.Sprintf("prompt names %q, which the project does not track", tok)})
 			}
 		}
 	}

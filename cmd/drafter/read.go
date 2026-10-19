@@ -238,7 +238,7 @@ func scopePages(c *config.Config, root, since, head, rev string, handoffs []hand
 			continue
 		}
 		if sc.Kind == blueprint.ScopeScoped {
-			block, err := changeBlock(root, since, head, h.Plan, sc, old, cur)
+			block, err := changeBlock(root, diffEnds{from: since, to: head, file: h.Plan}, sc, old, cur)
 			if err != nil {
 				sc = blueprint.Scope{Kind: blueprint.ScopeWhole, Why: "the change could not be built: " + err.Error()}
 			} else {
@@ -251,13 +251,29 @@ func scopePages(c *config.Config, root, since, head, rev string, handoffs []hand
 	return kept, skipped
 }
 
-// changeBlock builds the block a scoped read judges: the blueprint's diff between the two
-// commits, each touched fact whose bullet changed, and the outline entry when it changed. The diff
-// flags keep a user's git configuration out of the bytes.
-func changeBlock(root, since, head, file string, sc blueprint.Scope, old, cur blueprint.Revision) (string, error) {
-	diff, err := exec.Command("git", "-C", root, "diff", "--no-color", "--no-ext-diff", "--no-textconv", since, head, "--", file).Output()
+// diffEnds are the two sides of a blueprint diff: two commits, limited to the blueprint at file,
+// or, with blobs set, two blob ids. A blob diff labels its hunks with the ids, so the block opens
+// with a line that names the file.
+type diffEnds struct {
+	from, to string
+	file     string
+	blobs    bool
+}
+
+// changeBlock builds the block a scoped read judges: the blueprint's diff between the two ends,
+// each touched fact whose bullet changed, and the outline entry when it changed. The diff flags
+// keep a user's git configuration out of the bytes.
+func changeBlock(root string, ends diffEnds, sc blueprint.Scope, old, cur blueprint.Revision) (string, error) {
+	args := []string{"-C", root, "diff", "--no-color", "--no-ext-diff", "--no-textconv", ends.from, ends.to}
+	if !ends.blobs {
+		args = append(args, "--", ends.file)
+	}
+	diff, err := exec.Command("git", args...).Output()
 	if err != nil {
 		return "", fmt.Errorf("git diff: %w", err)
+	}
+	if ends.blobs && len(diff) > 0 {
+		diff = append([]byte("Blueprint file: "+ends.file+"\n"), diff...)
 	}
 	var facts []assemble.FactChange
 	for _, id := range sc.Facts {
@@ -288,13 +304,16 @@ func changeBlock(root, since, head, file string, sc blueprint.Scope, old, cur bl
 	return assemble.ChangeBlock(string(diff), facts, oldEntry, newEntry), nil
 }
 
+// gitShow returns the file at rel as committed at rev, untrimmed.
+func gitShow(root, rev, rel string) ([]byte, error) {
+	return exec.Command("git", "-C", root, "show", rev+":"+rel).Output()
+}
+
 // revisionAt gathers a page's blueprint, outline entry, and facts store as committed at rev. What
 // rev lacks or cannot decode comes back empty, which Compare reads as a reason to read the whole
 // page.
 func revisionAt(c *config.Config, root, rev string, h handoff.Handoff) blueprint.Revision {
-	show := func(rel string) ([]byte, error) {
-		return exec.Command("git", "-C", root, "show", rev+":"+rel).Output()
-	}
+	show := func(rel string) ([]byte, error) { return gitShow(root, rev, rel) }
 	var r blueprint.Revision
 	if out, err := show(h.Plan); err == nil {
 		r.Blueprint = out
@@ -353,11 +372,11 @@ func writeReadSummary(w io.Writer, c *config.Config, s pipeline.Summary, dry boo
 // blueprintHandoffs builds one handoff per blueprint argument. Each page's outline entry comes
 // from the outline as committed at head, so a resume describes the page as the run started.
 func blueprintHandoffs(c *config.Config, root, head string, args []string) ([]handoff.Handoff, error) {
-	outline, err := gitText(root, "show", head+":"+c.Blueprints.Outline)
+	outlineBytes, err := gitShow(root, head, c.Blueprints.Outline)
 	if err != nil {
 		return nil, fmt.Errorf("read the outline at %s: %w", head, err)
 	}
-	o, fs := blueprint.DecodeOutline(c.Blueprints.Outline, []byte(outline))
+	o, fs := blueprint.DecodeOutline(c.Blueprints.Outline, outlineBytes)
 	if o == nil || plan.HasError(fs) {
 		return nil, fmt.Errorf("the outline at %s is malformed; run drafter check", c.Blueprints.Outline)
 	}
@@ -384,15 +403,20 @@ func blueprintHandoffs(c *config.Config, root, head string, args []string) ([]ha
 		if err != nil {
 			return nil, err
 		}
-		ctx, err := json.Marshal(map[string]any{"resolved": map[string]any{"pages": []any{entryJSON(o, *entry)}}})
+		brief := blueprint.BriefPath(c.Blueprints.Root, pagePath)
+		ctx, err := json.Marshal(map[string]any{"resolved": map[string]any{"pages": []any{entryJSON(o, *entry, brief)}}})
+		if err != nil {
+			return nil, err
+		}
+		in, err := draftInputs(c, root, head, rel, outlineBytes, *entry)
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, handoff.Handoff{
 			Version: handoff.Version, Project: root,
-			Page:     handoff.Page{Path: pagePath, Brief: strings.TrimSuffix(blueprint.BlueprintPath(c.Blueprints.Root, pagePath), ".blueprint.yaml") + ".brief.json", Type: entry.Type},
+			Page:     handoff.Page{Path: pagePath, Brief: brief, Type: entry.Type},
 			Plan:     rel,
-			Inputs:   handoff.Inputs{Job: entry.Job},
+			Inputs:   in,
 			Context:  ctx,
 			Checksum: sum, File: a,
 		})
@@ -401,16 +425,24 @@ func blueprintHandoffs(c *config.Config, root, head string, args []string) ([]ha
 }
 
 // entryJSON is an outline entry in the shape of the chain's JSON outlines, which the prompts
-// module reads from resolved.pages. It adds the anatomy the page's type follows and, when the
-// page's track names one, the register that holds the anatomy's entry.
-func entryJSON(o *blueprint.Outline, p blueprint.Page) map[string]any {
+// module reads from resolved.pages. It adds the anatomy the page's type follows, the page's brief
+// path, the standard its track follows (google when the outline declares no tracks), and the
+// track's reader profile. When the track names a register, it adds the register that holds the
+// anatomy's entry.
+func entryJSON(o *blueprint.Outline, p blueprint.Page, brief string) map[string]any {
 	e := map[string]any{
 		"path": p.Path, "slug": p.Slug, "title": p.Title, "pageType": p.Type, "job": p.Job,
 		"covers": nonNil(p.Covers), "outOfScope": nonNil(p.OutOfScope), "figure": p.Figure,
-		"anatomy": o.AnatomyOf(p.Type),
+		"anatomy": o.AnatomyOf(p.Type), "brief": brief,
 	}
-	if t, ok := o.TrackFor(p.Path); ok && t.Register != "" {
-		e["register"] = t.Register
+	if len(o.Tracks) == 0 {
+		e["standard"] = "google"
+	}
+	if t, ok := o.TrackFor(p.Path); ok {
+		e["standard"], e["reader"] = t.Standard, t.Reader
+		if t.Register != "" {
+			e["register"] = t.Register
+		}
 	}
 	return e
 }

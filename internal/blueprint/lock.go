@@ -51,6 +51,11 @@ func ReadLock(file string) (*Lock, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read lock: %w", err)
 	}
+	return DecodeLock(file, data)
+}
+
+// DecodeLock decodes lock bytes; file names them in errors.
+func DecodeLock(file string, data []byte) (*Lock, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	l := new(Lock)

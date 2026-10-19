@@ -17,6 +17,14 @@ Resolve every numbered finding exactly once, by its number: status edited with t
 The brief must still be valid JSON after your edits. An answer that breaks any of these rules is refused with the problems listed, and you answer again; resolutions from earlier answers stand unless you resolve the same finding again.`
 }
 
+// BoundInstructions returns the sentence a bounded turn appends after
+// Instructions. Instructions allows declining a blocking finding only when
+// it is wrong about the page, and a finding located outside the sections a
+// bound allows has no edit that could fix it.
+func BoundInstructions() string {
+	return "This answer may change only the sections the redraft names, so resolve a finding located outside them as declined, with the reason that it lies outside the sections this redraft may change."
+}
+
 // Render returns the numbered findings text a redraft answers.
 func Render(fs []Finding) string {
 	var b strings.Builder

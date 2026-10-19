@@ -1,0 +1,125 @@
+version: 1
+argument: |
+  Tally keeps one saved total, and you add to it by naming items.
+introduction:
+  covers: |
+    How to add items to a tally and read the total.
+  priorKnowledge: |
+    The reader has tally installed and a terminal open in the directory they count in.
+  notCovered: |
+    Installing tally.
+framing:
+  readers: |
+    A developer with tally installed who wants a running count.
+  placeInDocSet: |
+    The only task guide in the set.
+  introPlan: |
+    Open on the task and name what the page covers, which is adding items and reading the total. Say what the reader needs first, which is tally installed and a terminal in the directory they count in. Say what the page leaves out, which is installing tally.
+orderReason: |
+  The reader learns where the count lives, then adds items, then reads the total, then finds the readme.
+preconditions: [tally-installed, count-directory]
+sections:
+  - id: before-you-begin
+    heading: Before you begin
+    why: |
+      The reader needs to know where tally keeps the count before adding to it.
+    opens: |
+      Tally saves its count between runs.
+    items:
+      - id: f-state
+        kind: fact
+        fact: tally-state-file
+      - id: c-dir
+        kind: sentence
+        mode: claim
+        text: |
+          Run every tally command in the same directory.
+        facts: [tally-state-file]
+      - id: s-reset
+        kind: step
+        optional: true
+        text: |
+          To start from zero, run `tally reset` first.
+        requires: [tally-installed, count-directory]
+        produces: [clean-count]
+      - id: f-reset
+        kind: fact
+        fact: tally-reset-cmd
+  - id: add-items
+    heading: Add items
+    why: |
+      Adding items is the page's job, so it follows the setup.
+    opens: |
+      Name each item on the command line.
+    items:
+      - id: c-pace
+        kind: sentence
+        mode: verbatim
+        text: |
+          Pick the items you want to count.
+      - id: s-count
+        kind: step
+        text: |
+          Run `tally count` with the items you want to add.
+        requires: [tally-installed, count-directory]
+        produces: [counted]
+      - id: f-count
+        kind: fact
+        fact: tally-count-cmd
+      - id: f-example
+        kind: fact
+        fact: tally-count-example
+      - id: f-creates
+        kind: fact
+        fact: tally-count-creates
+  - id: read-the-total
+    heading: Read the total
+    why: |
+      Reading the total comes last, after the reader has added items.
+    opens: |
+      Print the total to check your count.
+    items:
+      - id: s-total
+        kind: step
+        text: |
+          Run `tally total` in the same directory.
+        requires: [counted]
+        produces: [total-read]
+        canFail: true
+      - id: f-total
+        kind: fact
+        fact: tally-total-cmd
+      - id: f-output
+        kind: fact
+        fact: tally-total-example
+      - id: f-empty
+        kind: fact
+        fact: tally-total-empty
+      - id: x-empty
+        kind: failure
+        from: s-total
+        symptom: |
+          `tally total` prints 0 although you counted items.
+        handledBy: h-dir
+        facts: [tally-total-empty, tally-state-file]
+      - id: h-dir
+        kind: handoff
+        text: |
+          Run `tally total` in the directory where you ran `tally count`.
+      - id: f-state-again
+        kind: fact
+        fact: tally-state-file
+        use: |
+          Only the file's name.
+  - id: see-also
+    heading: See also
+    why: |
+      A task guide closes by pointing the reader to related pages.
+    opens: |
+      The readme covers the rest of tally.
+    items:
+      - id: l-readme
+        kind: link
+        target: ../README.md
+        text: |
+          the tally readme

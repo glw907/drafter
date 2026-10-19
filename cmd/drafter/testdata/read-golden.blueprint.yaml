@@ -1,0 +1,67 @@
+version: 1
+argument: |
+  Tally keeps one saved total, and you add to it by naming items.
+introduction:
+  covers: |
+    How to add items to a tally and read the total.
+  priorKnowledge: |
+    The reader has tally installed and runs commands in a terminal.
+  notCovered: |
+    Installing tally.
+  facts: [tally-state-file]
+framing:
+  readers: |
+    A developer with tally installed who wants a running count.
+  placeInDocSet: |
+    The only task guide in the set.
+  introPlan: |
+    Open on the task and say what the page covers.
+orderReason: |
+  The reader learns where the count lives, then adds items, then reads the total.
+sections:
+  - id: before-you-begin
+    heading: Before you begin
+    why: |
+      The reader needs to know where tally keeps the count before adding to it.
+    opens: |
+      Tally saves its count between runs.
+    items:
+      - id: f-state
+        kind: fact
+        fact: tally-state-file
+  - id: add-items
+    heading: Add items
+    why: |
+      Adding items is the page's job, so it follows the setup.
+    opens: |
+      Name each item on the command line.
+    items:
+      - id: f-count
+        kind: fact
+        fact: tally-count-cmd
+      - id: f-by
+        kind: fact
+        fact: tally-by-flag
+      - id: c-pace
+        kind: sentence
+        mode: claim
+        text: |
+          Add items one at a time so that each one is counted.
+  - id: read-the-total
+    heading: Read the total
+    why: |
+      Reading the total comes last, after the reader has added items.
+    opens: |
+      Print the total to check your count.
+    items:
+      - id: f-total
+        kind: fact
+        fact: tally-total-cmd
+      - id: f-reset
+        kind: fact
+        fact: tally-reset-cmd
+      - id: f-state-again
+        kind: fact
+        fact: tally-state-file
+        use: |
+          Only the file's name.

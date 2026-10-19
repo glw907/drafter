@@ -30,7 +30,7 @@ const (
 	countedTokens = 500
 )
 
-var wantSeats = []string{"draft", "structure", "editor", "fact", "reader", "coverage", "consistency", "blueprint"}
+var wantSeats = []string{"draft", "structure", "editor", "fact", "reader", "coverage", "consistency", "blueprint", "coherence"}
 
 var syncUsage = batch.Usage{InputTokens: 77, OutputTokens: 9, CacheRead: 4}
 
@@ -477,14 +477,14 @@ func TestRun(t *testing.T) {
 		}
 	})
 
-	t.Run("eight distinct custom ids", func(t *testing.T) {
+	t.Run("nine distinct custom ids", func(t *testing.T) {
 		b := f.batch(t, rep.BatchID)
 		seen := map[string]bool{}
 		for _, r := range b.reqs {
 			seen[r.CustomID] = true
 		}
-		if len(b.reqs) != 8 || len(seen) != 8 {
-			t.Errorf("requests = %d, distinct custom_ids = %d, want 8 and 8", len(b.reqs), len(seen))
+		if len(b.reqs) != 9 || len(seen) != 9 {
+			t.Errorf("requests = %d, distinct custom_ids = %d, want 9 and 9", len(b.reqs), len(seen))
 		}
 	})
 
@@ -571,7 +571,7 @@ func TestRunProblems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if len(rep.Problems) != 8 {
+	if len(rep.Problems) != 9 {
 		t.Errorf("problems = %v, want one per request over its counted figure", rep.Problems)
 	}
 }
@@ -643,8 +643,8 @@ func TestResume(t *testing.T) {
 			}
 			return old, all
 		}
-		if old, all := count(); old != 8 || all != 8+9 {
-			t.Errorf("after resume: old-batch lines %d, all %d, want 8 and 17", old, all)
+		if old, all := count(); old != 9 || all != 9+10 {
+			t.Errorf("after resume: old-batch lines %d, all %d, want 9 and 19", old, all)
 		}
 		rep, err = Run(context.Background(), params(f, dir), testShapes(t))
 		if err != nil {
@@ -653,8 +653,8 @@ func TestResume(t *testing.T) {
 		if len(rep.Resumed) != 0 {
 			t.Errorf("third run resumed %v, want nothing", rep.Resumed)
 		}
-		if old, all := count(); old != 8 || all != 8+9+9 {
-			t.Errorf("after third run: old-batch lines %d, all %d, want 8 and 26", old, all)
+		if old, all := count(); old != 9 || all != 9+10+10 {
+			t.Errorf("after third run: old-batch lines %d, all %d, want 9 and 29", old, all)
 		}
 	})
 
@@ -703,8 +703,8 @@ func TestResume(t *testing.T) {
 				t.Errorf("no estimated line keyed %s/%s", intent, s.Seat)
 			}
 		}
-		if len(keys) != 8 || math.Abs(total-worst) > 1e-9 {
-			t.Errorf("estimated keys %d, total %v, want 8 and %v", len(keys), total, worst)
+		if len(keys) != 9 || math.Abs(total-worst) > 1e-9 {
+			t.Errorf("estimated keys %d, total %v, want 9 and %v", len(keys), total, worst)
 		}
 	})
 
