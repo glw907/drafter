@@ -591,3 +591,76 @@ A run that stopped writes no lock entry, because its pages aren't final. Resume 
 pages accepted before and after the stop. If you discard a stopped run's pages instead, run again.
 If the lock can't be written after the run finished, the command prints the run's summary, then the
 error and the command that resumes the run. The resume submits no request and writes the lock.
+
+## The brief
+
+A brief is the file that maps a page's sentences to the facts they rest on. `drafter page` writes
+it beside the page's blueprint: `blueprints/docs/guide.brief.json` for `docs/guide.md`. Commit it
+with the page.
+
+```json
+{
+  "sentences": [
+    {"text": "Rotating a key needs the admin role.", "id": "f:bbbbbb"},
+    {"text": "The check returns the id of the key that signed.", "id": ["f:cccccc", "f:aaaaaa"]},
+    {"text": "Here is how the rotation works.", "id": "no-claim"}
+  ]
+}
+```
+
+The brief is a JSON object with a `sentences` array, one entry for each sentence of the page's
+prose, in page order. Other fields are ignored. Each entry has these fields:
+
+| Field | Value |
+|---|---|
+| `text` | The sentence as the page has it. Emphasis and code marks don't need to match. |
+| `id` | The bare string `no-claim`, one fact id, or a non-empty list of fact ids. |
+
+A fact id is any string without whitespace or a backtick. A list never holds `no-claim`.
+
+### What `drafter gate` checks in a brief
+
+The stock gate runs the provenance check on a page that has a blueprint, after the blueprint
+checks. A page with a blueprint and no brief prints `no brief for <page>; provenance check
+skipped`. The check reads the brief, the page, the facts store, and the blueprint's `fact` items,
+and every defect it finds is an error. It prints each as `file:line: error: provenance: message
+(fix)`. A defect in a sentence cites the brief, at the line that holds the sentence, and a defect
+in page text cites the page.
+
+The check denies by default. It reports:
+
+- **A shape defect.** The brief isn't valid JSON, isn't an object, or has no `sentences` array.
+  The check stops there.
+- **An unclassified sentence.** The `text` is empty, the `id` is missing or isn't a string or a
+  list of strings, the list is empty, a list holds `no-claim`, or an id has whitespace or a
+  backtick.
+- **An id that doesn't resolve.** Each id must name exactly one bullet in the facts store, and the
+  bullet's tag must be `verified`, `external`, or `vendor`. A `candidate`, `rejected`, or
+  `docs-drift` bullet, or a bullet whose tag doesn't parse, can't be cited. When the project sets
+  no `facts.dir`, every cited id is a defect.
+- **A token no cited fact holds.** The check pulls these from a cited sentence: dates, versions,
+  numerals, paths and URLs, commands, flags, and code names. Each must appear in at least one cited
+  bullet. A numeral or version must appear in the bullet's claim, the text before its `Source:`
+  part. Any other token may also appear in the bullet's source pointers.
+- **A `no-claim` sentence that states a token.** A sentence that names a command or a number cites
+  the fact that states it.
+- **A sentence that isn't on the page, or page text that isn't a sentence.** The page's prose is
+  the page less its front matter, fenced code, HTML comments, `details` and `summary` tags,
+  images, and heading lines. Each brief sentence must occur in it, and nothing but Markdown
+  punctuation may be left over. An empty `sentences` array on a page with prose reports the prose
+  as unclassified page text.
+- **A fact item no sentence cites.** Each `fact` item of the blueprint must be cited by at least
+  one sentence. `drafter page` checks that the sentence sits in the item's section.
+
+A command is a code span that begins with a known command-line tool and has at least one more word.
+The known tools are `git`, `go`, `make`, `npm`, `npx`, `pnpm`, `yarn`, `node`, `curl`, `docker`,
+`python`, `pip`, and `cargo`, and the first word of every code span of two or more words in a fact's
+claim. A project's own tool is read as a command once a fact states it.
+
+When the check passes, the gate prints `provenance: <page>: N sentences (cited X, no-claim Y)`,
+after the other output. The gate holds that line back when the gate fails, so a failure in the
+store alone isn't read as a defect in the page.
+
+The check reads tokens, not meaning. A sentence that contradicts its fact with the fact's own
+tokens passes, and so do a spelled-out number, a unit, a short flag, a bare filename in prose, and
+a snippet in a code span. A reviewer who reads the brief beside the page owns those.
