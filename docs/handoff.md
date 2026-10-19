@@ -10,7 +10,7 @@ worktree.
 `drafter page` also takes blueprints and pages, and then needs no handoff: it builds the handoff
 from the blueprint, the outline entry, and the facts. See
 [What `drafter page` does with a blueprint](blueprint-format.md#what-drafter-page-does-with-a-blueprint).
-Handoff files and `--workflow-run` work as before.
+Handoff files and `--workflow-run` work as the rest of this page describes.
 
 ## The handoff file
 

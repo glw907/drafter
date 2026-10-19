@@ -44,9 +44,8 @@ The drafting, structure, and editor seats also read the page's anatomy from
 read the anatomy from that register's anatomies section instead.
 
 The whole draft's prompt states the brief's schema and the provenance rules that
-`drafter gate --page` checks, so that a draft can pass the gate: every sentence of the page's prose
-is in the brief, each sentence cites the facts it rests on or `no-claim`, and a cited sentence
-states nothing its facts don't.
+`drafter gate --page` checks. Every sentence of the page's prose is in the brief. Each sentence
+cites the facts it rests on, or `no-claim`. A cited sentence states nothing its facts don't.
 
 ### Name a file or a section in a prompt
 
@@ -88,9 +87,10 @@ return {
 };
 ```
 
-The seat names are `draft`, `structure`, `editor`, `fact`, `reader`, `coverage`,
-`consistency`, `blueprint`, and `coherence`. The module needs a builder for each seat that runs. Asking for a seat the module
-doesn't define fails with an error that lists the seats it does define.
+The seat names are `draft`, `structure`, `editor`, `fact`, `reader`, `blueprint`, and
+`coherence`. The module needs a builder for each of these seats that runs. drafter builds the
+`coverage` and `consistency` prompts itself, so a module never defines them. Asking for a seat the
+module doesn't define fails with an error that lists the seats it does define.
 
 A builder that throws, and a builder that returns anything other than a string, are errors that
 name the module, the seat, and the line.
@@ -159,8 +159,8 @@ them:
    block: the blueprint's diff and the old and new text of each fact bullet that changed.
 
 The `draft`, `structure`, `editor`, `fact`, and `coherence` requests carry these blocks. The
-`reader` requests carry none of them, since the reader reads as a reader. A prompt names the page
-and its brief by path, so drafter inlines them as files; it never names the blueprint's path.
+`reader` requests carry none of them. The reader sees only the page. A prompt names the page and
+its brief by path, so drafter inlines them as files. It never names the blueprint's path.
 
 ### What each answer holds
 
@@ -200,8 +200,9 @@ Run:
 drafter check-prompts --matrix matrix.json --module prompts.js
 ```
 
-Each prompt must contain its context's `page.path` and, when the context has findings, the
-findings text. With `--expect <file>`, drafter compares each prompt byte for byte with the
+Each prompt except the `blueprint` seat's must contain its context's `page.path` and, when the
+context has findings, the findings text. The `blueprint` prompt must not name `page.path`, because
+its request inlines every path it names and the page isn't written yet. With `--expect <file>`, drafter compares each prompt byte for byte with the
 rendering that the file holds for the same case name. A name on only one side fails. The command
 exits 0 when every case passes, 1 when any case fails, and 2 when it can't read or load an input.
 
@@ -209,8 +210,8 @@ When the project sets no `prompts`, the command checks drafter's stock module, a
 run on each prompt. A project module, set by `prompts` or `--module`, gets neither.
 
 - `path`: every token that looks like a path must resolve. A token is a path when it holds a `/`
-  and no `://`, or begins `drafter:`. A trailing `.`, `,`, `;`, or `:` is trimmed, and a `#slug` is
-  cut first. A repository path must name a file or directory that git tracks, except the
+  and no `://`, or begins `drafter:`. drafter trims a trailing `.`, `,`, `;`, or `:`, then cuts
+  any `#slug`. A repository path must name a file or directory that git tracks, except the
   context's `page.path` and `page.brief`, which the run itself produces. A `drafter:` name must be
   one of the stock files. A token that doesn't resolve fails, and the failure names it.
 - `names`: the prompt must not hold `cairn`, `docs/internal`, `docs-register`, `sveltekit`,

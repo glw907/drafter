@@ -5,10 +5,11 @@ The drafting seat reads these excerpts for the voice of the
 sentences, the reader addressed directly, and the instruction stated plainly. Imitate the voice
 only. Never take an excerpt's facts, terms, product names, or wording into a page.
 
-Each excerpt is a few sentences from one page of the guide, quoted with its title, URL, license,
-and retrieval date. Before each excerpt was added, its page's own footer was checked for the
-license it states. The guide is never copied beyond these excerpts. The excerpts drop the source's
-italics and code formatting, and change nothing else.
+The excerpts are by Google, from its developer documentation style guide. Each is a few sentences
+from one page of the guide, quoted with its title, URL, license, and retrieval date. Each
+excerpt's page states its license in its footer, and this file copies nothing from the guide
+beyond these excerpts. The excerpts drop the source's italics and code formatting, and change
+nothing else.
 
 ## Active voice
 

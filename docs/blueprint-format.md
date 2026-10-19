@@ -324,9 +324,9 @@ the page and the fix. The entry it writes keeps `accepted`.
 
 `drafter page` writes a page's entry when it accepts the page. The entry holds the page as written,
 the blueprint as committed at the run's start, and the section hashes of the written page. The
-entry keeps its `accepted` id, except when the page's blueprint read judged the whole blueprint:
-then `accepted` is the blueprint it accepted. A scoped read and a skipped read leave `accepted`
-alone. See [What `drafter page` does with a blueprint](#what-drafter-page-does-with-a-blueprint).
+entry's `accepted` id changes only when the page's blueprint read covered the whole blueprint:
+then `accepted` becomes that blueprint's id. A scoped or skipped read leaves it alone. See
+[What `drafter page` does with a blueprint](#what-drafter-page-does-with-a-blueprint).
 
 ## What `drafter check` checks
 
@@ -562,17 +562,17 @@ comparing the blueprint with the entry in `drafted.lock`.
 | Changed in some sections | Redrafts those sections. |
 
 A changed fact bullet counts for every section that cites it, in the blueprint or in the page's
-brief. The redraft edits only the changed sections, under a bound: an edit outside them, or on a
-heading, is refused. The review reads are narrowed to the same sections. A read of the whole page
-for coherence follows, and its findings can change any section. A gate fix can too. A finding the
-bound can't fix is declined with the reason that it lies outside the changed sections.
+brief. The redraft may edit only the changed sections. drafter refuses an edit outside them or on
+a heading. The review reads are narrowed to the same sections. A read of the whole page for
+coherence follows, and its findings, like a gate fix, can change any section. drafter declines a
+finding whose fix lies outside the changed sections, and gives that as the reason.
 
 When the entry's `accepted` id equals the blueprint at the start commit, the blueprint read is
 skipped. That happens after a change to a fact alone.
 
 To tell what changed, drafter needs the outline entry and the facts the earlier draft saw. The
-lock names no commit, so drafter finds the commit that introduced the page's current entry, by
-walking the history of `drafted.lock`, and reads those two from that commit's parent. A
+lock names no commit. drafter walks the history of `drafted.lock` to the commit that introduced
+the page's current entry, and reads the outline entry and the facts from that commit's parent. A
 `drafter read` that rewrites only `accepted` doesn't move the commit. The walk stops at a lock it
 can't decode.
 
@@ -583,8 +583,8 @@ track must name the `google` standard. A project module is not checked.
 
 A run writes the page and its brief, and, when it ends with every page decided, the lock. It never
 commits. Commit the page, the brief, and `drafted.lock` together, with nothing committed between
-them and the run's start. A fact or outline edit committed on its own after the run began can hide
-from the next run, so drafter warns and names the files when it finds one.
+them and the run's start. If a fact or outline edit is committed on its own after the run starts,
+the next run may not see it. drafter warns and names the files when it finds one.
 
 A run that stopped writes no lock entry, because its pages aren't final. Resume it with
 `drafter page --resume <id>` and the same arguments, and the resume writes the entries of the

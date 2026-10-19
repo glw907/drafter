@@ -53,6 +53,21 @@
 - [ ] **#17** Make the stock read's anatomy slug match drafter's slugger for non-ASCII names `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
   `slug` in `stock/prompts.js` handles only ASCII names, so a non-ASCII anatomy name with no register builds a `drafter:anatomies.md#` token that may not resolve. Every stock name is ASCII today. `stock/prompts.js`
 
+- [ ] **#18** Retry a reader read that stops at `max_tokens` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  The reader's schema lets the model run a string on past its end: in the B3 live runs about one reader call in four filled its 32000-token ceiling with repeated blank lines, quotes, or tags, and the page escalated as an unreadable reader at about $1.2. `noRetry` gives `stReader1` and `stReader2` no second try by design. The reader prompt now asks for plain text and the stock reader runs at low effort, which cut the rate in a replay but not to zero. A single retry of a `max_tokens` stop, or a lower `max_tokens` for the reader, needs Geoff's ruling because it changes the failures table. `internal/pipeline/handle.go`
+
+- [ ] **#19** Detect a redraft that rewrites the page to the same bytes `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  A fact bullet changes, the redraft writes byte-identical text, and the lock entry comes out identical too, so the next run sees the same fact change and redrafts again. The lock's commit field (B4) closes it. `cmd/drafter/draftscope.go`
+
+- [ ] **#20** Run the consistency read when the blueprint read is skipped and a cited fact changed `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  When the lock's `accepted` equals the blueprint at the start commit, the one stage-1 batch is skipped, so a fact bullet changed since the last read drafts with no fresh consistency read. The same skip leaves a change to the outline entry alone with no change read, though the plan's table calls for one. `internal/pipeline/blueprint.go`
+
+- [ ] **#21** Record the start commit in a lock entry `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  The lock names no commit, so `drafter page` infers what the draft saw from the parent of the commit that introduced the entry, and a fact or outline edit committed alone between a run's start and its lock commit can hide from the next run. It warns now. A start-commit field replaces the walk (B4). `internal/blueprint/drafted.go`
+
+- [ ] **#22** Let a stopped pre-B3 run resume across the new `coherence` seat `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  The fingerprint hashes every configured seat, so a run stopped before B3 refuses to resume with "the configuration changed since the run started (seat.coherence.…)". Fixing it edits `fingerprint.go`, which needs the auth-data bar. Resume such a run with the old binary before installing the new one. `internal/pipeline/fingerprint.go`
+
 ## Done
 
 - [x] **#12** Stop a base-only fact conflict from escalating a change read `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18 → 2026-10-18)*

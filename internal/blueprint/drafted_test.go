@@ -73,8 +73,9 @@ func TestLockIntroducedAt(t *testing.T) {
 			return "", redrafted
 		}},
 		{"a historical lock that does not decode stops the walk", func(t *testing.T, root string) (string, LockEntry) {
-			commitFile(t, root, draftedLock, "version: 1\nfuture-field: x\n", "an older format")
-			return commitLock(t, root, map[string]LockEntry{page: drafted}, "lock A"), drafted
+			commitLock(t, root, map[string]LockEntry{page: drafted}, "lock A")
+			commitFile(t, root, draftedLock, "version: 1\nfuture-field: x\n", "an older format between two good locks")
+			return commitLock(t, root, map[string]LockEntry{page: drafted}, "lock C"), drafted
 		}},
 	}
 	for _, tt := range tests {

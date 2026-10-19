@@ -108,8 +108,7 @@ Source: [Voice and tone](https://developers.google.com/style/tone)
 
 ## Use common contractions
 
-Use common two-word contractions, such as "don't" and "isn't", for a conversational tone. A
-negative contraction is harder to misread than a "not" a scanning reader can miss. Don't invent
-contractions or stack three words into one.
+Use common two-word contractions, such as "don't" and "isn't", for a conversational tone. Don't
+invent contractions or stack three words into one.
 
 Source: [Contractions](https://developers.google.com/style/contractions)

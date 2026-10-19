@@ -184,6 +184,19 @@ func TestPageRefusesTheStockModuleOnATrackMismatch(t *testing.T) {
 	})
 }
 
+func TestPageRefusesALockItCannotReadBeforeAnyRequest(t *testing.T) {
+	f := newCLIFixture(t)
+	f.write(tallyLock, "version: 1\nfuture-field: x\n")
+	f.commit("a lock from a later format", tallyLock)
+	code, out, errOut := f.page("--dry-run", tallyPage)
+	if code != 2 || !strings.Contains(out+errOut, tallyLock) {
+		t.Errorf("exit %d, want 2 naming %s\n%s%s", code, tallyLock, out, errOut)
+	}
+	if n := len(f.stub.counts); n != 0 {
+		t.Errorf("%d API calls before the refusal", n)
+	}
+}
+
 func TestBlueprintHandoffsCarryTheDraftingInputs(t *testing.T) {
 	f := newCLIFixture(t)
 	bp := f.read1(tallyBP)
