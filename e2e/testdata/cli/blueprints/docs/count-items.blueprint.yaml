@@ -58,7 +58,7 @@ sections:
         kind: sentence
         mode: verbatim
         text: |
-          Separate the items with spaces.
+          Add your items now.
   - id: read-the-total
     heading: Read the total
     why: |

@@ -16,7 +16,7 @@ The command `tally count` adds each item you name on the command line to the tot
 
 The flag `--by` sets the amount each item adds, and the default is 1.
 
-Separate the items with spaces.
+Add your items now.
 
 ## Read the total
 
