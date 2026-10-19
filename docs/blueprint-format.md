@@ -311,6 +311,7 @@ as an example item.
 | `types` | The page's `type` is one `types` declares, and the type's `anatomy` isn't empty. | error |
 | `lock` | An entry with a `page` id names a page on disk, and an entry with only an `accepted` id names a page the outline lists. | error |
 | `convention` | `blueprints.root` is `blueprints`, and `facts.dir` is `<root>/facts`. | warning |
+| `handler` | A `failure`'s handler gives the reader a next action. A `handledBy` that names only a `fact` item, a `sentence` with `mode: verbatim`, or a `link` or `handoff` that sends the reader back to the section holding the failure's `from` step warns. The message carries the fix: hand off to the step or section that gives the reader a next action. | warning |
 | `store` | Every fact bullet in the facts store has an id no other bullet has, a `Source:`, and one valid tag, and each source pointer names something that exists. See [The facts store](#the-facts-store). | error, or warning for a bare path that doesn't exist |
 
 A prose field that carries a `[[id]]` is `argument`, `orderReason`, the `introduction` parts, the
@@ -442,11 +443,10 @@ the page edits the gate demands, and changes the blueprint to match.
 ## Check what you add
 
 The blueprint read (`blueprintPrompt`) checks each item a change adds or alters against these
-lines, and a change read blocks on a defect in one.
+lines. Which lines block in a change read, and which come back as "Nit:", is set out in [what the read does](#what-drafter-read-does-with-a-blueprint).
 
 - An `example` appears only for a recorded fact, and it never invents output (drafter's own rule: an `example`'s `facts` names what it rests on, see [Items](#items)). See [what the read does](#what-drafter-read-does-with-a-blueprint).
 - A `failure` follows the diagnosis that tells the reader which failure they have, its handler is a next action, and its symptom differs from every existing row (the last clause is drafter's own rule). See [what the read does](#what-drafter-read-does-with-a-blueprint), the Red Hat peer review guide's [Structure checklist](https://redhat-documentation.github.io/peer-review/#_structure) on logical order and troubleshooting steps, and the "Add a failure case" row of [the edit catalog](#the-edit-catalog).
-- A caution about something that can go wrong is a `failure` item with a handler, never a `sentence`. See [what the read does](#what-drafter-read-does-with-a-blueprint), the Red Hat [Structure checklist](https://redhat-documentation.github.io/peer-review/#_structure) on troubleshooting, and the "Add a failure case" row of [the edit catalog](#the-edit-catalog).
 - A `heading` names what the section delivers. See Google's [Headings and titles](https://developers.google.com/style/headings).
 - A `use` scopes a placed fact and never restates it. See [what the read does](#what-drafter-read-does-with-a-blueprint) and [Say what a placement carries](#say-what-a-placement-carries).
 - In a task section, the steps (the actions the reader takes) come before the explanation. See the Red Hat [Structure checklist](https://redhat-documentation.github.io/peer-review/#_structure) on mixed module types and logical order.
@@ -471,3 +471,18 @@ starts "Already present:". The consistency read blocks only on a conflict that t
 change touched, and reports any other conflict as already present. In a change read, a conflict that names no fact
 and no page is recorded as a warning starting "Unplaced:" and never blocks. A blueprint with no earlier
 version at `<rev>` is read whole. A change read writes no `drafted.lock` entry when it accepts.
+
+Within the defects a change adds, the change read blocks on a defect that makes the page wrong, or
+leaves a reader stuck or without a state a later step needs: a claim past its fact, invented
+output, a handler that loops or dead-ends, a state no step supplies, a missing step. Order, pace,
+heading form, field placement, and a `use` that restates its fact come back as non-blocking
+findings that start "Nit:", and a Nit never makes the verdict "fix". A whole read keeps the
+blocking rule above for those.
+
+House register rules apply in neither blueprint read. The page's type sets the introduction and
+closing section it requires, and nothing else in the register is graded here; the editor seat
+applies the register to prose.
+
+`drafter read` prints each finding under its page with its location and whether it blocks, and
+prints the record's warnings and any escalation detail. `--json` carries the same as fields of the
+page.
