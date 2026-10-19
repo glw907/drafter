@@ -5,7 +5,7 @@ types:
   - name: task guide
     anatomy: Task guide
   - name: reference
-    anatomy: Reference page
+    anatomy: Reference entry
 pages:
   - path: README.md
     managed: false

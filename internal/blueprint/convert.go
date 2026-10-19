@@ -324,6 +324,9 @@ func idSlug(s string) string {
 // judgment lists what a person decides after the mechanical mapping, over the decoded blueprint.
 func judgment(b *Blueprint) []string {
 	var out []string
+	if b.Framing.IntroPlan == "" {
+		out = append(out, "framing.introPlan: write it; the check requires a plan for the page's introduction")
+	}
 	for _, s := range b.Sections {
 		out = append(out, fmt.Sprintf("section %q (%s): write its why", s.Heading, s.ID))
 		for _, it := range s.Items {
