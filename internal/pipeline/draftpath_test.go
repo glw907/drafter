@@ -159,7 +159,7 @@ func TestDraftPathAcceptsAWholeDraft(t *testing.T) {
 		h := newBlueprintHarness(t, withPages("a"), withDrafting)
 		s := h.mustRun()
 		mustAccept(t, h, s)
-		if len(h.api.requests) != 2 || h.exists(pageA) {
+		if len(h.api.requests) != 3 || h.exists(pageA) {
 			t.Errorf("requests = %d, page written = %v, want stage 1 only and no page", len(h.api.requests), h.exists(pageA))
 		}
 	})

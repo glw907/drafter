@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -375,6 +376,18 @@ type readStub struct {
 	answer   string
 }
 
+var factListed = regexp.MustCompile("(?:\\\\n|\n)- `([^`]+)` ")
+
+// holdsAnswer is the fact-truth answer that finds every fact the request body lists true.
+func holdsAnswer(body string) string {
+	facts := []map[string]string{}
+	for _, m := range factListed.FindAllStringSubmatch(body, -1) {
+		facts = append(facts, map[string]string{"id": m[1], "verdict": "holds", "excerpt": "", "fix": ""})
+	}
+	b, _ := json.Marshal(map[string]any{"facts": facts})
+	return string(b)
+}
+
 func newReadStub(t *testing.T) *readStub {
 	t.Helper()
 	s := &readStub{}
@@ -396,6 +409,9 @@ func newReadStub(t *testing.T) *readStub {
 			s.mu.Unlock()
 			if answer == "" {
 				answer = `{"verdict":"ok","findings":[],"summary":"read"}`
+				if strings.Contains(string(body), `"fix":{`) {
+					answer = holdsAnswer(string(body))
+				}
 			}
 			quoted, _ := json.Marshal(answer)
 			if refuse {
@@ -700,11 +716,12 @@ func TestReadSince(t *testing.T) {
 
 	t.Run("the change block holds the diff, the changed fact, and the entry change", func(t *testing.T) {
 		p := newSinceProject(t)
-		p.write("blueprints/facts/keys.md", "## Facts\n\n- `f:one` One is old. [verified]\n- `f:other` Other. [verified]\n")
+		p.write("src/one.go", "package one\n\nconst Old = 1\n")
+		p.write("blueprints/facts/keys.md", "## Facts\n\n- `f:one` One is old. Source: `src/one.go:3`. [verified]\n- `f:other` Other. [verified]\n")
 		p.write("blueprints/docs/a.blueprint.yaml", strings.Replace(sinceBlueprint, "        text: |\n          Begin.\n", "        text: |\n          Begin.\n      - id: one-fact\n        kind: fact\n        fact: f:one\n        use: |\n          Only the age.\n", 1))
 		p.git("add", "-A")
 		p.git("commit", "-q", "-m", "facts and a fact item")
-		p.write("blueprints/facts/keys.md", "## Facts\n\n- `f:one` One is new. [verified]\n- `f:other` Other, revised. [verified]\n")
+		p.write("blueprints/facts/keys.md", "## Facts\n\n- `f:one` One is new. Source: `src/one.go:3`. [verified]\n- `f:other` Other, revised. [verified]\n")
 		p.write("blueprints/outline.yaml", strings.Replace(sinceOutline, "Do A.", "Do A well.", 1))
 		p.commit(editItem)
 		p.git("add", "-A")
@@ -714,8 +731,8 @@ func TestReadSince(t *testing.T) {
 			t.Fatalf("exit %d\nstdout %s\nstderr %s", code, out, errOut)
 		}
 		reqs := p.stub.requests()
-		if len(reqs) != 1 {
-			t.Fatalf("%d requests, want 1", len(reqs))
+		if len(reqs) != 2 {
+			t.Fatalf("%d requests, want the blueprint read and the fact-truth read", len(reqs))
 		}
 		text := requestText(reqs[0])
 		for _, want := range []string{

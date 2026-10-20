@@ -27,14 +27,17 @@ const (
 // the facts the current blueprint places or cites that the earlier one did not; a conflict between
 // facts in neither was already on the page. Both are never nil on a scoped page, and their tags
 // carry no omitempty because an empty slice written without its key would read back as nil, the
-// mark of a state recorded before the fields existed. Why says what made a page whole.
+// mark of a state recorded before the fields existed. RawChanged holds the cited facts whose whole
+// bullet differs, which catches a tag-qualifier or pointer-anchor edit that FactChanged does not
+// see; it is nil when none does. Why says what made a page whole.
 type Scope struct {
-	Kind    string   `json:"kind"`
-	IDs     []string `json:"ids,omitempty"`
-	Facts   []string `json:"facts"`
-	Bullets []string `json:"bullets"`
-	Joined  []string `json:"joined"`
-	Why     string   `json:"why,omitempty"`
+	Kind       string   `json:"kind"`
+	IDs        []string `json:"ids,omitempty"`
+	Facts      []string `json:"facts"`
+	Bullets    []string `json:"bullets"`
+	Joined     []string `json:"joined"`
+	RawChanged []string `json:"raw_changed,omitempty"`
+	Why        string   `json:"why,omitempty"`
 }
 
 // Revision is one version of a page's inputs: its blueprint file, its outline entry (nil when the
@@ -156,6 +159,12 @@ func Compare(file string, old, cur Revision) Scope {
 			bullets = append(bullets, id)
 		}
 	}
+	var rawChanged []string
+	for _, id := range slices.Compact(slices.Sorted(slices.Values(slices.Concat(citedFacts(ob, old.Facts), citedFacts(cb, cur.Facts))))) {
+		if rawDiffers(old.Facts, cur.Facts, id) {
+			rawChanged = append(rawChanged, id)
+		}
+	}
 	atBase := citedFacts(ob, old.Facts)
 	var joined []string
 	for _, id := range citedFacts(cb, cur.Facts) {
@@ -182,7 +191,20 @@ func Compare(file string, old, cur Revision) Scope {
 		Facts:   append([]string{}, slices.Sorted(maps.Keys(facts))...),
 		Bullets: append([]string{}, bullets...),
 		Joined:  append([]string{}, joined...),
+
+		RawChanged: rawChanged,
 	}
+}
+
+// rawDiffers reports whether the bullet that holds id has a different whole text, tag qualifier and
+// pointer spans included, between the two stores. A project with no store has none.
+func rawDiffers(old, cur *plan.Facts, id string) bool {
+	if old == nil || cur == nil {
+		return false
+	}
+	o, okOld := old.Get(id)
+	c, okCur := cur.Get(id)
+	return okOld != okCur || o.Raw != c.Raw
 }
 
 // withoutSections is the blueprint with its sections dropped, the fields Compare holds apart.

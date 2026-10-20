@@ -62,7 +62,7 @@ func walk(t *testing.T, where string, node any) int {
 
 func TestSchemasKeepToStructuredOutputLimits(t *testing.T) {
 	f := newFixture(t)
-	for _, a := range []Answer{AnswerDraft, AnswerRead, AnswerBlueprint, AnswerReader1, AnswerReader2, AnswerEdits, AnswerCoverage, AnswerConsistency} {
+	for _, a := range []Answer{AnswerDraft, AnswerRead, AnswerBlueprint, AnswerReader1, AnswerReader2, AnswerEdits, AnswerCoverage, AnswerConsistency, AnswerFactTruth} {
 		t.Run(string(a), func(t *testing.T) {
 			in := f.input(f.config(), "p")
 			in.Answer = a
@@ -94,6 +94,7 @@ func TestSchemaShapes(t *testing.T) {
 		{AnswerReader2, []string{`"verdict"`, `"findings"`, `"summary"`, `"location"`, `"finding"`, `"rewrite"`, `"blocking"`, `"kind"`}, []string{"friction"}, nil},
 		{AnswerBlueprint, []string{`"verdict"`, `"findings"`, `"summary"`, `"location"`, `"finding"`, `"rewrite"`, `"blocking"`}, []string{"friction"}, []string{`"kind"`}},
 		{AnswerConsistency, []string{`"conflicts"`, `"facts"`, `"with"`, `"conflict"`}, nil, nil},
+		{AnswerFactTruth, []string{`"facts"`, `"id"`, `"verdict"`, `"excerpt"`, `"fix"`}, nil, nil},
 	}
 	for _, tt := range tests {
 		t.Run(string(tt.answer), func(t *testing.T) {

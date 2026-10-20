@@ -27,6 +27,7 @@ func newBlueprintHarness(t *testing.T, opts ...harnessOption) *harness {
 	h.cfg.Blueprints = config.Blueprints{Root: "blueprints", Outline: "blueprints/outline.yaml"}
 	seat := h.cfg.Seat["structure"]
 	h.cfg.Seat["blueprint"] = seat
+	h.cfg.Seat["facttruth"] = seat
 	h.handoffs = []handoff.Handoff{h.blueprintHandoff(pageA, briefA, bpA, "Rotate a key"), h.blueprintHandoff(pageB, briefB, bpB, "Revoke a key")}
 	for _, o := range opts {
 		o(h)
@@ -121,8 +122,8 @@ func TestBlueprintReadAccepts(t *testing.T) {
 	if n := len(requestsFor(h, "s1", "consistency")); n != 2 {
 		t.Errorf("consistency requests = %d, want one per page, in the same stage", n)
 	}
-	if len(h.api.requests) != 4 {
-		t.Errorf("requests = %d, want stage 1 only", len(h.api.requests))
+	if len(h.api.requests) != 5 {
+		t.Errorf("requests = %d, want stage 1 only: two pages, three requests for the page with a sourced fact, two for the other", len(h.api.requests))
 	}
 	if open := h.openIntents(s.RunID); len(open) != 0 {
 		t.Errorf("open intents after a finished run: %v", open)
@@ -299,11 +300,11 @@ func TestBlueprintDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.EstimateStage != "s1" || len(s.Estimates) != 2 {
-		t.Fatalf("stage %q with %d estimates, want s1 with the consistency and blueprint requests", s.EstimateStage, len(s.Estimates))
+	if s.EstimateStage != "s1" || len(s.Estimates) != 3 {
+		t.Fatalf("stage %q with %d estimates, want s1 with the consistency, blueprint, and fact-truth requests", s.EstimateStage, len(s.Estimates))
 	}
-	seats := []string{s.Estimates[0].Seat, s.Estimates[1].Seat}
-	if seats[0] != "consistency" || seats[1] != "blueprint" {
+	seats := []string{s.Estimates[0].Seat, s.Estimates[1].Seat, s.Estimates[2].Seat}
+	if seats[0] != "consistency" || seats[1] != "blueprint" || seats[2] != "facttruth" {
 		t.Errorf("seats = %v", seats)
 	}
 	if len(h.api.batches) != 0 || h.api.creates != 0 || h.api.sends != 0 {

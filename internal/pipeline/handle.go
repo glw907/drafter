@@ -44,10 +44,14 @@ func (p *page) handle(ctx context.Context, in *run.Intent, results []batch.Resul
 func (p *page) stepSeats() []string {
 	switch p.ps.Step {
 	case stBpRead:
+		seats := []string{"blueprint"}
 		if p.runs("consistency") {
-			return []string{"consistency", "blueprint"}
+			seats = []string{"consistency", "blueprint"}
 		}
-		return []string{"blueprint"}
+		if p.askFactTruth() {
+			seats = append(seats, "facttruth")
+		}
+		return seats
 	case stConsistency:
 		return []string{"consistency"}
 	case stCoverage:
@@ -194,9 +198,13 @@ type readerAnswer struct {
 func (p *page) validate(seat, text string) error {
 	switch p.ps.Step {
 	case stBpRead:
-		if seat == "consistency" {
+		switch seat {
+		case "consistency":
 			var a consistencyAnswer
 			return decodeAnswer(text, &a)
+		case "facttruth":
+			_, err := parseFactTruth(text)
+			return err
 		}
 		_, err := parseRead(text)
 		return err

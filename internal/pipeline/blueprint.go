@@ -122,11 +122,15 @@ func (p *page) doBlueprintCheck() error {
 	return nil
 }
 
-// stageBlueprintRead sends the consistency read, when the project has a facts store, and the
-// blueprint read in one stage-1 batch, asking again only the seats with no accepted answer.
+// stageBlueprintRead sends the consistency read, when the project has a facts store, the
+// blueprint read, and the fact-truth read, when a read has facts to judge, in one stage-1 batch,
+// asking again only the seats with no accepted answer.
 func (p *page) stageBlueprintRead(ctx context.Context) (*stage, error) {
 	in, err := p.blueprintInputs()
 	if err != nil {
+		return nil, err
+	}
+	if err := p.planFactTruth(ctx, in); err != nil {
 		return nil, err
 	}
 	var reqs []batch.Request
@@ -139,6 +143,11 @@ func (p *page) stageBlueprintRead(ctx context.Context) (*stage, error) {
 				return nil, err
 			}
 			req, err = p.build(ctx, s1, seat, assemble.AnswerConsistency, prompt, nil, nil)
+			if err != nil {
+				return nil, err
+			}
+		case "facttruth":
+			req, err = p.factTruthRequest(ctx, seat)
 			if err != nil {
 				return nil, err
 			}
@@ -216,10 +225,10 @@ func (p *page) untouched(in *bpInputs, ids []string, with string) bool {
 	return slices.Contains(assemble.LinkedPages(in.view), file)
 }
 
-// completeBlueprintRead decides the page from the two stage-1 reads. A consistency conflict or a
-// blueprint read that says fix sets the page aside under the plan rule, and an accepted page
-// records the blob id of the blueprint the read saw. When both fire, the escalation names the
-// consistency seat. The blueprint read's findings are in the record whatever its verdict. A change
+// completeBlueprintRead decides the page from the stage-1 reads. A consistency conflict, a
+// fact-truth verdict that blocks, or a blueprint read that says fix sets the page aside, and an
+// accepted page records the blob id of the blueprint the read saw. When several fire, the
+// escalation names the consistency seat first, then the fact-truth seat. The blueprint read's findings are in the record whatever its verdict. A change
 // read demotes a conflict that lies outside what the change touched to a warning, and the page
 // goes on to the blueprint verdict. A change read also sets aside an unplaced conflict, one with no
 // fact and an empty with, as an "Unplaced:" warning: it blocks nothing and counts as neither
@@ -233,9 +242,21 @@ func (p *page) completeBlueprintRead() error {
 	p.w.Rec.addFriction("blueprint", a.Friction)
 	fs := a.findings("blueprint", 0)
 	p.w.Rec.findings(s1, fs)
+	ftFs, ftBlocks, err := p.factTruthFindings(len(fs))
+	if err != nil {
+		return err
+	}
+	p.w.Rec.findings(s1, ftFs)
+	if ft := p.w.Rec.FactTruth; ft != nil && len(ft.Asked)+len(ft.NoExcerpt) > 0 {
+		verdict := "ok"
+		if ftBlocks {
+			verdict = "fix"
+		}
+		p.w.Rec.verdict(s1, "facttruth", verdict)
+	}
 	// Set before the consistency branch, so a page escalated on a conflict still records the
 	// findings of a whole read that blocked.
-	p.w.WholeBlocked = a.Verdict == "fix" && !p.changeRead()
+	p.w.WholeBlocked = (a.Verdict == "fix" || ftBlocks) && !p.changeRead()
 	if raw, ok := p.w.Got["consistency"]; ok {
 		var c consistencyAnswer
 		if err := decodeAnswer(raw, &c); err != nil {
@@ -272,6 +293,15 @@ func (p *page) completeBlueprintRead() error {
 		} else {
 			p.w.Rec.verdict(s1, "consistency", "ok")
 		}
+	}
+	if ftBlocks {
+		var ns []int
+		for _, f := range ftFs {
+			if f.Blocking {
+				ns = append(ns, f.N)
+			}
+		}
+		return p.escalate("facttruth", "facttruth", ns, factTruthDetail(ftFs))
 	}
 	if a.Verdict == "fix" {
 		ns := make([]int, 0, len(fs))

@@ -305,8 +305,8 @@ The resume fingerprint leaves `require_prompts` out, because it changes no reque
 A resume still runs the check. A run that started on the stock module refuses to resume after the
 project sets `require_prompts` and leaves `prompts` unset.
 
-The nine seats are `draft`, `structure`, `editor`, `fact`, `reader`, `coverage`, `consistency`,
-`blueprint`, and `coherence`. `seats` lists the ones that run in `drafter page`, and by default
+The ten seats are `draft`, `structure`, `editor`, `fact`, `reader`, `coverage`, `consistency`,
+`blueprint`, `coherence`, and `facttruth`. `seats` lists the ones that run in `drafter page`, and by default
 it names the first seven. The list must include `draft`, which always runs. Leaving a review seat out removes
 its stages, and the run record notes each seat that didn't run. The `consistency` seat runs only
 when `facts.dir` is set.
@@ -322,7 +322,14 @@ redraft and isn't governed by `seats`, so a project can't turn it off. `drafter 
 blueprint refuses to start, with exit status 2, when `[seat.coherence]` lacks a model, an effort,
 or `max_tokens`, or when the model has no entry under `prices.models`.
 
-The stock defaults set a model, an effort, and `max_tokens` for all nine seats, so a project
+The `facttruth` seat checks each fact a blueprint places, cites, or disposes against the source
+excerpts its pointers show, one request per blueprint, and answers `holds`, `wider`, `contradicts`,
+or `no-excerpt` for each fact. `drafter read` runs it whenever `facts.dir` is set, and `drafter
+page` never does. Like `blueprint`, it isn't governed by `seats`: `drafter read` refuses to start,
+with exit status 2, when `[seat.facttruth]` lacks a model, an effort, or `max_tokens`, or when the
+model has no entry under `prices.models`.
+
+The stock defaults set a model, an effort, and `max_tokens` for all ten seats, so a project
 sets a seat's value only to change it. They are the values the cairn docs project measured.
 
 Replace `<name>` with a seat name. A `seat.<name>` table for any other name is an error.

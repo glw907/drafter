@@ -74,7 +74,7 @@ const wholeOnRequest = "drafted whole on request (--whole)"
 func scopeFromLock(c *config.Config, root, head string, handoffs []handoff.Handoff, whole bool, warn io.Writer) (draftPlan, error) {
 	d := draftPlan{
 		scopes: map[string]blueprint.Scope{}, changes: map[string]string{}, skipRead: map[string]bool{},
-		read: barMaps{scopes: map[string]blueprint.Scope{}, changes: map[string]string{}, bars: map[string]string{}, barFrom: map[string]string{}},
+		read: barMaps{scopes: map[string]blueprint.Scope{}, changes: map[string]string{}, bars: map[string]string{}, barFrom: map[string]string{}, barFacts: map[string][]string{}},
 	}
 	lock, err := committedLock(c, root, head)
 	if err != nil {

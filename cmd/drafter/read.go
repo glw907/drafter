@@ -118,7 +118,7 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 	}
 	var skipped []pipeline.PageResult
 	var since string
-	bm := barMaps{scopes: map[string]blueprint.Scope{}, changes: map[string]string{}, bars: map[string]string{}, barFrom: map[string]string{}}
+	bm := barMaps{scopes: map[string]blueprint.Scope{}, changes: map[string]string{}, bars: map[string]string{}, barFrom: map[string]string{}, barFacts: map[string][]string{}}
 	switch {
 	case st != nil:
 		handoffs, skipped = inRun(handoffs, st)
@@ -155,7 +155,7 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 	client := batch.New(batch.Options{Key: k, BaseURL: c.APIBaseURL, WorkspaceID: c.WorkspaceID})
 	s, err := pipeline.Run(cmd.Context(), pipeline.Options{
 		Config: c, Handoffs: handoffs, API: client, Resume: f.resume, DryRun: f.dryRun, Since: since, Scopes: bm.scopes, Changes: bm.changes,
-		Bars: bm.bars, BarFrom: bm.barFrom,
+		Bars: bm.bars, BarFrom: bm.barFrom, BarFacts: bm.barFacts,
 		Version: version(), Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr(), Command: "drafter read", ResumeArgs: args,
 	})
 	if err != nil {
