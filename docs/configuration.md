@@ -343,11 +343,19 @@ request. A template that names `{baseline}` runs only when the page has a baseli
 |---|---|---|---|
 | `facts.dir` | project, local | `<blueprints.root>/facts` when that directory exists, otherwise unset. No facts store. | `DRAFTER_FACTS_DIR` |
 | `facts.bullet_format` | project, local | Unset. | `DRAFTER_FACTS_BULLET_FORMAT` |
+| `facts.prose_sources` | project, local | Unset. No prose file may be a source. | None. |
 | `register.<track>` | project, local | Unset. | None. |
 
 `facts.dir` is the directory of fact files. Setting it turns on the facts store, including the
 `consistency` seat. `facts.bullet_format` names the format of the bullets in a fact file. The only
 value is `v1`. [Plan format](plan-format.md) describes how a plan cites facts.
+
+`facts.prose_sources` lists project-relative prose files that may stand as a fact's source, such
+as an owner's brief that the claim restates. A `path.md:N` or `path.md:A-B` pointer into a listed
+file yields the lines around it as an excerpt. Every other pointer into a prose file, including a
+bare path to a listed one and any page of the docs, shows as `no excerpt: prose`, because a
+document shows what the project says, not what the code does. Run `drafter excerpt <pointer>` to
+see what a pointer yields.
 
 `register.<track>` is a list of the register sections that a track reads. Replace `<track>` with
 the track's name. drafter records the list and `drafter config` prints it.

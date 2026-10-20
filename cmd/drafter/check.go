@@ -1,10 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"io/fs"
+	"maps"
+	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/glw907/drafter/internal/blueprint"
@@ -85,6 +90,99 @@ func repoRelative(root, arg string) (string, error) {
 	return filepath.ToSlash(rel), nil
 }
 
+// checkNoExcerpt names the warning for a verified fact whose pointers show a read no source lines.
+const checkNoExcerpt = "no-excerpt"
+
+// noExcerptFindings warns on each verified fact that a checked blueprint cites and whose
+// pointers yield no excerpt, once per fact however many blueprints cite it. It asks the
+// assemble package the question a read's request asks, so the warning and the read agree. A
+// project with no facts store has no such facts.
+func noExcerptFindings(ctx context.Context, p blueprint.Project, named []string) ([]plan.Finding, error) {
+	if p.FactsDir == "" {
+		return nil, nil
+	}
+	facts, err := plan.LoadFacts(p.FactsDir)
+	if err != nil {
+		return nil, err
+	}
+	files := named
+	if len(named) == 0 {
+		if files, err = blueprintFiles(p); err != nil {
+			return nil, err
+		}
+	}
+	cited := map[string]bool{}
+	for _, rel := range files {
+		data, err := os.ReadFile(filepath.Join(p.Root, filepath.FromSlash(rel)))
+		if err != nil {
+			continue // Check already reported a file it could not read
+		}
+		if b, _ := blueprint.Decode(rel, data); b != nil {
+			for _, id := range blueprint.CitedFacts(b, facts) {
+				cited[id] = true
+			}
+		}
+	}
+	if len(cited) == 0 {
+		return nil, nil
+	}
+	ex, err := excerpterFor(ctx, p)
+	if err != nil {
+		// Without tracked files, which only a git work tree has, no pointer can yield an
+		// excerpt, and warning on every fact would only repeat that.
+		return nil, nil
+	}
+	var out []plan.Finding
+	for _, id := range slices.Sorted(maps.Keys(cited)) {
+		f, ok := facts.Get(id)
+		if !ok || f.Tag != "verified" {
+			continue
+		}
+		_, real, err := ex.Fact(facts, id)
+		if err != nil {
+			return nil, err
+		}
+		if real {
+			continue
+		}
+		out = append(out, plan.Finding{
+			File: path.Join(filepath.ToSlash(mustRel(p.Root, p.FactsDir)), f.File), Line: f.Line,
+			Severity: plan.SeverityWarning, Check: checkNoExcerpt,
+			Message: "verified fact " + id + " has no pointer that yields an excerpt, so a read cannot check it against source",
+			Fix:     "point it at the code that shows the claim; `drafter excerpt " + id + "` shows what a read sees",
+		})
+	}
+	return out, nil
+}
+
+// mustRel returns dir relative to root, or dir itself when it lies elsewhere.
+func mustRel(root, dir string) string {
+	if rel, err := filepath.Rel(root, dir); err == nil {
+		return rel
+	}
+	return dir
+}
+
+// blueprintFiles lists the repo-relative slash paths of every blueprint under the blueprint root.
+func blueprintFiles(p blueprint.Project) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(filepath.Join(p.Root, filepath.FromSlash(p.BlueprintRoot)), func(file string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, err := filepath.Rel(p.Root, file)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		if _, ok := blueprint.PagePath(p.BlueprintRoot, rel); ok {
+			files = append(files, rel)
+		}
+		return nil
+	})
+	return files, err
+}
+
 func runCheck(cmd *cobra.Command, args []string, f *checkFlags) error {
 	p, err := projectFor(f.root)
 	if err != nil {
@@ -102,6 +200,11 @@ func runCheck(cmd *cobra.Command, args []string, f *checkFlags) error {
 	if err != nil {
 		return exitError{code: exitCannotRun, msg: err.Error()}
 	}
+	noExcerpts, err := noExcerptFindings(cmd.Context(), p, named)
+	if err != nil {
+		return exitError{code: exitCannotRun, msg: err.Error()}
+	}
+	findings = append(findings, noExcerpts...)
 	storeLine := ""
 	if len(named) == 0 && p.FactsDir != "" {
 		store, checked, skipped, err := plan.VerifyFacts(p.FactsDir, p.Root, nil)

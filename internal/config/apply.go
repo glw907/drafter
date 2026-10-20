@@ -150,6 +150,7 @@ func (c *Config) apply(l *layer) {
 	if d := f.Facts; d != nil {
 		putPath(c, l, "facts.dir", &c.Facts.Dir, d.Dir)
 		put(c, l, "facts.bullet_format", &c.Facts.BulletFormat, d.BulletFormat)
+		put(c, l, "facts.prose_sources", &c.Facts.ProseSources, d.ProseSources)
 	}
 	if b := f.Blueprints; b != nil {
 		put(c, l, "blueprints.root", &c.Blueprints.Root, b.Root)

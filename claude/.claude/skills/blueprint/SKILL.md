@@ -38,7 +38,19 @@ When a fact changes, `drafter refs` is the lookup: [Find where a fact is used](f
 
 ## Read
 
-Before the first edit, note `git rev-parse HEAD` as the base. Every read uses that base. Run `drafter check <blueprint>`, commit, then read as a separate command: `drafter read --sync --since <base> <blueprint>`. A read of an uncommitted tree prints "nothing changed" and judges nothing. The read judges the change as a code reviewer judges a pull request; [What `drafter read` does with a blueprint](format.md#what-drafter-read-does-with-a-blueprint) says what blocks and what returns as a "Nit:". It prints each finding with its location and whether it blocks.
+Before the first edit, note `git rev-parse HEAD` as the base. Every read uses that base. Run `drafter check <blueprint>`, commit, then read as a separate command: `drafter read --since <base> <blueprint>`. A read of an uncommitted tree prints "nothing changed" and judges nothing. The read judges the change as a code reviewer judges a pull request; [What `drafter read` does with a blueprint](format.md#what-drafter-read-does-with-a-blueprint) says what blocks and what returns as a "Nit:". It prints each finding with its location and whether it blocks.
+
+A read also proves each fact the change touches against the code. A fact-truth finding is a block, and it names the fact as `fact f:<id>` with one verdict, the lines of the excerpt it rests on, and the claim the code supports:
+
+| Verdict | It means | Fix |
+|---|---|---|
+| `wider` | Part of the claim, such as a count, a list, "only", "every", "always", or a scope, is not shown by any excerpt. | Correct the bullet to what the excerpt shows, or re-point it so the excerpt shows the whole claim. |
+| `contradicts` | The code disagrees with the bullet. | Correct the bullet to what the code shows. |
+| `no-excerpt` | No excerpt bears on the claim. It blocks a `verified` fact and warns on an `external` or `vendor` one. | Re-point the bullet at the code that shows the claim. Run `drafter excerpt f:<id>` to see what a read sees. |
+
+Never widen a claim to match a thin excerpt, and never loosen a bullet to make a block go away. A fact-truth fix is a bullet edit, so run `drafter refs <fact-id>` and fix each placement the corrected fact makes wrong.
+
+A page whose accepted facts have changed is lapsed. `drafter page` refuses a lapsed page before any request and names the changed facts. Run `drafter read <blueprint>` on it, fix what the read blocks, and read again until it accepts.
 
 Fix every blocking finding, and any Nits you choose, in one batch. Run `drafter check <blueprint>`, commit, and read again. Polish goes before a read, never after an accepted one: once a read accepts, make no further edit, Nits included, because an edit after the last read is a change no read saw. Stop at an accept or after the third read. Findings that start "Already present:" are older defects and stay out of the edit.
 
@@ -48,7 +60,7 @@ Fix every blocking finding, and any Nits you choose, in one batch. Run `drafter 
 | Exit 0 with a blocking finding printed, or exit 1 with the blueprint read's findings | Fix and read again. |
 | Exit 1 from a consistency escalation | Fix the conflict the change caused and read again. |
 | Exit 1 escalated on rule `cap`, or exit 3 naming `cycle cap` or `spend limit` | Stop reading, commit, and report the stop to the user. |
-| Any other exit 3 | Run `drafter read --sync --resume <run-id> <blueprint>` once. It counts as the same read. |
+| Any other exit 3 | Run `drafter read --resume <run-id> <blueprint>` once. It counts as the same read. |
 | Exit 2 naming the key | Skip the reads and say so in the report. |
 | Exit 2 for a dirty tree, an unresolved `--since`, or config | Fix the cause and rerun. It isn't a read. |
 

@@ -94,6 +94,7 @@ type Tier struct {
 type Facts struct {
 	Dir          string
 	BulletFormat string
+	ProseSources []string // project-relative prose files a line pointer may excerpt
 }
 
 // Blueprints holds the blueprint-tree settings. Root and Outline are slash paths relative to the
