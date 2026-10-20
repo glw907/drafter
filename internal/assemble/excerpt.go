@@ -324,7 +324,8 @@ func innerDeclaration(lines []string, ext, outer, inner string, first, last int)
 	case tsExt[strings.ToLower(ext)]:
 		res = []*regexp.Regexp{
 			regexp.MustCompile(`^\s*(?:(?:export|public|private|protected|static|readonly|abstract|override|async|get|set|declare)\s+)*\*?\s*["']?` + q + `["']?\s*[(:=<?!]`),
-			regexp.MustCompile(`^\s*(?:export\s+)?(?:async\s+)?(?:function\s*\*?|const|let|var|class)\s+` + q + `\b`),
+			// A factory often returns a named function expression: "return async function handle(".
+			regexp.MustCompile(`^\s*(?:export\s+|return\s+)?(?:async\s+)?(?:function\s*\*?|const|let|var|class)\s+` + q + `\b`),
 		}
 	}
 	best, bestIndent := -1, 0
