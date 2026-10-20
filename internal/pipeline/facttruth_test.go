@@ -100,7 +100,7 @@ func TestFactTruthWholeReadHolds(t *testing.T) {
 			t.Errorf("request lacks the Raw bullet %q", want)
 		}
 	}
-	if n := strings.Count(text, "=== excerpt: src/keys.js:2 (fact "); n != 4 {
+	if n := strings.Count(text, "=== excerpt: src/keys.js (fact "); n != 4 {
 		t.Errorf("request holds %d excerpt blocks, want 4", n)
 	}
 	pg := statusPage(s, pageA)

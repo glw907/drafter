@@ -48,7 +48,7 @@ func TestFactTruthRequestCarriesOnlyExcerpts(t *testing.T) {
 	in := f.input(c, "Check src/panel.ts against the facts.")
 	in.Seat, in.Answer, in.Facts, in.FactIDs = "facttruth", AnswerFactTruth, facts, []string{"f:greet"}
 	got := requestText(t, in)
-	if !strings.Contains(got, "=== excerpt: src/greet.go#Hello (fact f:greet)") {
+	if !strings.Contains(got, "=== excerpt: src/greet.go (fact f:greet) lines 1-") {
 		t.Errorf("request lacks the fact's excerpt:\n%s", got)
 	}
 	if strings.Contains(got, "=== file: src/panel.ts ===") {
