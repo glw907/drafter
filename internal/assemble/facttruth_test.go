@@ -28,9 +28,13 @@ func TestFactTruthPrompt(t *testing.T) {
 		"- `f:two` The second claim. [external: the vendor guide]",
 		"- holds:", "- wider:", "- contradicts:", "- no-excerpt:",
 		`"only", "every", "always"`,
-		"presents a list or set of cases as complete is contradicts",
+		"presents it as complete unless it says otherwise",
+		"Split its claim into parts",
+		"Give holds only for a claim whose every part you can point to.",
 		"the code line outranks the comment",
 		"never what the code does",
+		"a string in the code",
+		"There are 2 facts. The answer has 2 entries",
 		"quote the excerpt lines",
 		"Never ask for an edit",
 	} {
@@ -78,5 +82,9 @@ func TestFactTruthRequestCarriesOnlyExcerpts(t *testing.T) {
 	}
 	if !strings.Contains(got, "one entry for each listed fact") {
 		t.Errorf("request lacks the answer's contract:\n%s", got)
+	}
+	excerpt, prompt := strings.Index(got, "=== excerpt: "), strings.Index(got, "Check src/panel.ts")
+	if excerpt < 0 || prompt < excerpt {
+		t.Errorf("the prompt does not follow the excerpts (excerpt at %d, prompt at %d)", excerpt, prompt)
 	}
 }

@@ -90,12 +90,19 @@ func Build(ctx context.Context, in Input) (batch.Request, error) {
 	if first && in.Answer != AnswerCoverage && in.Answer != AnswerConsistency {
 		parts = append(parts, note)
 	}
-	parts = append(parts, in.Prompt)
 	blocks, err := inputBlocks(ctx, in, seat)
 	if err != nil {
 		return batch.Request{}, err
 	}
-	parts = append(parts, blocks...)
+	// The fact-truth read asks about many facts over a long run of excerpts, and a question placed
+	// after its documents is answered more reliably than one placed before them.
+	if in.Answer == AnswerFactTruth {
+		parts = append(parts, blocks...)
+		parts = append(parts, in.Prompt)
+	} else {
+		parts = append(parts, in.Prompt)
+		parts = append(parts, blocks...)
+	}
 	msg := batch.Message{Role: "user"}
 	if len(in.Cached) > 0 {
 		msg.Cached = append([]string{strings.Join(parts, "\n\n")}, in.Cached...)
