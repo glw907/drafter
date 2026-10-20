@@ -262,6 +262,20 @@ func TestExcerptAnchors(t *testing.T) {
 			}
 		})
 	}
+	t.Run("a returned named function", func(t *testing.T) {
+		g := newFixture(t)
+		factory := "export function createGuard(config: Config): Handle {\n  const name = config.name;\n" +
+			"  return async function handle({ event }: Input): Promise<Response> {\n    return respond(event, name);\n  };\n}\n"
+		g.addTracked(t, "src/guard.ts", factory+numbered(160))
+		rg, err := openRepo(context.Background(), g.config())
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := strings.Join(rg.excerpt("f:x", "src/guard.ts#createGuard.handle", map[string]bool{}), "\n")
+		if !strings.Contains(got, "return async function handle(") || !strings.Contains(got, "return respond(event, name);") || strings.Contains(got, "const name") {
+			t.Errorf("excerpt is not the returned function:\n%s", got)
+		}
+	})
 	t.Run("the cap is 200 lines plus the closing line", func(t *testing.T) {
 		got := r.excerpt("f:x", "src/big.ts#huge", map[string]bool{})
 		if len(got) != 1 {
