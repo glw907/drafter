@@ -266,6 +266,16 @@ func pageFacts(b *Blueprint, facts *plan.Facts) []string {
 	return slices.Concat(b.Introduction.Facts, dispositionFacts(b), framingFacts(b, facts))
 }
 
+// CitedFacts returns the ids of every fact the page places, cites, or disposes, sorted and without
+// repeats: the fact items, every item's facts list, the introduction's facts, the dispositions,
+// and the framing's citations. Unlike [Project.Cited], it includes the dispositions. A framing
+// citation counts only against facts, so with a nil store the framing adds nothing.
+func CitedFacts(b *Blueprint, facts *plan.Facts) []string {
+	ids := citedFacts(b, facts)
+	slices.Sort(ids)
+	return slices.Compact(ids)
+}
+
 // citedFacts lists every fact the page places or cites, wherever it does.
 func citedFacts(b *Blueprint, facts *plan.Facts) []string {
 	ids := pageFacts(b, facts)

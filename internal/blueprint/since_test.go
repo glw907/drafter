@@ -77,6 +77,22 @@ func sinceRev(bp, facts string, entry *Page) Revision {
 	return Revision{Blueprint: []byte(bp), Entry: entry, Facts: plan.ParseFacts(map[string]string{"facts.md": facts}, "/nowhere")}
 }
 
+func TestCitedFacts(t *testing.T) {
+	bp := sinceBase + "dispositions:\n  - fact: f:other\n    disposition: cut\n    reason: |\n      Not this page's claim.\n  - fact: f:one\n    disposition: cut\n    reason: |\n      A repeat.\n"
+	b, findings := Decode("a.blueprint.yaml", []byte(bp))
+	if len(findings) > 0 {
+		t.Fatalf("decode: %v", findings)
+	}
+	facts := plan.ParseFacts(map[string]string{"facts.md": sinceFacts}, "/nowhere")
+	want := []string{"f:frame", "f:intro", "f:one", "f:other", "f:three", "f:two"}
+	if got := CitedFacts(b, facts); !slices.Equal(got, want) {
+		t.Errorf("CitedFacts = %q, want %q", got, want)
+	}
+	if got := CitedFacts(b, nil); slices.Contains(got, "f:frame") {
+		t.Errorf("CitedFacts with no store = %q, want no framing citation", got)
+	}
+}
+
 func TestCompare(t *testing.T) {
 	edit := func(old, new string) string { return strings.Replace(sinceBase, old, new, 1) }
 	changedEntry := sinceEntry

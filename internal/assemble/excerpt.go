@@ -1,6 +1,7 @@
 package assemble
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/glw907/drafter/internal/config"
 	"github.com/glw907/drafter/internal/plan"
 )
 
@@ -24,20 +26,58 @@ var proseExt = map[string]bool{".md": true, ".mdx": true, ".markdown": true, ".t
 
 var tsExt = map[string]bool{".ts": true, ".tsx": true, ".mts": true, ".cts": true, ".js": true, ".jsx": true, ".mjs": true, ".cjs": true, ".svelte": true}
 
+// Excerpter renders fact excerpts against one project's tracked files. Its blocks are the ones a
+// request carries, so a command that shows a fact's excerpts and a read that sends them agree.
+type Excerpter struct {
+	r *repo
+}
+
+// NewExcerpter lists the project's tracked files once, for every excerpt the Excerpter renders.
+func NewExcerpter(ctx context.Context, c *config.Config) (*Excerpter, error) {
+	r, err := openRepo(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	return &Excerpter{r: r}, nil
+}
+
+// Fact returns the excerpt blocks of the fact with the given id, one per source pointer or line
+// range, and reports whether any of them shows source lines rather than a "no excerpt:" reason.
+// A fact with no source pointer has no blocks and reports false. An id the store does not hold
+// once is an error.
+func (e *Excerpter) Fact(facts *plan.Facts, id string) ([]string, bool, error) {
+	return e.r.factBlocks(facts, id)
+}
+
 // excerptBlocks returns the source excerpts of the facts with the given ids: one block per
 // source pointer or line range. An id the store does not hold once is an error.
 func (r *repo) excerptBlocks(facts *plan.Facts, ids []string) ([]string, error) {
 	var blocks []string
 	for _, id := range ids {
-		f, ok := facts.Get(id)
-		if !ok {
-			return nil, fmt.Errorf("assemble: fact %q is not held by exactly one bullet", id)
+		b, _, err := r.factBlocks(facts, id)
+		if err != nil {
+			return nil, err
 		}
-		for _, s := range f.Sources {
-			blocks = append(blocks, r.excerpt(id, s)...)
-		}
+		blocks = append(blocks, b...)
 	}
 	return blocks, nil
+}
+
+func (r *repo) factBlocks(facts *plan.Facts, id string) ([]string, bool, error) {
+	f, ok := facts.Get(id)
+	if !ok {
+		return nil, false, fmt.Errorf("assemble: fact %q is not held by exactly one bullet", id)
+	}
+	var blocks []string
+	real := false
+	for _, s := range f.Sources {
+		for _, b := range r.excerpt(id, s) {
+			_, body, _ := strings.Cut(b, "\n")
+			real = real || !strings.HasPrefix(body, "no excerpt:")
+			blocks = append(blocks, b)
+		}
+	}
+	return blocks, real, nil
 }
 
 // excerpt returns the blocks for one source pointer of fact id.

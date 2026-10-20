@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -97,6 +98,59 @@ func TestExcerptBareSpecialFile(t *testing.T) {
 	if len(got) != 1 || !strings.Contains(got[0], "no excerpt: not a regular file") {
 		t.Errorf("excerpt = %q, want one block reading no excerpt: not a regular file", got)
 	}
+}
+
+func TestExcerpterFact(t *testing.T) {
+	f := newFixture(t)
+	e, err := NewExcerpter(context.Background(), f.config())
+	if err != nil {
+		t.Fatal(err)
+	}
+	facts := plan.ParseFacts(map[string]string{"a.md": strings.Join([]string{
+		"- `f:dir` A directory only. Source: `src`. [verified]",
+		"- `f:line` A line in a code file. Source: `src/greet.go:25`. [verified]",
+		"- `f:mixed` A directory and a line. Source: `src`, `src/greet.go:25`. [verified]",
+		"- `f:none` No source part. [verified]",
+	}, "\n")}, f.root)
+	tests := []struct {
+		id     string
+		blocks int
+		real   bool
+	}{
+		{"f:dir", 1, false},
+		{"f:line", 1, true},
+		{"f:mixed", 2, true},
+		{"f:none", 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.id, func(t *testing.T) {
+			blocks, real, err := e.Fact(facts, tt.id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(blocks) != tt.blocks || real != tt.real {
+				t.Errorf("Fact(%s) = %d blocks, real %v; want %d, %v:\n%s", tt.id, len(blocks), real, tt.blocks, tt.real, strings.Join(blocks, "\n"))
+			}
+		})
+	}
+	t.Run("the blocks are the ones a request carries", func(t *testing.T) {
+		blocks, _, err := e.Fact(facts, "f:mixed")
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, err := e.r.excerptBlocks(facts, []string{"f:mixed"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(blocks, want) {
+			t.Errorf("Fact blocks differ from excerptBlocks:\n%q\n%q", blocks, want)
+		}
+	})
+	t.Run("an unknown id is an error", func(t *testing.T) {
+		if _, _, err := e.Fact(facts, "f:absent"); err == nil {
+			t.Error("Fact(f:absent) returned no error")
+		}
+	})
 }
 
 func TestBuildWithFacts(t *testing.T) {
