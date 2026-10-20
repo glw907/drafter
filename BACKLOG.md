@@ -12,6 +12,9 @@
 
 ## Medium
 
+- [ ] **#27** Make `FactChanged` ignore a fact whose only change is a moved `Source:` path `#improvement` `#drafter` `#initiative:repo-organization` *(2026-10-20)*
+  The docs-layout sweep moved `docs/superpowers/` paths, so fact f:swjwxb's `Source:` line changed while its claim did not. The next `drafter page` on cairn-cms's `docs/extend/debug-your-site.md` now counts the bullet as changed and redrafts the page whole instead of scoped. A rename-aware comparison would treat a pointer that resolves to the same content as unchanged. Reported by the docs-layout session. `internal/blueprint/since.go`
+
 - [ ] **#6** Stop an unplaceable consistency answer from blocking a change read `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
   A base conflict between two recurring facts escalates whenever a tweak re-cites one of them (the rerun's tweak 5). `internal/pipeline/blueprint.go`
   The first case, a conflict with empty `facts` and `with`, closed in the skill-rules pass: a change read records it as an "Unplaced:" warning and never blocks. Evidence is the unplaced rows of `TestChangeReadConsistency` and format-test runs 20261018T223440Z-9f9c8f61 and 20261018T224305Z-769284ec, each of which recorded an "Unplaced:" warning. `--json`'s `demoted` counts unplaced and already-present conflicts together, so only `record.json` tells them apart.
