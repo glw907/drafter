@@ -28,6 +28,8 @@ const (
 	AnswerReader2     Answer = "reader2"
 	AnswerCoverage    Answer = "coverage"
 	AnswerConsistency Answer = "consistency"
+	// AnswerBlueprint is the blueprint read's verdict: a read whose findings carry no kind.
+	AnswerBlueprint Answer = "blueprint"
 )
 
 // Input is what Build assembles a request from.

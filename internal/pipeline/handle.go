@@ -52,7 +52,7 @@ func (p *page) stepSeats() []string {
 		return []string{"consistency"}
 	case stCoverage:
 		return []string{"coverage"}
-	case stDraft, stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix:
+	case stDraft, stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix, stSmall:
 		return []string{"draft"}
 	case stCoherence:
 		return []string{"coherence"}
@@ -214,7 +214,7 @@ func (p *page) validate(seat, text string) error {
 		if !json.Valid([]byte(a.Brief)) {
 			return errors.New("the brief is not JSON")
 		}
-	case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix:
+	case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix, stSmall:
 		var a edits.Answer
 		return decodeAnswer(text, &a)
 	case stCoverage:
@@ -250,7 +250,7 @@ func (p *page) complete(ctx context.Context) error {
 		return p.completeConsistency()
 	case stDraft:
 		return p.completeDraft(ctx)
-	case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix:
+	case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix, stSmall:
 		return p.completeExchange(ctx)
 	case stCoherence:
 		return p.completeCoherence()

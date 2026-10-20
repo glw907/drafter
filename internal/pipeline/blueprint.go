@@ -157,7 +157,7 @@ func (p *page) stageBlueprintRead(ctx context.Context) (*stage, error) {
 			if err != nil {
 				return nil, err
 			}
-			req, err = p.buildInput(ctx, s1, seat, assemble.Input{Answer: assemble.AnswerRead, Prompt: prompt,
+			req, err = p.buildInput(ctx, s1, seat, assemble.Input{Answer: assemble.AnswerBlueprint, Prompt: prompt,
 				Cached: []string{assemble.FactsBlock(in.view, p.r.facts)}, Extra: extra,
 			})
 			if err != nil {
@@ -369,15 +369,15 @@ func (p *page) sectionScope() string {
 }
 
 // bound returns the region bound of the exchange's next answer, or nil for an unbounded one. In a
-// section redraft the section, redraft, and final exchanges are bounded to the changed sections,
-// cut by the start commit's blueprint. A gate-fix turn is never bounded, since a red can name a
-// line anywhere, and neither is the coherence fix.
+// section redraft the section, redraft, final, and small exchanges are bounded to the changed
+// sections, cut by the start commit's blueprint. A gate-fix turn is never bounded, since a red can
+// name a line anywhere, and neither is the coherence fix.
 func (p *page) bound(ex *exchange) (*edits.Bound, error) {
 	if !p.w.Section || ex.GateFix {
 		return nil, nil
 	}
 	switch ex.Kind {
-	case exSection, exRedraft, exFinal:
+	case exSection, exRedraft, exFinal, exSmall:
 	default:
 		return nil, nil
 	}
@@ -397,9 +397,10 @@ func (p *page) bound(ex *exchange) (*edits.Bound, error) {
 // draftingBlocks returns the blocks a drafting blueprint page's request carries after its prompt,
 // as stage 1's read does: the facts the blueprint places or cites as a cached part, and the
 // blueprint with its outline entry after it. A section redraft's draft request adds the scope
-// sentence and the page's change block. The reader reads as a reader, so it gets neither, and a
-// page that does not draft from a blueprint gets none.
-func (p *page) draftingBlocks(seat string) (cached []string, extra string, err error) {
+// sentence and the page's change block, and every draft request adds the files its code items
+// name. The reader reads as a reader, so it gets neither, and a page that does not draft from a
+// blueprint gets none.
+func (p *page) draftingBlocks(ctx context.Context, seat string) (cached []string, extra string, err error) {
 	if !p.blueprint || !p.w.Draft {
 		return nil, "", nil
 	}
@@ -419,5 +420,27 @@ func (p *page) draftingBlocks(seat string) (cached []string, extra string, err e
 			extra += "\n\n" + p.w.Change
 		}
 	}
+	if seat == "draft" {
+		snippets, err := assemble.SnippetBlocks(ctx, p.r.cfg, p.h.Page.Path, codeSources(in.bp))
+		if err != nil {
+			return nil, "", err
+		}
+		for _, b := range snippets {
+			extra += "\n\n" + b
+		}
+	}
 	return []string{assemble.DraftingFactsBlock(in.view, p.r.facts)}, extra, nil
+}
+
+// codeSources lists the source of each code item in the blueprint, in order.
+func codeSources(bp *blueprint.Blueprint) []string {
+	var out []string
+	for _, s := range bp.Sections {
+		for _, it := range s.Items {
+			if it.Kind == "code" && it.Source != "" {
+				out = append(out, it.Source)
+			}
+		}
+	}
+	return out
 }

@@ -112,7 +112,7 @@ func (p *page) build(ctx context.Context, stage, seat string, a assemble.Answer,
 	}
 	if len(hist) == 0 {
 		var err error
-		if in.Cached, in.Extra, err = p.draftingBlocks(seat); err != nil {
+		if in.Cached, in.Extra, err = p.draftingBlocks(ctx, seat); err != nil {
 			return batch.Request{}, err
 		}
 	}
@@ -156,7 +156,7 @@ func (p *page) advance(ctx context.Context) (*stage, error) {
 			stg, err = p.stageConsistency(ctx)
 		case stDraft:
 			stg, err = p.stageDraft(ctx)
-		case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix:
+		case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix, stSmall:
 			stg, err = p.stageExchange(ctx)
 		case stCoherence:
 			stg, err = p.stageCoherence(ctx)
@@ -228,6 +228,8 @@ func exchangeStage(kind string) string {
 		return s7
 	case exCoherence:
 		return s8
+	case exSmall:
+		return s6b
 	}
 	return s2
 }
@@ -313,6 +315,8 @@ func coverageStage(phase string) string {
 		return s7
 	case covCoherence:
 		return s8
+	case covSmall:
+		return s6b
 	}
 	return s3
 }
@@ -323,6 +327,7 @@ const (
 	covRedraft   = "redraft"
 	covFinal     = "final"
 	covCoherence = "coherence"
+	covSmall     = "small"
 )
 
 // toCoverage moves the page to a fresh coverage check.
@@ -346,10 +351,24 @@ func (p *page) afterCoverage() error {
 		return nil
 	case covRedraft:
 		if len(cov.Misses) > 0 {
+			var fs []edits.Finding
+			for _, m := range cov.Misses {
+				fs = append(fs, missFinding(m))
+			}
+			if allSmall(fs) {
+				p.openSmall(fs)
+				return nil
+			}
 			return p.escalate("second fix verdict", "coverage", nil, missSummary(cov.Misses))
 		}
 		p.w.Got = nil
 		p.ps.Step = stRound2
+	case covSmall:
+		if len(cov.Misses) > 0 {
+			return p.escalate("second fix verdict", "coverage", nil, "after the small-finding fix: "+missSummary(cov.Misses))
+		}
+		p.w.Got = nil
+		return p.reviewed()
 	case covCoherence:
 		if len(cov.Misses) > 0 {
 			return p.escalate("coherence", "coverage", nil, missSummary(cov.Misses))
@@ -373,10 +392,31 @@ func missFinding(m missRecord) edits.Finding {
 		loc = "the brief"
 	}
 	return edits.Finding{
-		Seat: "coverage", Location: loc, Blocking: true,
+		Seat: "coverage", Location: loc, Blocking: true, Kind: missKind(m),
 		Text:    fmt.Sprintf("plan item %s (%s) is not carried: %s", m.Item, m.Kind, m.Reason),
 		Rewrite: "Add what the plan item asks for in the section named.",
 	}
+}
+
+// missKind labels a coverage miss with the review kind it amounts to. A miss in a section whose
+// heading is gone is the section's absence, whatever the item, so it is a placement finding.
+func missKind(m missRecord) string {
+	if m.Reason == "heading not found" {
+		return "placement"
+	}
+	switch m.Kind {
+	case "link":
+		return "link"
+	case "handoff":
+		return "handoff"
+	case "brief", "fact":
+		return "citation"
+	case "verbatim":
+		return "code"
+	case "reason", "claim":
+		return "claim"
+	}
+	return "other"
 }
 
 func missSummary(ms []missRecord) string {
@@ -452,6 +492,7 @@ type readAnswer struct {
 		Finding  string `json:"finding"`
 		Rewrite  string `json:"rewrite"`
 		Blocking bool   `json:"blocking"`
+		Kind     string `json:"kind"`
 	} `json:"findings"`
 	Summary  string   `json:"summary"`
 	Friction []string `json:"friction"`
@@ -485,7 +526,7 @@ func (a readAnswer) findings(seat string, n int) []edits.Finding {
 	var out []edits.Finding
 	for _, f := range a.Findings {
 		n++
-		out = append(out, edits.Finding{N: n, Seat: seat, Location: f.Location, Text: f.Finding, Rewrite: f.Rewrite, Blocking: f.Blocking})
+		out = append(out, edits.Finding{N: n, Seat: seat, Location: f.Location, Text: f.Finding, Rewrite: f.Rewrite, Blocking: f.Blocking, Kind: f.Kind})
 	}
 	return out
 }
@@ -578,20 +619,35 @@ func (p *page) declinedFor(seat string) []edits.DeclinedFinding {
 	return out
 }
 
+// afterRound2 weighs every seat that answered fix. When each such seat's blocking findings are
+// all small, and there is at least one, they open the small exchange; any other fix escalates. A
+// fix with no blocking finding contradicts its own verdict, so it escalates too.
 func (p *page) afterRound2(seats []string) error {
+	var small []edits.Finding
 	for _, seat := range seats {
 		a, err := parseRead(p.w.Got[seat])
 		if err != nil {
 			return err
 		}
-		if a.Verdict == "fix" {
-			var ns []int
-			for i := range a.Findings {
-				ns = append(ns, i+1)
-			}
-			p.w.Rec.findings(s6, a.findings(seat, 0))
-			return p.escalate("second fix verdict", seat, ns, "")
+		if a.Verdict != "fix" {
+			continue
 		}
+		fs := a.findings(seat, 0)
+		blocking := blockingOnly(fs)
+		if len(blocking) > 0 && allSmall(blocking) {
+			small = append(small, blocking...)
+			continue
+		}
+		var ns []int
+		for i := range a.Findings {
+			ns = append(ns, i+1)
+		}
+		p.w.Rec.findings(s6, fs)
+		return p.escalate("second fix verdict", seat, ns, "")
+	}
+	if len(small) > 0 {
+		p.openSmall(small)
+		return nil
 	}
 	p.w.Got = nil
 	p.ps.Step = stReader1

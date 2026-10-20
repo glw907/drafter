@@ -122,6 +122,8 @@ func coveragePhase(kind string) string {
 		return covFinal
 	case exCoherence:
 		return covCoherence
+	case exSmall:
+		return covSmall
 	}
 	return covInitial
 }
@@ -137,6 +139,8 @@ func exchangeStep(kind string) string {
 		return stSection
 	case exCoherence:
 		return stCoherenceFix
+	case exSmall:
+		return stSmall
 	}
 	return stGateFix
 }

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -238,4 +239,54 @@ func fileBlock(t target) (string, bool) {
 // block wraps body between the header and footer lines every block shares.
 func block(kind, label, body string) string {
 	return "=== " + kind + ": " + label + " ===\n" + strings.TrimSuffix(body, "\n") + "\n=== end " + kind + ": " + label + " ==="
+}
+
+// SnippetBlocks returns a block for each code source of a page's blueprint, each source relative
+// to the page's directory, or to the root when it starts with a slash. A "#Symbol" suffix is
+// dropped, so the whole file is inlined. A tracked file gets fileBlock's block; an untracked one, or
+// a path outside the root, gets a not-inlined line and never its contents. A URL, a directory, and
+// a repeat of an earlier source add nothing.
+func SnippetBlocks(ctx context.Context, c *config.Config, page string, sources []string) ([]string, error) {
+	if len(sources) == 0 {
+		return nil, nil
+	}
+	r, err := openRepo(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	var blocks []string
+	seen := map[string]bool{}
+	for _, src := range sources {
+		if strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://") {
+			continue
+		}
+		file, _, _ := strings.Cut(src, "#")
+		if file == "" {
+			continue
+		}
+		rel := path.Join(path.Dir(page), file)
+		if rest, ok := strings.CutPrefix(file, "/"); ok {
+			rel = path.Clean(rest)
+		}
+		if seen[rel] {
+			continue
+		}
+		seen[rel] = true
+		if rel == ".." || strings.HasPrefix(rel, "../") {
+			blocks = append(blocks, block("file", rel, "not inlined: outside the repository"))
+			continue
+		}
+		if info, err := os.Stat(filepath.Join(r.root, filepath.FromSlash(rel))); err == nil && info.IsDir() {
+			continue
+		}
+		t, ok := r.resolve(rel)
+		if !ok {
+			blocks = append(blocks, block("file", rel, "not inlined: untracked"))
+			continue
+		}
+		if b, ok := fileBlock(t); ok {
+			blocks = append(blocks, b)
+		}
+	}
+	return blocks, nil
 }
