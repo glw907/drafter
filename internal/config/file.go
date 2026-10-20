@@ -92,8 +92,9 @@ type blueprintsFile struct {
 }
 
 type factsFile struct {
-	Dir          *string `toml:"dir"`
-	BulletFormat *string `toml:"bullet_format"`
+	Dir          *string   `toml:"dir"`
+	BulletFormat *string   `toml:"bullet_format"`
+	ProseSources *[]string `toml:"prose_sources"`
 }
 
 // decode parses data strictly: an unknown key, a malformed document, and a value of the wrong

@@ -14,7 +14,7 @@ var settingKeys = []string{
 	"pages_in_flight", "retries.gate_fix", "retries.edit_contract",
 	"gate.command", "gate.index_link_command", "gate.protocol", "gate.lane",
 	"gate.section_pattern", "gate.failure_pattern",
-	"prompts", "require_prompts", "seats", "facts.dir", "facts.bullet_format", "inline_files",
+	"prompts", "require_prompts", "seats", "facts.dir", "facts.bullet_format", "facts.prose_sources", "inline_files",
 	"blueprints.root", "blueprints.required", "blueprints.outline", "blueprints.brief_path",
 }
 

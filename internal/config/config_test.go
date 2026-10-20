@@ -671,3 +671,37 @@ docs = ["voice"]
 		}
 	}
 }
+
+func TestFactsProseSources(t *testing.T) {
+	tests := []struct {
+		name    string
+		project string
+		local   string
+		want    []string
+		printed string
+	}{
+		{"unset", "mode = \"batch\"\n", "", nil, ""},
+		{"project layer", "[facts]\nprose_sources = [\"notes.md\", \"docs/owner.md\"]\n", "", []string{"notes.md", "docs/owner.md"}, "notes.md, docs/owner.md"},
+		{"local layer replaces", "[facts]\nprose_sources = [\"notes.md\"]\n", "[facts]\nprose_sources = [\"mine.md\"]\n", []string{"mine.md"}, "mine.md"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sb := newSandbox(t)
+			sb.ignoreLocal(t)
+			writeFile(t, sb.project(), tt.project)
+			if tt.local != "" {
+				writeFile(t, sb.local(), tt.local)
+			}
+			c, err := Load(sb.root, Flags{})
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if !slices.Equal(c.Facts.ProseSources, tt.want) {
+				t.Errorf("facts.prose_sources = %q, want %q", c.Facts.ProseSources, tt.want)
+			}
+			if got := row(t, c, "facts.prose_sources").Value; got != tt.printed {
+				t.Errorf("Sources row value = %q, want %q", got, tt.printed)
+			}
+		})
+	}
+}

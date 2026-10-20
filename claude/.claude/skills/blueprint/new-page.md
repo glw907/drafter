@@ -17,7 +17,9 @@ Every command, step, transcript, figure, warning, success signal, and assertion 
 - **Cut.** The claim does not survive the page. Record the reason in a `dispositions` entry.
 - **Re-pointed.** Another page owns it. Link to that page.
 
-A fact whose only source is another docs page gets retraced to code, config, or a vendor doc first. When that fails, do not cite it. Edit fact bullets with the Edit tool, never a shell append. `drafter check` reports a fact with no valid tag; see [What `drafter check` checks](format.md#what-drafter-check-checks).
+File a fact code first. Set the pointer and its anchor before you write the claim: find the code, config, or vendor document that settles it, and choose the narrowest anchor that shows the whole claim (`path#Outer.inner` for a method or property, `path:A-B` for lines). Run `drafter excerpt <pointer>`, then write the claim with the excerpt in view, so the bullet says no more than the lines show. A claim that needs two places takes two pointers. When the excerpt prints `no excerpt:`, the pointer is wrong; fix it before you write on.
+
+A live docs page is a map to the code, never a source. A claim you find only on a page gets retraced to code, config, or a vendor document, or it is not filed; when that fails, do not cite it. Edit fact bullets with the Edit tool, never a shell append. `drafter check` reports a fact with no valid tag, and warns on a verified fact whose pointers show a read nothing; see [What `drafter check` checks](format.md#what-drafter-check-checks) and [See what a read sees](format.md#see-what-a-read-sees).
 
 ## 3. Write the plan into the blueprint
 
@@ -42,6 +44,13 @@ Decide the introduction's framing from the reader before any prose exists. Intro
 
 Cite a fact in the framing as [framing](format.md#framing) describes. Put narration of how your planning moved in the commit message, never in the blueprint.
 
-## 5. Check and commit
+## 5. Check and read until a read accepts
 
-Run `drafter check`. Fix every error: [What `drafter check` checks](format.md#what-drafter-check-checks) lists them. Commit the outline entry, the blueprint, and any new fact bullets together. The nightly run drafts the page from there.
+The loop has no cap:
+
+1. Run `drafter check`. Fix every error and every `no-excerpt` warning: [What `drafter check` checks](format.md#what-drafter-check-checks) lists them.
+2. Commit the outline entry, the blueprint, and any new fact bullets together.
+3. Run `drafter read <blueprint>`. Fix every blocking finding from every seat, fact-truth findings included, with the edits [Read](SKILL.md#read) names. The reads run on the API key, so the fixing stays on your session.
+4. Run `drafter check`, commit, and read again.
+
+Stop when a read accepts. Polish before a read and never after the accept, because an edit after the last read is a change no read saw. Report the number of reads it took. The nightly run drafts the page from there.
