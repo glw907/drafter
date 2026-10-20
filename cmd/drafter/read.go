@@ -53,8 +53,10 @@ that changed is read whole, with the diff of its blueprint, the changed fact bul
 outline entry alongside, and it is blocked only on a defect the change adds, alters, or causes;
 an older defect is reported as already present and does not block. The consistency read blocks
 only on a conflict that touches a fact the change touched. A page with no earlier blueprint to
-diff against is read as a whole. A change read writes no drafted.lock entry. A resume takes no
---since: the run recorded each page's scope.
+diff against is read as a whole. A change read that accepts records the blueprint's blob id in
+drafted.lock only when the page's entry holds no bar and records as accepted the blueprint at
+<rev>, so the change is all that is new since that accept; otherwise the entry stays, and a
+line on stderr says why. A resume takes no --since: the run recorded each page's scope.
 
 The output has one line per blueprint with its verdict, scope, and cost. Under it, one line per
 finding of the blueprint read, marked blocking or non-blocking, then one per warning and the
@@ -163,13 +165,9 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 		}
 		return cannot(errors.New(msg))
 	}
-	lockErr := recordAccepted(c, root, head, s, f.dryRun)
-	if lockErr == nil && !f.dryRun && s.Stop == "" {
-		for _, r := range s.Pages {
-			if scopedAccept(r) {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s: accepted on a scoped read; drafted.lock keeps its earlier entry\n", r.Path)
-			}
-		}
+	kept, lockErr := recordAccepted(c, root, head, s, scopeBases(root, handoffs, s), f.dryRun)
+	if lockErr == nil {
+		scopedKept(cmd.ErrOrStderr(), s, kept)
 	}
 	s.Pages = append(s.Pages, skipped...)
 	if err := writeReadSummary(out, c, s, f.dryRun); err != nil {
@@ -506,9 +504,35 @@ func nonNil(s []string) []string {
 // A dry run and a run that stopped write nothing: the pipeline released its locks when it
 // returned, so only a run that ended with every page decided has outcomes worth recording. A
 // write that failed is made by resuming the finished run, which sends no request.
-func recordAccepted(c *config.Config, root, start string, s pipeline.Summary, dry bool) error {
+func recordAccepted(c *config.Config, root, start string, s pipeline.Summary, bases map[string]string, dry bool) (kept map[string]string, err error) {
 	if dry || s.Stop != "" {
-		return nil
+		return nil, nil
 	}
-	return updateLock(c, root, func(l *blueprint.Lock) (bool, error) { return recordReads(l, start, s), nil })
+	err = updateLock(c, root, func(l *blueprint.Lock) (bool, error) {
+		var changed bool
+		changed, kept = recordReads(l, start, s, bases)
+		return changed, nil
+	})
+	return kept, err
+}
+
+// scopeBases maps each page accepted on a scoped read to its blueprint's blob at the commit the
+// read diffed from, the page's Since, which a resumed read carries from its start. A blueprint
+// that cannot be found there maps to nothing, so its entry stays.
+func scopeBases(root string, handoffs []handoff.Handoff, s pipeline.Summary) map[string]string {
+	plans := map[string]string{}
+	for _, h := range handoffs {
+		plans[h.Page.Path] = h.Plan
+	}
+	bases := map[string]string{}
+	for _, r := range s.Pages {
+		bp, ok := plans[r.Path]
+		if !ok || r.Since == "" || !scopedAccept(r) {
+			continue
+		}
+		if blob, err := blueprint.CommitBlobID(root, r.Since, bp); err == nil {
+			bases[r.Path] = blob
+		}
+	}
+	return bases
 }

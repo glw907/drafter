@@ -132,6 +132,9 @@ type PageResult struct {
 	// ReadScope is what the page's blueprint read was limited to when it differs from Scope, the
 	// draft's: set only for a page given a read scope of its own.
 	ReadScope *blueprint.Scope `json:"read_scope,omitempty"`
+	// Since is the commit the page's blueprint read compared against, empty for a read with no
+	// comparison.
+	Since string `json:"since,omitempty"`
 }
 
 // FindingResult is one finding of a page's blueprint read.
@@ -265,7 +268,7 @@ func (r *runner) summary() Summary {
 		if p.ps.Status == StatusAccepted {
 			res.Accepted = p.w.Accepted
 		}
-		res.WholeBlocked, res.BarFrom, res.ReadScope = p.w.WholeBlocked, p.w.BarFrom, p.w.ReadScope
+		res.WholeBlocked, res.BarFrom, res.ReadScope, res.Since = p.w.WholeBlocked, p.w.BarFrom, p.w.ReadScope, p.w.Since
 		s.Pages = append(s.Pages, res)
 	}
 	if r.stop != "" {

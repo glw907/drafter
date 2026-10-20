@@ -19,7 +19,7 @@ cache_read = 0.20
 [seat.draft]
 model = "claude-opus-5-5"
 effort = "high"
-max_tokens = 64000
+max_tokens = 128000
 
 [seat.structure]
 model = "claude-opus-5-5"

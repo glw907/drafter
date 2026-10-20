@@ -178,8 +178,11 @@ func checkStockTracks(c *config.Config, root, head string, handoffs []handoff.Ha
 //
 // The reads' outcomes are written first, in the same write (recordReads): an accept that judged
 // the whole blueprint, or the change since a bar, sets the accepted id and clears the bar, and a
-// whole read that blocked records its bar. A drafted page's entry then keeps that accepted id, so
-// a skipped read and a scoped accept keep the id the entry held, and it carries no bar.
+// whole read that blocked records its bar. A scoped read here diffs from the entry's own
+// blueprint, so a scoped accept sets the accepted id only when the entry holds no bar and its
+// accepted id is its blueprint; otherwise the entry stays and warn says why. A drafted page's
+// entry then keeps the accepted id recordReads left, so a skipped read keeps the id the entry
+// held, and it carries no bar.
 func recordDrafted(c *config.Config, root, start string, handoffs []handoff.Handoff, s pipeline.Summary, dry bool, warn io.Writer) error {
 	if dry || s.Stop != "" {
 		return nil
@@ -189,7 +192,12 @@ func recordDrafted(c *config.Config, root, start string, handoffs []handoff.Hand
 		plans[h.Page.Path] = h.Plan
 	}
 	return updateLock(c, root, func(lock *blueprint.Lock) (bool, error) {
-		read := recordReads(lock, start, s)
+		bases := map[string]string{}
+		for p, e := range lock.Pages {
+			bases[p] = e.Blueprint
+		}
+		read, kept := recordReads(lock, start, s, bases)
+		scopedKept(warn, s, kept)
 		drafted := false
 		for _, r := range s.Pages {
 			bp, ok := plans[r.Path]

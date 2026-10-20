@@ -30,7 +30,7 @@ func TestStockDefaultsRunWithoutSeatOrGateSettings(t *testing.T) {
 		{"gate.protocol", "plain", "default"},
 		{"seat.draft.model", "claude-opus-5-5", "default"},
 		{"seat.draft.effort", "high", "default"},
-		{"seat.draft.max_tokens", "64000", "default"},
+		{"seat.draft.max_tokens", "128000", "default"},
 		{"seat.coverage.effort", "low", "default"},
 		{"seat.consistency.effort", "low", "default"},
 		{"seat.structure.effort", "medium", "default"},

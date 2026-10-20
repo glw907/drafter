@@ -289,7 +289,7 @@ the failing lines of a red log. drafter uses the two to attribute each failing s
 | `seat.<name>.agent` | project, local | Unset. | None. |
 | `seat.<name>.model` | project, local | `claude-opus-5-5` | None. |
 | `seat.<name>.effort` | project, local | `high` for `draft`, `low` for `reader`, `coverage`, and `consistency`, `medium` for the rest. | None. |
-| `seat.<name>.max_tokens` | project, local | `64000` for `draft`, `32000` for the rest. | None. |
+| `seat.<name>.max_tokens` | project, local | `128000` for `draft`, `32000` for the rest. | None. |
 | `seat.<name>.inputs` | project, local | None. | None. |
 
 `prompts` is the path to the prompts module. When it's unset, drafter uses the stock module that
@@ -414,7 +414,7 @@ command = "make check-docs PAGE={page}"
 [seat.draft]
 model = "example-model"
 effort = "high"
-max_tokens = 64000
+max_tokens = 128000
 
 [seat.structure]
 model = "example-model"
