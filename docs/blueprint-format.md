@@ -296,7 +296,7 @@ Each entry is keyed on the page path and holds these fields.
 | `blueprint` | The git blob id of the blueprint at drafter's last write. |
 | `accepted` | The blob id of the blueprint that the blueprint read last accepted. |
 | `sections` | One hash per section id, and `_intro` for the text above the first section. |
-| `blocked` | The read bar: the outcome of the last read of the whole blueprint that blocked it. |
+| `blocked` | The read bar: the outcome of the last whole read that blocked. |
 
 Hashes follow three rules.
 
@@ -312,8 +312,9 @@ Hashes follow three rules.
 An entry with only `accepted` set belongs to a page that isn't drafted yet. A missing
 `drafted.lock` is valid and reads as no entries.
 
-`blocked` holds `commit`, the full sha of the commit the blocked read read, and `findings`, its
-blocking findings in the order the read gave them, each with a `location` and a `text`. A page with
+`blocked` holds two fields. `commit` is the full sha of the commit the whole read ran against.
+`findings` lists its blocking findings in the order the read gave them, each with a `location` and
+a `text`. A page with
 no entry gets an entry that holds only `blocked`:
 
 ```yaml
@@ -327,13 +328,18 @@ pages:
           text: A step the reader needs is missing.
 ```
 
-An accept that writes `accepted` removes `blocked`. A later accept of that page then leaves an
-entry with only `accepted`. A read with `--since` that accepts writes nothing: its `blocked` and
-earlier `accepted` stay. A draft writes a full entry with no `blocked`. The walk that finds the
-commit that introduced an entry ignores both `blocked` and `accepted`. `drafter check`
-reports an entry that holds `blocked` or `accepted` for a page the outline doesn't list. A
-`drafted.lock` that doesn't decode stops `drafter read` and `drafter page` before any request, and
-the error names the file.
+These rules govern `blocked`:
+
+- An accept that writes `accepted` removes `blocked`, and a later accept of that page leaves an
+  entry with only `accepted`.
+- A read with `--since` that accepts writes nothing, so its `blocked` and earlier `accepted` stay.
+- A draft writes a full entry with no `blocked`.
+- The walk that finds the commit that introduced an entry ignores both `blocked` and `accepted`.
+- `drafter check` reports an entry that holds `blocked` or `accepted` for a page the outline
+  doesn't list.
+
+A `drafted.lock` that doesn't decode stops `drafter read` and `drafter page` before any request,
+and the error names the file.
 
 `drafter convert` seeds a page's entry with the page as it stands, at no cost, and records the
 blueprint it wrote. The reshape that follows is a blueprint change, so a converted page gets
@@ -567,7 +573,8 @@ page.
 
 ### The read bar
 
-A read of the whole blueprint that blocks leaves a bar in the page's `drafted.lock` entry: the
+A whole read is a read of the whole blueprint, with no `--since` and no bar. A whole read that
+blocks leaves a bar in the page's `drafted.lock` entry: the
 commit the run started at and the read's blocking findings. The summary marks that page
 `whole_blocked`. A read with no blocking finding leaves no bar. The next `drafter read` with no
 `--since` holds the page to the bar. It reads the change since the bar's commit, as `--since` with
@@ -578,12 +585,12 @@ present:". The summary names the bar's commit as `bar_from`.
 
 An accept on that read writes `accepted` and removes the bar. A read that blocks again leaves the
 bar as it was, so each later read judges every change since the first blocked whole read, including
-a defect an earlier fix added. The run reads the lock as committed at its start, so commit
-`drafted.lock` with the fix.
+a defect an earlier fix added. Commit `drafted.lock` with the fix, because the run
+reads the lock as committed at its start.
 
 When the blueprint hasn't changed since the bar's commit, the page isn't read. The command prints
 `held`, the line `unchanged since the blocked read at <commit>; fix its <n> findings and commit`,
-and the bar's findings, sends no request for the page, and exits 1. When the bar's commit isn't in
+and the bar's findings. It sends no request for the page and exits 1. When the bar's commit isn't in
 the repository, as after a squash or rebase merge, the command prints `the blocked read's commit
 <commit> is not in this repository; reading whole`, and the page is read whole with no bar. A
 whole read that blocks then replaces the bar. `--since` ignores bars, and a resume reads each
@@ -623,14 +630,14 @@ skipped. That happens after a change to a fact alone.
 
 A page whose entry holds a [read bar](#the-read-bar), and whose blueprint read isn't skipped, reads
 with the bar as `drafter read` does: the change since the bar's commit, judged against the bar's
-findings. Its draft still follows the table above, so a bar page can read the change since its bar
+findings. Its draft still follows the table above, so a page with a bar can read the change since its bar
 and redraft only the sections changed since its last draft. The summary gives the read's own scope
 as `read_scope` beside the draft's `scope`. A page whose blueprint hasn't changed since the bar's
 commit is `held`, isn't run, and makes the command exit 1. A read that blocks inside `drafter page`
 writes the bar as `drafter read` does.
 
 `--whole` drafts each page whole, whatever its entry says: no page is up to date, and none is a
-section redraft. This is how a page converted to a blueprint is first drafted. Conversion seeds an
+section redraft. Use `--whole` for the first draft of a page converted to a blueprint. Conversion seeds an
 entry from the page as it stands, so without `--whole` the page is up to date until its blueprint
 changes, and a change can make it a section redraft of the old prose. The blueprint read is still
 skipped when `accepted` matches, and a bar still applies. `--whole` can't be combined with

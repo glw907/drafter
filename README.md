@@ -104,8 +104,9 @@ The command runs stage 1 of the pipeline on each blueprint: the local check, the
 holding the consistency read and the blueprint read. It needs a clean tree and `[seat.blueprint]`
 in the configuration, and it reads every input from the commit the run started at. When the run
 ends with every blueprint decided, it records each accepted blueprint's blob id in
-`drafted.lock`, and the blocking findings of each whole read that blocked, which the next read
-holds the blueprint's change to. The exit status is the same as `page`'s.
+`drafted.lock`. For each whole read that blocked, it also records a
+[read bar](docs/blueprint-format.md#the-read-bar): the read's blocking findings, which the next
+read checks the change against. The exit status is the same as `page`'s.
 
 ### check-plan
 

@@ -373,9 +373,9 @@ blueprint settings have no environment variable.
 it, `{dir}` stands for the base name of the page's directory and `{name}` for the page's file name
 without `.md`. With `brief_path = "notes/briefs/{dir}/{name}.json"`, the brief for
 `docs/guide/start.md` is `notes/briefs/guide/start.json`. The template must contain `{name}`, so
-no two pages share a brief, and it must stay inside the project. The setting exists for a project
-whose own tooling already reads briefs from another place. It carries that legacy path until the
-project moves to the convention, as call 13 of drafter's architecture sets out.
+pages in one directory never share a brief, and it must stay inside the project. Use it when a
+project's own tooling already reads briefs from another place, until the project moves to the
+convention.
 
 ## Example
 
