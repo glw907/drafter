@@ -1,4 +1,4 @@
-// Runs the draft-docs page chain (docs/superpowers/specs/2026-09-26-draft-docs-approach-design.md,
+// Runs the draft-docs page chain (docs/specs/2026-09-26-draft-docs-approach-design.md,
 // "The page chain" and "Scoped re-review") over a list of pages, a few pages in flight at once.
 //
 // Per page: a page-inputs agent writes the page's job, its type, the fact ids the drafter should
@@ -59,7 +59,7 @@
 //           job: "<the page's job and type, from the stage outline, verbatim>",
 //           pageType: "how-to",            // optional hint; the page-inputs agent may confirm or correct it
 //           exemplarSources: ["docs/admin/x.md", "docs/editors/y.md"],  // full pages the drafter reads whole
-//           inputs: ["docs/superpowers/plans/<plan>.mining.md#is-it-working", "..."],
+//           inputs: ["docs/plans/<plan>.mining.md#is-it-working", "..."],
 //           pinned: ["#slug-one", "#slug-two"],   // optional; slugs the page must keep
 //           extraChecks: ["<a sentence the fact read must also verify>"],   // optional
 //           figure: false,                 // optional; true adds a figure-verifier read
@@ -119,7 +119,7 @@
 // `pending <this page's slug>`, its own retags' rows included, so an accepted page leaves none. Page inputs reports `rowsReceived` and `rowsDisposed`, carried in
 // `record.pageInputs`.
 //
-// The page plan (`docs/superpowers/research/2026-10-01-draft-docs-2a-page-plan-diagnosis.md`):
+// The page plan (`docs/research/2026-10-01-draft-docs-2a-page-plan-diagnosis.md`):
 // the chain carried no artifact that holds a page's argument, so one plan step runs after page
 // inputs (or a rework page's inventory) and before the draft, on `args.planModel` at
 // `args.planEffort` (default Opus 5.5 at `high`, the chain's plan seat). It writes
@@ -194,7 +194,7 @@
 // whose record a probe (`probe:<id>:framing`, `test -f`) finds missing on disk at its reported path.
 //
 // Round 2 reads (draft-docs 2a run 2 measured about 2.4M tokens a page against the 1.3M budgeted;
-// `docs/superpowers/research/2026-10-03-draft-docs-2a-targeted-close-record.md` on
+// `docs/research/2026-10-03-draft-docs-2a-targeted-close-record.md` on
 // `draft-docs-2a`): the round-2 redrafter runs `git hash-object -w -- <page>` before any edit and
 // reports the blob as `baseline`, the page as round 1 read it. Each round-2 seat then receives its
 // own round-1 findings and the command that prints the diff since round 1
@@ -226,7 +226,7 @@
 //
 // The structural edit seat (`structural edit` in the record, `general-purpose`, read-only by its
 // prompt) runs the structural-edit checklist that
-// `docs/superpowers/research/2026-09-30-page-level-review-prior-art.md` adopts in "## b.
+// `docs/research/2026-09-30-page-level-review-prior-art.md` adopts in "## b.
 // Structural edit seat": the Red Hat peer review guide's Structure Checklist, less its two
 // AsciiDoc and reuse items, and Google Technical Writing Two's introduction, review, navigation,
 // and heading lead-in items, all quoted verbatim, with the introduction checked on every page.
@@ -264,7 +264,7 @@
 // rule.
 //
 // Rework (`rework` on a page): the plan's task 7b
-// (`docs/superpowers/plans/2026-09-30-draft-docs-stage-2a.md`, "Task 7b: rework the pilot at the
+// (`docs/plans/2026-09-30-draft-docs-stage-2a.md`, "Task 7b: rework the pilot at the
 // page level") reworks committed pages at the page level, a sentence kept where the page plan keeps
 // it, and takes them through the new seats. A page carrying `rework`, a string of that page's
 // job-read findings and owner rulings, skips page inputs and the round-1 draft: its committed page
@@ -1241,7 +1241,7 @@ checkPlan: { exit, output }, and never report a run you did not make.`;
 /**
  * The plan step's prompt, for the first plan or its one revision on the plan read's findings. The
  * plan is Google's outline written down, per the 2026-10-01 page-plan diagnosis
- * (docs/superpowers/research/2026-10-01-draft-docs-2a-page-plan-diagnosis.md): the chain carried
+ * (docs/research/2026-10-01-draft-docs-2a-page-plan-diagnosis.md): the chain carried
  * no artifact that holds a page's argument.
  * @param {Record<string, any>} p
  * @param {Record<string, any>} pageInputs
@@ -1630,7 +1630,7 @@ function scopeNote(scope, where = "The page changed only at the spots the final 
   if (!scope) return "";
   return `
 This read is scoped. ${where}. "Changed sentences get both reviews, scoped to those sentences"
-(docs/superpowers/specs/2026-09-26-draft-docs-approach-design.md, "Edits after the chain"). Grade
+(docs/specs/2026-09-26-draft-docs-approach-design.md, "Edits after the chain"). Grade
 the changed sentences. ${CAP_SCOPE}
 
 ${scope}
@@ -1750,7 +1750,7 @@ figure fails; otherwise "accept".${p.figureNote ? `\n\nFigure note, from the out
 
 // The prior-art record the structural edit seat and the final reader read quote: the only source
 // of their checklist and test wording.
-const PRIOR_ART = "docs/superpowers/research/2026-09-30-page-level-review-prior-art.md";
+const PRIOR_ART = "docs/research/2026-09-30-page-level-review-prior-art.md";
 
 /**
  * The structural edit seat's prompt: the two published blocks the prior-art record adopts in
@@ -1919,7 +1919,7 @@ section means, and keep each paraphrase in summary.`;
   } else if (/task|tutorial|how-to/i.test(type)) {
     first = `DigitalOcean's test for a tutorial: "We ask that you thoroughly test it by reading through it and
 following it as a reader would." Follow the page as the cold reader of
-docs/superpowers/specs/2026-09-21-draft-docs-design.md does: "an agent with the page and a terminal
+docs/specs/2026-09-21-draft-docs-design.md does: "an agent with the page and a terminal
 only", "logging every point where it had to infer". Run a step only in a scratch directory outside
 the worktree; read a step that needs an account, a secret, or a deploy without running it, and log
 what you had to infer to understand it.`;
@@ -1951,7 +1951,7 @@ function readerStepThree(job) {
   return `Step 3. Only now, ${job}. Each mismatch between your paraphrase and that job is a blocking finding:
 "wherever participants misunderstood the message, the document has a problem that you should fix"
 (Part V). Each point where you had to infer is a finding, blocking when it is an unstated step or an
-unclassified error (the cold-reader row of docs/superpowers/specs/2026-09-21-draft-docs-design.md).
+unclassified error (the cold-reader row of docs/specs/2026-09-21-draft-docs-design.md).
 Give each its file:line as location. The method's source is ${PRIOR_ART}, "## f. The final reader
 read". Verdict "fix" if any blocking finding exists; otherwise "accept".`;
 }

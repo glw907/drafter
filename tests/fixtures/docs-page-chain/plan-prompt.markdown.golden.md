@@ -12,7 +12,7 @@ document," and "Structure your outline so that your document introduces informat
 relevant to your reader." The drafter drafts from it: the plan is the source of the page's order,
 each section's claim, and each fact's placement. The structural edit seat reads it before any prose
 exists. The outline's covers order is an inventory, and Google's lesson is "a published reason to
-re-sequence sections that follow the outline's `covers` order as an inventory" (docs/superpowers/research/2026-09-30-page-level-review-prior-art.md,
+re-sequence sections that follow the outline's `covers` order as an inventory" (docs/research/2026-09-30-page-level-review-prior-art.md,
 "## b. Structural edit seat"): the plan argues the order.
 
 Read the section "## The page anatomies" of docs/internal/docs-register.md, by its exact heading, for this page type's
