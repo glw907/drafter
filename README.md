@@ -83,6 +83,18 @@ drafter refs [--root <dir>] [--json] <fact-id>
 The command lists every blueprint item, on every page, that places or cites the fact, one
 `file:line: item-id (kind)` per line. It exits 1 when there are none.
 
+### excerpt
+
+```sh
+drafter excerpt [--root <dir>] [--json] <fact-id | pointer>
+```
+
+The command prints the source lines a read gets for a fact: the fact's bullet, then each excerpt
+block as a read's request carries it. Given a source pointer instead of a fact id, it prints that
+pointer's block. It exits 0 when at least one block shows source lines and 1 when none does.
+[Blueprint format](docs/blueprint-format.md#see-what-a-read-sees) lists what each pointer form
+yields.
+
 ### convert
 
 ```sh

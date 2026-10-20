@@ -398,6 +398,7 @@ as an example item.
 | `lock` | An entry with a `page` id names a page on disk, and an entry with only an `accepted` id names a page the outline lists. | error |
 | `convention` | `blueprints.root` is `blueprints`, and `facts.dir` is `<root>/facts`. | warning |
 | `handler` | A `failure`'s handler gives the reader a next action. A `handledBy` that names only a `fact` item, a `sentence` with `mode: verbatim`, or a `link` or `handoff` that sends the reader back to the section holding the failure's `from` step warns. The message carries the fix: hand off to the step or section that gives the reader a next action. | warning |
+| `no-excerpt` | A `verified` fact that a checked blueprint cites has a pointer that yields an excerpt, so a read can check the claim against source lines. Each fact is reported once, at its bullet, and the fix names `drafter excerpt`. | warning |
 | `store` | Every fact bullet in the facts store has an id no other bullet has, a `Source:`, and one valid tag, and each source pointer names something that exists. See [The facts store](#the-facts-store). | error, or warning for a bare path that doesn't exist |
 
 A prose field that carries a `[[id]]` is `argument`, `orderReason`, the `introduction` parts, the
@@ -424,6 +425,38 @@ The exit status is 0 when the command lists at least one place and 1 when it lis
 message for none says whether the facts store holds the id, which tells a mistyped id from a fact
 no page uses yet. The status is 2 when the command can't run, for the same reasons as `drafter
 check`.
+
+### See what a read sees
+
+`drafter excerpt [--root dir] [--json] <fact-id | pointer>` prints the source lines a read gets
+for a fact. For a fact id it prints the fact's bullet, then each excerpt block exactly as a
+read's request carries it. For a pointer, such as `src/panel.ts#Panel.open`, it prints that
+pointer's block, so you can try an anchor before you write the bullet. The exit status is 0 when
+at least one block shows source lines, 1 when none does, and 2 when the command can't run.
+
+A block that reads `no excerpt:` gives the reason a read sees nothing there: `missing`,
+`untracked`, `directory`, `prose`, `not a regular file`, `declaration not found`, or `range beyond
+the end of the file`. A verified fact whose pointers all give one of these draws the `no-excerpt`
+warning from `drafter check`.
+
+What a pointer yields depends on its form.
+
+| Pointer | The excerpt |
+|---|---|
+| `path:N` | 10 lines on each side of line N. |
+| `path:A-B` | Lines A through B, with 5 lines on each side. |
+| `path#name` | The declaration of `name`, from its leading doc comment through its last line. An excerpt over 200 lines stops at 200 and ends with `… (N more lines)`. |
+| `path#outer.inner` | The declaration of `inner` inside the declaration of `outer`: a member, property, method, or a `const`, `let`, `var`, or `function` declared inside it. A longer chain, such as `a.b.c`, resolves link by link. In Go, `Type.Method` finds the method of that receiver type. |
+| `path` | The whole file. |
+
+A pointer into a tracked code file of 150 lines or fewer shows the whole file, once per fact,
+whatever its form. A pointer that doesn't resolve keeps its `no excerpt:` reason instead.
+
+Prose files give no excerpt, because a document shows what the project says and not what the code
+does. The exception is a file that `facts.prose_sources` lists in `drafter.toml`: a `path:N` or
+`path:A-B` pointer into it yields its lines, for a claim whose source is an owner's statement.
+Every other pointer into a prose file, a bare path to a listed one, and every page of the docs
+stays `no excerpt: prose`. See [Configuration](configuration.md#facts-and-registers).
 
 ## The facts store
 

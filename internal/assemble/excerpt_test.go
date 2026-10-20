@@ -2,6 +2,7 @@ package assemble
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -21,8 +22,25 @@ func loadFacts(t *testing.T, f fixture) *plan.Facts {
 	return fs
 }
 
+// numbered returns a file of n lines, each "// line K".
+func numbered(n int) string {
+	var b strings.Builder
+	for i := 1; i <= n; i++ {
+		fmt.Fprintf(&b, "// line %d\n", i)
+	}
+	return b.String()
+}
+
+// addTracked writes a file into the fixture and tracks it.
+func (f fixture) addTracked(t *testing.T, rel, text string) {
+	t.Helper()
+	f.write(t, filepath.Join(f.root, rel), text)
+	f.git(t, "add", rel)
+}
+
 func TestExcerpt(t *testing.T) {
 	f := newFixture(t)
+	f.addTracked(t, "src/big.go", numbered(400))
 	r, err := openRepo(context.Background(), f.config())
 	if err != nil {
 		t.Fatal(err)
@@ -33,11 +51,11 @@ func TestExcerpt(t *testing.T) {
 		in     []string
 		out    []string
 	}{
-		{"line pointer takes ten lines each way", "src/greet.go:25", []string{"lines 15-35", "func (g *Greeter) Hello()", "// line 31"}, []string{"// line 36", "package greet"}},
-		{"span takes five lines each way", "src/greet.go:23-26", []string{"lines 18-31", "func (g *Greeter) Hello()"}, []string{"// line 32"}},
-		{"span clamps at the top", "src/greet.go:3-4", []string{"lines 1-9"}, nil},
-		{"range past the end clamps", "src/greet.go:45-60", []string{"lines 40-50", "// line 50"}, nil},
-		{"comma list yields each", "src/greet.go:3,45", []string{"lines 1-13", "lines 35-50"}, nil},
+		{"line pointer takes ten lines each way", "src/big.go:25", []string{"lines 15-35", "// line 31"}, []string{"// line 36", "// line 14"}},
+		{"span takes five lines each way", "src/big.go:23-26", []string{"lines 18-31"}, []string{"// line 32"}},
+		{"span clamps at the top", "src/big.go:3-4", []string{"lines 1-9"}, nil},
+		{"range past the end clamps", "src/big.go:395-410", []string{"lines 390-400", "// line 400"}, nil},
+		{"comma list yields each", "src/big.go:3,45", []string{"lines 1-13", "lines 35-55"}, nil},
 		{"range entirely past the end", "src/greet.go:200", []string{"no excerpt: range beyond the end of the file"}, nil},
 		{"bare file inlined whole", "src/panel.ts", []string{"=== file: src/panel.ts ===", "toggle(): void"}, nil},
 		{"directory", "src", []string{"no excerpt: directory"}, nil},
@@ -47,12 +65,12 @@ func TestExcerpt(t *testing.T) {
 		{"untracked path", "untracked.txt:1", []string{"no excerpt: untracked"}, []string{"UNTRACKED-CONTENT"}},
 		{"path that climbs out of the root", "../outside/secret.txt:1", []string{"no excerpt: untracked"}, []string{"OUTSIDE-SECRET"}},
 		{"symlink to a file outside the root", "docs/escape.md:1", []string{"no excerpt: untracked"}, []string{"OUTSIDE-SECRET"}},
-		{"Go function declaration, not the mention", "src/greet.go#Shout", []string{"lines 22-50", "func Shout(s string)"}, []string{"Greeting is mentioned"}},
-		{"Go method", "src/greet.go#Hello", []string{"lines 18-50", "func (g *Greeter) Hello() string"}, nil},
+		{"Go function declaration, not the mention", "src/greet.go#Shout", []string{"lines 1-50", "func Shout(s string)"}, nil},
+		{"Go method", "src/greet.go#Hello", []string{"lines 1-50", "func (g *Greeter) Hello() string"}, nil},
 		{"Go method by dotted name", "src/greet.go#Greeter.Hello", []string{"func (g *Greeter) Hello() string"}, nil},
 		{"Go type", "src/greet.go#Greeter", []string{"type Greeter struct"}, nil},
 		{"Go const and var", "src/greet.go#Suffix", []string{"var Suffix"}, nil},
-		{"imported name excerpt holds the declaration", "src/widget.ts#render", []string{"lines 22-35", "export function render(input: string)"}, []string{"import { render }"}},
+		{"imported name excerpt holds the declaration", "src/widget.ts#render", []string{"lines 1-35", "export function render(input: string)"}, nil},
 		{"export default class", "src/panel.ts#Panel", []string{"export default class Panel"}, nil},
 		{"export default async function", "src/widget.ts#load", []string{"export default async function load()"}, nil},
 		{"interface", "src/widget.ts#Options", []string{"export interface Options"}, nil},
@@ -66,7 +84,7 @@ func TestExcerpt(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := strings.Join(r.excerpt("f:x", tt.source), "\n")
+			got := strings.Join(r.excerpt("f:x", tt.source, map[string]bool{}), "\n")
 			for _, s := range tt.in {
 				if !strings.Contains(got, s) {
 					t.Errorf("excerpt of %s lacks %q:\n%s", tt.source, s, got)
@@ -94,7 +112,7 @@ func TestExcerptBareSpecialFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := r.excerpt("f:x", "src/widget.ts")
+	got := r.excerpt("f:x", "src/widget.ts", map[string]bool{})
 	if len(got) != 1 || !strings.Contains(got[0], "no excerpt: not a regular file") {
 		t.Errorf("excerpt = %q, want one block reading no excerpt: not a regular file", got)
 	}
@@ -161,10 +179,9 @@ func TestBuildWithFacts(t *testing.T) {
 	in.FactIDs = []string{"f:greet", "f:render", "f:other"}
 	got := requestText(t, in)
 	for _, want := range []string{
-		"=== excerpt: src/greet.go#Hello (fact f:greet) lines 18-50 ===",
-		"=== excerpt: src/widget.ts#render (fact f:render) lines 22-35 ===",
-		"=== excerpt: src/widget.ts:7 (fact f:render) lines 1-17 ===",
-		"=== excerpt: src/panel.ts#Panel (fact f:other) lines 1-8 ===",
+		"=== excerpt: src/greet.go (fact f:greet) lines 1-50 ===",
+		"=== excerpt: src/widget.ts (fact f:render) lines 1-35 ===",
+		"=== excerpt: src/panel.ts (fact f:other) lines 1-8 ===",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("request lacks %q", want)
@@ -186,4 +203,157 @@ func TestBuildWithFacts(t *testing.T) {
 			t.Errorf("request holds an excerpt with no facts store")
 		}
 	})
+}
+
+// tsFixture is a TypeScript file over the whole-file limit, so every pointer into it gets a
+// declaration span. pad lines of filler separate the declarations.
+func tsFixture(pad int) string {
+	filler := strings.Repeat("// filler\n", pad)
+	body60 := strings.Repeat("  step();\n", 60)
+	body250 := strings.Repeat("  step();\n", 250)
+	return "export class Panel {\n" +
+		"  open = false;\n\n" +
+		"  /** Flips the panel. */\n" +
+		"  toggle(): void {\n    this.open = !this.open;\n  }\n\n" +
+		"  readonly opts = {\n    size: 4,\n    label: 'x',\n  };\n" +
+		"}\n\n" + filler +
+		"export function outer(a: number): number {\n" +
+		"  function helper(b: number): number {\n    return b + 1;\n  }\n" +
+		"  const local = helper(a);\n  return local;\n}\n\n" +
+		"export const a = {\n  b: {\n    c: {\n      deep: 1,\n    },\n  },\n};\n\n" +
+		"/**\n * Documented.\n */\nexport function documented(): void {\n" + body60 + "}\n\n" +
+		"export function huge(): void {\n" + body250 + "}\n"
+}
+
+func TestExcerptAnchors(t *testing.T) {
+	f := newFixture(t)
+	f.addTracked(t, "src/big.ts", tsFixture(150))
+	r, err := openRepo(context.Background(), f.config())
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name   string
+		source string
+		in     []string
+		out    []string
+	}{
+		{"method of a class", "src/big.ts#Panel.toggle", []string{"/** Flips the panel. */", "toggle(): void {", "this.open = !this.open;"}, []string{"export class Panel", "readonly opts"}},
+		{"object property", "src/big.ts#Panel.opts", []string{"readonly opts = {", "label: 'x',"}, []string{"toggle()"}},
+		{"nested function", "src/big.ts#outer.helper", []string{"function helper(b: number)", "return b + 1;"}, []string{"const local"}},
+		{"three links", "src/big.ts#a.b.c", []string{"c: {", "deep: 1,"}, []string{"b: {"}},
+		{"inner member absent", "src/big.ts#Panel.missing", []string{"no excerpt: declaration not found"}, nil},
+		{"outer absent", "src/big.ts#Nope.toggle", []string{"no excerpt: declaration not found"}, nil},
+		{"doc comment through last line", "src/big.ts#documented", []string{" * Documented.", "export function documented()", "step();\n}"}, []string{"more lines", "export function huge"}},
+		{"250-line declaration is capped", "src/big.ts#huge", []string{"export function huge()", "… (52 more lines)"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := strings.Join(r.excerpt("f:x", tt.source, map[string]bool{}), "\n")
+			for _, s := range tt.in {
+				if !strings.Contains(got, s) {
+					t.Errorf("excerpt of %s lacks %q:\n%s", tt.source, s, got)
+				}
+			}
+			for _, s := range tt.out {
+				if strings.Contains(got, s) {
+					t.Errorf("excerpt of %s holds %q:\n%s", tt.source, s, got)
+				}
+			}
+		})
+	}
+	t.Run("the cap is 200 lines plus the closing line", func(t *testing.T) {
+		got := r.excerpt("f:x", "src/big.ts#huge", map[string]bool{})
+		if len(got) != 1 {
+			t.Fatalf("blocks = %d, want 1", len(got))
+		}
+		// Header, 200 body lines, the closing line, and the footer make 203 lines, 202 newlines.
+		if n := strings.Count(got[0], "\n"); n != 202 {
+			t.Errorf("block has %d newlines, want 202:\n%s", n, got[0])
+		}
+	})
+}
+
+func TestExcerptWholeSmallFile(t *testing.T) {
+	f := newFixture(t)
+	f.addTracked(t, "src/mid.go", numbered(120))
+	f.addTracked(t, "src/long.go", numbered(400))
+	r, err := openRepo(context.Background(), f.config())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("a 120-line file shows whole for a line pointer", func(t *testing.T) {
+		got := strings.Join(r.excerpt("f:x", "src/mid.go:60", map[string]bool{}), "\n")
+		if !strings.Contains(got, "lines 1-120") || !strings.Contains(got, "// line 1\n") || !strings.Contains(got, "// line 120") {
+			t.Errorf("excerpt is not the whole file:\n%s", got)
+		}
+	})
+	t.Run("a 400-line file keeps the window", func(t *testing.T) {
+		got := strings.Join(r.excerpt("f:x", "src/long.go:200", map[string]bool{}), "\n")
+		if !strings.Contains(got, "lines 190-210") || strings.Contains(got, "// line 189\n") {
+			t.Errorf("excerpt is not the plus-or-minus-ten window:\n%s", got)
+		}
+	})
+	t.Run("two pointers into one small file show it once", func(t *testing.T) {
+		facts := plan.ParseFacts(map[string]string{"a.md": "- `f:two` Two pointers. Source: `src/mid.go:5`, `src/mid.go:100`. [verified]\n"}, f.root)
+		e := &Excerpter{r: r}
+		blocks, real, err := e.Fact(facts, "f:two")
+		if err != nil || !real || len(blocks) != 1 {
+			t.Errorf("Fact = %d blocks, real %v, err %v; want 1 block, real", len(blocks), real, err)
+		}
+	})
+}
+
+func TestExcerptProseSources(t *testing.T) {
+	f := newFixture(t)
+	f.addTracked(t, "notes.md", numbered(20))
+	f.addTracked(t, "docs/guide/page.md", numbered(20))
+	c := f.config()
+	c.Facts.ProseSources = []string{"notes.md"}
+	r, err := openRepo(context.Background(), c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name   string
+		source string
+		in     []string
+		out    []string
+	}{
+		{"a span into a listed file yields its window", "notes.md:3-5", []string{"lines 1-10", "// line 10"}, []string{"// line 11", "lines 1-20"}},
+		{"a line into a listed file yields its window", "notes.md:15", []string{"lines 5-20"}, nil},
+		{"a bare listed file stays prose", "notes.md", []string{"no excerpt: prose"}, nil},
+		{"an anchor into a listed file stays prose", "notes.md#Setup", []string{"no excerpt: prose"}, nil},
+		{"a line into an unlisted prose file stays prose", "docs/guide/page.md:4", []string{"no excerpt: prose"}, []string{"// line 4"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := strings.Join(r.excerpt("f:x", tt.source, map[string]bool{}), "\n")
+			for _, s := range tt.in {
+				if !strings.Contains(got, s) {
+					t.Errorf("excerpt of %s lacks %q:\n%s", tt.source, s, got)
+				}
+			}
+			for _, s := range tt.out {
+				if strings.Contains(got, s) {
+					t.Errorf("excerpt of %s holds %q:\n%s", tt.source, s, got)
+				}
+			}
+		})
+	}
+}
+
+func TestExcerptPointer(t *testing.T) {
+	f := newFixture(t)
+	e, err := NewExcerpter(context.Background(), f.config())
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocks, real := e.Pointer("src/greet.go#Hello")
+	if len(blocks) != 1 || !real || !strings.Contains(blocks[0], "=== excerpt: src/greet.go lines 1-50 ===") {
+		t.Errorf("Pointer = %q, real %v; want one real block labeled src/greet.go lines 1-50", blocks, real)
+	}
+	if _, real := e.Pointer("src"); real {
+		t.Error("Pointer(src) reports a real excerpt for a directory")
+	}
 }
