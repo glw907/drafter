@@ -12,6 +12,9 @@
 
 ## Medium
 
+- [ ] **#33** Give the fact-truth seat repository access, an agentic read `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-20)*
+  The seat judges each fact against fixed excerpts, so a claim whose settling code sits outside every excerpt reads as holds, and so does a bullet that leaves out a case the code has. The blueprint-first replay at cairn 517158fae flagged 10 of the 13 false or over-claiming bullets and 17 of 25 in all, after two prompt rounds. Five of the eight misses were "omits" bullets with the code in view. A seat that can open and search the repository could follow a claim to its code. This is new machinery for the next pass (Geoff's ruling 1 on the blueprint-first plan). `internal/pipeline/facttruth.go`
+
 - [ ] **#28** Resolve a dotted excerpt anchor to a nested declaration `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-20)*
   A pointer like `file.ts#outer.inner` excerpts as "declaration not found", so the fact seat can't see the claim's source. The acceptance pass re-anchored 35 such cairn pointers to line ranges by hand (finding 8). `internal/assemble/excerpt.go:86-92`
 
