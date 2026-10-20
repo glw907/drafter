@@ -12,6 +12,21 @@
 
 ## Medium
 
+- [ ] **#28** Resolve a dotted excerpt anchor to a nested declaration `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-20)*
+  A pointer like `file.ts#outer.inner` excerpts as "declaration not found", so the fact seat can't see the claim's source. The acceptance pass re-anchored 35 such cairn pointers to line ranges by hand (finding 8). `internal/assemble/excerpt.go:86-92`
+
+- [ ] **#29** Refuse a resume on a binary other than the run's `drafter_version` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-20)*
+  A run started under one build resumes under another, so a stock change like the 64000-to-128000 draft ceiling can split one run across two configurations. `internal/pipeline/resume.go`
+
+- [ ] **#30** Follow `--first-parent` in `LockIntroducedAt` across merge commits `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-20)*
+  On a branch that merges task branches, the commit that introduced a lock entry can sit on a side parent, and the start-commit inference reads the wrong base. `blueprint/drafted.go:41-60`
+
+- [ ] **#31** Show the consistency seat the linked page's text, not only its headings `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-20)*
+  The consistency seat sees placed fact text and the headings of linked pages. A table under a linked page's title heading looked absent, and debug-your-site's read blocked on it in the acceptance pass. `internal/pipeline/blueprint.go`
+
+- [ ] **#32** Keep every round-2 seat's small findings in the s6 record `#bug` `#drafter` `#initiative:docs-system` *(2026-10-20)*
+  When an earlier round-2 seat's findings are all small and a later seat escalates, only the escalating seat's findings reach `record.json`, so the evidence drops the earlier ones. Control flow is right. `internal/pipeline/steps.go:646`
+
 - [ ] **#27** Make `FactChanged` ignore a fact whose only change is a moved `Source:` path `#improvement` `#drafter` `#initiative:repo-organization` *(2026-10-20)*
   The docs-layout sweep moved `docs/superpowers/` paths, so fact f:swjwxb's `Source:` line changed while its claim did not. The next `drafter page` on cairn-cms's `docs/extend/debug-your-site.md` now counts the bullet as changed and redrafts the page whole instead of scoped. A rename-aware comparison would treat a pointer that resolves to the same content as unchanged. Reported by the docs-layout session. `internal/blueprint/since.go`
 
@@ -28,6 +43,10 @@
   The edit-quality pass (2026-10-18) sent a caution with no fact-supplied handler to the "Add a caveat" row and made the smaller edit on a conflicting request. Prompt 4 then made the caveat in 3 of 3 runs and 2 of 3 were accepted; prompt 5 passed 1 of 3. The prompt 5 misses were consistency escalations (#12), so the shape that remains is a new section placed between the push and the checks, which the read now returns as a Nit. Left open for prompt 5.
 
 ## Low
+
+- [ ] **#18** Retry a reader read that stops at `max_tokens` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  The reader's schema lets the model run a string on past its end: in the B3 live runs about one reader call in four filled its 32000-token ceiling with repeated blank lines, quotes, or tags, and the page escalated as an unreadable reader at about $1.2. `noRetry` gives `stReader1` and `stReader2` no second try by design. The reader prompt now asks for plain text and the stock reader runs at low effort, which cut the rate in a replay but not to zero. A single retry of a `max_tokens` stop, or a lower `max_tokens` for the reader, needs Geoff's ruling because it changes the failures table. `internal/pipeline/handle.go`
+  The acceptance pass (2026-10-20) hit it again: debug-your-site's s7 reader wrote a full paraphrase, then repeated a separator and "(fin)" to 32000 output tokens, and the page escalated "unreadable reader" (run 20261020T082130Z-33e822ff). A guard that cuts a degenerate repetition loop would have saved the page.
 
 - [ ] **#14** Make `drafter read`'s error hint print a resume command drafter accepts `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
   The stopped-run line now carries `--sync` and the blueprint, but the error message `read.go` builds still says `drafter read --resume <id>`, which a sync run refuses. `cmd/drafter/read.go`
@@ -53,9 +72,6 @@
 - [ ] **#17** Make the stock read's anatomy slug match drafter's slugger for non-ASCII names `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
   `slug` in `stock/prompts.js` handles only ASCII names, so a non-ASCII anatomy name with no register builds a `drafter:anatomies.md#` token that may not resolve. Every stock name is ASCII today. `stock/prompts.js`
 
-- [ ] **#18** Retry a reader read that stops at `max_tokens` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
-  The reader's schema lets the model run a string on past its end: in the B3 live runs about one reader call in four filled its 32000-token ceiling with repeated blank lines, quotes, or tags, and the page escalated as an unreadable reader at about $1.2. `noRetry` gives `stReader1` and `stReader2` no second try by design. The reader prompt now asks for plain text and the stock reader runs at low effort, which cut the rate in a replay but not to zero. A single retry of a `max_tokens` stop, or a lower `max_tokens` for the reader, needs Geoff's ruling because it changes the failures table. `internal/pipeline/handle.go`
-
 - [ ] **#19** Detect a redraft that rewrites the page to the same bytes `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
   A fact bullet changes, the redraft writes byte-identical text, and the lock entry comes out identical too, so the next run sees the same fact change and redrafts again. The lock's commit field (B4) closes it. `cmd/drafter/draftscope.go`
 
@@ -68,19 +84,20 @@
 - [ ] **#22** Let a stopped pre-B3 run resume across the new `coherence` seat `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
   The fingerprint hashes every configured seat, so a run stopped before B3 refuses to resume with "the configuration changed since the run started (seat.coherence.…)". Fixing it edits `fingerprint.go`, which needs the auth-data bar. Resume such a run with the old binary before installing the new one. `internal/pipeline/fingerprint.go`
 
-- [ ] **#23** Hold a page whose gate red names only a sibling page of the same run `#bug` `#drafter` `#initiative:docs-system` *(2026-10-19)*
-  In B3c's wave 2, two pages went to a gate-fix draft for a `check:symbols` line in a third page of the run, spending a draft attempt each on a defect they could not fix. A red line that names another page in the run should hold the page as a foreign red does. `internal/pipeline/check.go`
-
 - [ ] **#24** Keep a heading that another page links to, or show the links to the gate-fix step `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
   Twice in B3c a redraft dropped a heading another page linked to, and the run stopped "tree red outside drafter's pages". The pass worked around it with a pre-run sweep of inbound anchors against blueprint ids. The draft or gate-fix prompt could carry the inbound anchors instead.
 
-- [ ] **#25** Let a scoped accept advance the lock, or skip the s1 re-read after one `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
-  A `--since` read that accepts writes nothing, so a later `page --whole` re-reads the blueprint whole at s1 and can block on findings the scoped read never weighed. B3c's rotate probe blocked that way. `cmd/drafter/read.go`
-
-- [ ] **#26** Raise the stock `seat.draft.max_tokens` above 64000 `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
-  Two of cairn's longest task guides stopped at 64000 tokens of page, brief, and thinking; at 128000 the same drafts fit. `internal/config/stock.toml`
 
 ## Done
+
+- [x] **#26** Raise the stock `seat.draft.max_tokens` above 64000 `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19 → 2026-10-20)*
+  Two of cairn's longest task guides stopped at 64000 tokens of page, brief, and thinking; at 128000 the same drafts fit. `internal/config/stock.toml`
+
+- [x] **#25** Let a scoped accept advance the lock, or skip the s1 re-read after one `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19 → 2026-10-20)*
+  A `--since` read that accepts writes nothing, so a later `page --whole` re-reads the blueprint whole at s1 and can block on findings the scoped read never weighed. B3c's rotate probe blocked that way. `cmd/drafter/read.go`
+
+- [x] **#23** Hold a page whose gate red names only a sibling page of the same run `#bug` `#drafter` `#initiative:docs-system` *(2026-10-19 → 2026-10-20)*
+  In B3c's wave 2, two pages went to a gate-fix draft for a `check:symbols` line in a third page of the run, spending a draft attempt each on a defect they could not fix. A red line that names another page in the run should hold the page as a foreign red does. `internal/pipeline/check.go`
 
 - [x] **#13** Give a whole read a stable bar on a base that reads clean `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18 → 2026-10-19)*
   Four whole reads of the edit-quality test base each blocked on a different finding after the previous one was fixed, so a base can't be driven to an accept. The change read is unaffected because it labels base defects "Already present:". `claude/.claude/workflows/docs-page-chain.js`
