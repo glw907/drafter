@@ -36,7 +36,24 @@
           "title": { "type": "string", "minLength": 1, "description": "The page's H1." },
           "type": { "type": "string", "minLength": 1, "description": "A type the types list declares." },
           "job": { "type": "string", "minLength": 1, "description": "What the reader accomplishes with the page." },
-          "covers": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "What the page covers." },
+          "covers": {
+            "type": "array",
+            "description": "What the page covers. An entry is a string, or an object with an id that a blueprint section or disposition claims.",
+            "items": {
+              "oneOf": [
+                { "type": "string", "minLength": 1 },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["id", "text"],
+                  "properties": {
+                    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "description": "A lowercase token, unique in the entry." },
+                    "text": { "type": "string", "minLength": 1 }
+                  }
+                }
+              ]
+            }
+          },
           "outOfScope": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "What the page leaves to other pages." },
           "figure": { "type": "boolean", "default": false, "description": "True for a page that carries a figure, which stays on the docs page chain." },
           "managed": { "type": "boolean", "default": true, "description": "False for a page drafter never drafts, such as a historical record. Such an entry needs only its path." }

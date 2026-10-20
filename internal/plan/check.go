@@ -103,6 +103,9 @@ func (c *checker) ids() {
 	disposed := map[string]int{}
 	for i := range c.p.Dispositions {
 		d := &c.p.Dispositions[i]
+		if d.Fact == "" {
+			continue
+		}
 		disposed[d.Fact] = d.Lines["fact"]
 		if it := placed[d.Fact]; it != nil {
 			c.add(d.Lines["fact"], SeverityError, checkIDs,
@@ -455,6 +458,8 @@ func (c *checker) facts() {
 		}
 	})
 	for i := range c.p.Dispositions {
-		resolve(c.p.Dispositions[i].Lines["fact"], c.p.Dispositions[i].Fact)
+		if d := &c.p.Dispositions[i]; d.Fact != "" {
+			resolve(d.Lines["fact"], d.Fact)
+		}
 	}
 }

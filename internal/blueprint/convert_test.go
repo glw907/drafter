@@ -277,7 +277,7 @@ func TestConvertOutline(t *testing.T) {
 	if !o.Pages[0].Figure || o.Pages[1].Figure || !o.Pages[0].Managed {
 		t.Errorf("figure or managed lost: %+v", o.Pages)
 	}
-	if b := o.Pages[1]; b.Title != "[[Page]] B: the sequel # two" || !slices.Equal(b.Covers, []string{"x: y"}) || b.OutOfScope != nil {
+	if b := o.Pages[1]; b.Title != "[[Page]] B: the sequel # two" || !slices.Equal(CoverStrings(b.Covers), []string{"x: y"}) || b.OutOfScope != nil {
 		t.Errorf("page b = %+v", b)
 	}
 	if len(o.CrossLinks) != 1 || o.CrossLinks[0].Why != "A leads to B." {
@@ -301,7 +301,7 @@ func TestConvertOutlineKeepsRiskyProse(t *testing.T) {
 	}
 	p := o.Pages[0]
 	if p.Title != "[[x]] leads" || p.Job != "Do this # not a comment: and this\n\nthen [[that]]" ||
-		!slices.Equal(p.Covers, []string{"# heading", "a: b", "[[ref]] first", "yes", "line\none"}) {
+		!slices.Equal(CoverStrings(p.Covers), []string{"# heading", "a: b", "[[ref]] first", "yes", "line\none"}) {
 		t.Errorf("a value changed on the round trip: %+v\n%s", p, data)
 	}
 }

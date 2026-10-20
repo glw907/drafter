@@ -85,8 +85,12 @@ func (jo *JSONOutline) Outline() *Outline {
 			o.Types = append(o.Types, Type{Name: p.PageType})
 		}
 		// Managed stays false only to be left out of the file: an omitted managed means true.
+		var covers []Cover
+		for _, text := range p.Covers {
+			covers = append(covers, Cover{Text: text})
+		}
 		o.Pages = append(o.Pages, Page{Path: p.Path, Slug: p.Slug, Title: p.Title, Type: p.PageType,
-			Job: p.Job, Covers: p.Covers, OutOfScope: p.OutOfScope, Figure: p.Figure})
+			Job: p.Job, Covers: covers, OutOfScope: p.OutOfScope, Figure: p.Figure})
 	}
 	return o
 }
@@ -458,6 +462,10 @@ func valueNode(v reflect.Value, prose, required, empty bool) *yaml.Node {
 		n := &yaml.Node{Kind: yaml.SequenceNode}
 		for i := range v.Len() {
 			e := v.Index(i)
+			if c, ok := reflect.TypeAssert[Cover](e); ok && c.ID == "" {
+				n.Content = append(n.Content, stringNode(c.Text, prose))
+				continue
+			}
 			if e.Kind() == reflect.String {
 				n.Content = append(n.Content, stringNode(e.String(), prose))
 				continue

@@ -77,6 +77,11 @@ func validateBlueprint(r *plan.Reporter, b *Blueprint) {
 		if line, ok := s.Lines["items"]; ok && len(s.Items) == 0 && !parentOfSubsections && !r.Faulted(line) {
 			r.Add(line, fmt.Sprintf("sections[%d].items: must hold at least one entry unless the next section is level 3", i), "add an entry, or leave items empty only above a level-3 section")
 		}
+		for _, id := range s.Covers {
+			if !plan.ValidID(id) {
+				r.Add(s.Lines["covers"], fmt.Sprintf("sections[%d]: covers %q is not a lowercase token", i, id), "use lowercase letters, digits, - and _")
+			}
+		}
 		for j := range s.Items {
 			it := &s.Items[j]
 			where := fmt.Sprintf("sections[%d].items[%d]", i, j)
@@ -89,6 +94,7 @@ func validateBlueprint(r *plan.Reporter, b *Blueprint) {
 	for i := range b.Dispositions {
 		x := &b.Dispositions[i]
 		where := fmt.Sprintf("dispositions[%d]", i)
+		plan.ValidateDispositionTarget(r, x, where)
 		switch x.Disposition {
 		case "", "cut":
 		case "subordinated":
@@ -186,6 +192,11 @@ func validateOutline(r *plan.Reporter, o *Outline) {
 				r.Add(p.Lines["slug"], fmt.Sprintf("%s: slug %q is used twice", where, p.Slug), "give each page its own slug")
 			}
 			slugs[p.Slug] = true
+		}
+		for j, c := range p.Covers {
+			if line, ok := c.Lines["id"]; ok && !plan.ValidID(c.ID) && !r.Faulted(line) {
+				r.Add(line, fmt.Sprintf("%s.covers[%d]: id %q is not a lowercase token", where, j, c.ID), "use lowercase letters, digits, - and _")
+			}
 		}
 		if !p.Managed {
 			continue

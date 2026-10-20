@@ -94,10 +94,12 @@ type Item struct {
 	Lines map[string]int `yaml:"-"`
 }
 
-// Disposition records a fact the plan leaves out of the page body: subordinated to a link
-// target, or cut.
+// Disposition records a fact the plan leaves out of the page body, or an outline covers entry
+// the page leaves out: subordinated to a link target, or cut. It names exactly one of Fact and
+// Covers; ValidateDispositionTarget enforces that, so the decoder requires neither.
 type Disposition struct {
-	Fact        string `yaml:"fact" plan:"required"`
+	Fact        string `yaml:"fact"`
+	Covers      string `yaml:"covers"`
 	Disposition string `yaml:"disposition" plan:"required"`
 	Reference   string `yaml:"reference"`
 	Reason      string `yaml:"reason" plan:"required,prose"`

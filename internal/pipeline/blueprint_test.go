@@ -292,6 +292,43 @@ func TestBlueprintEveryCreateFollowsAReserve(t *testing.T) {
 	h.mustRun()
 }
 
+func TestBlueprintRequestShowsAMappedCoverAsOneString(t *testing.T) {
+	h := newBlueprintHarness(t, withPages("a"))
+	const outline = "blueprints/outline.yaml"
+	withMapped := strings.Replace(h.read(outline),
+		"      - Create and publish with a new key.\n",
+		"      - Create and publish with a new key.\n      - id: grace\n        text: How long the old key keeps working.\n", 1)
+	if withMapped == h.read(outline) {
+		t.Fatal("the outline has no covers list to extend")
+	}
+	if err := os.WriteFile(filepath.Join(h.root, outline), []byte(withMapped), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, h.root, "add", outline)
+	gitIn(t, h.root, "commit", "-q", "-m", "add a mapped cover")
+	h.commitBlueprint(bpA, func(s string) string {
+		return strings.Replace(s, "    heading: Before you begin\n", "    heading: Before you begin\n    covers: [grace]\n", 1)
+	})
+	h.mustRun()
+
+	reqs := requestsFor(h, "s1", "blueprint")
+	if len(reqs) != 1 {
+		t.Fatalf("blueprint requests = %d", len(reqs))
+	}
+	m := reqs[0].Messages[len(reqs[0].Messages)-1]
+	text := strings.Join(append(slices.Clone(m.Cached), m.Text), "\n\n")
+	for _, want := range []string{`"Create and publish with a new key."`, `"grace: How long the old key keeps working."`} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the request lacks the covers string %s", want)
+		}
+	}
+	for _, bad := range []string{"[object Object]", "map[", `"id": "grace"`} {
+		if strings.Contains(text, bad) {
+			t.Errorf("the request holds %q", bad)
+		}
+	}
+}
+
 func TestBlueprintDryRun(t *testing.T) {
 	h := newBlueprintHarness(t, withPages("a"))
 	h.opts = h.options()

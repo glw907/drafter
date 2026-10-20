@@ -79,9 +79,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["fact", "disposition", "reason"],
+        "required": ["disposition", "reason"],
+        "oneOf": [{ "required": ["fact"] }, { "required": ["covers"] }],
         "properties": {
-          "fact": { "type": "string", "minLength": 1 },
+          "fact": { "type": "string", "minLength": 1, "description": "The fact id left out. Name this or covers, never both." },
+          "covers": { "$ref": "#/$defs/id", "description": "The outline covers id left out. Name this or fact, never both." },
           "disposition": { "enum": ["subordinated", "cut"] },
           "reference": { "type": "string", "minLength": 1, "description": "The link target that carries the fact. Required when the disposition is subordinated." },
           "reason": { "type": "string", "minLength": 1 }

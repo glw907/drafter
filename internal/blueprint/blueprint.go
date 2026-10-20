@@ -68,6 +68,7 @@ type Section struct {
 	Anchor     string      `yaml:"anchor"`
 	Why        string      `yaml:"why" plan:"prose"`
 	Opens      string      `yaml:"opens" plan:"required,prose"`
+	Covers     []string    `yaml:"covers"`
 	Items      []Item      `yaml:"items" plan:"required,empty"`
 	StyleNotes []StyleNote `yaml:"styleNotes"`
 
@@ -157,13 +158,56 @@ type Page struct {
 	Title      string   `yaml:"title" plan:"prose"`
 	Type       string   `yaml:"type"`
 	Job        string   `yaml:"job" plan:"prose"`
-	Covers     []string `yaml:"covers" plan:"prose"`
+	Covers     []Cover  `yaml:"covers" plan:"prose"`
 	OutOfScope []string `yaml:"outOfScope" plan:"prose"`
 	Figure     bool     `yaml:"figure"`
 	Managed    bool     `yaml:"managed"`
 
 	Line  int            `yaml:"-"`
 	Lines map[string]int `yaml:"-"`
+}
+
+// Cover is one entry of an outline page's covers list. A bare string decodes to a Cover with only
+// Text; a mapping carries an ID that a section or a disposition can claim, which the covers check
+// requires of every mapped entry.
+type Cover struct {
+	ID   string `yaml:"id" plan:"required"`
+	Text string `yaml:"text" plan:"required,prose"`
+
+	Line  int            `yaml:"-"`
+	Lines map[string]int `yaml:"-"`
+}
+
+// FromScalar sets the Cover from its string form.
+func (c *Cover) FromScalar(text string, line int) {
+	*c = Cover{Text: text, Line: line, Lines: map[string]int{"text": line}}
+}
+
+// MarshalYAML writes a Cover without an ID as a bare string, so a string entry round-trips.
+func (c Cover) MarshalYAML() (any, error) {
+	if c.ID == "" {
+		return c.Text, nil
+	}
+	type plain Cover
+	return plain(c), nil
+}
+
+// String is the Cover as the prompts and the chain's JSON outlines see it: the text of a string
+// entry, and "<id>: <text>" for a mapping.
+func (c Cover) String() string {
+	if c.ID == "" {
+		return c.Text
+	}
+	return c.ID + ": " + c.Text
+}
+
+// CoverStrings returns the covers as the strings every prompts module reads.
+func CoverStrings(cs []Cover) []string {
+	var out []string
+	for _, c := range cs {
+		out = append(out, c.String())
+	}
+	return out
 }
 
 // CrossLink asks that the page From link to the page To, naming each by slug or path.

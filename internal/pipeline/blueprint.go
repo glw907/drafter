@@ -52,7 +52,7 @@ type outlineEntry struct {
 func EntryJSON(e blueprint.Page) ([]byte, error) {
 	return json.MarshalIndent(outlineEntry{
 		Path: e.Path, Slug: e.Slug, Title: e.Title, Type: e.Type, Job: e.Job,
-		Covers: e.Covers, OutOfScope: e.OutOfScope, Figure: e.Figure,
+		Covers: blueprint.CoverStrings(e.Covers), OutOfScope: e.OutOfScope, Figure: e.Figure,
 	}, "", "  ")
 }
 

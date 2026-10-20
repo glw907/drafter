@@ -26,6 +26,7 @@ const (
 	checkLock       = "lock"
 	checkConvention = "convention"
 	checkFraming    = "framing"
+	checkCovers     = "covers"
 )
 
 // sectionRef matches a [[section-id]] reference in prose.
@@ -139,9 +140,54 @@ func (c *projectCheck) blueprintData(rel string, data []byte) (*Blueprint, Page)
 	c.references(rel, b)
 	c.sections(rel, b)
 	c.framing(rel, b)
+	c.covers(rel, b, entry)
 	c.handlers(rel, b, entry.Title)
 	c.pageType(entry)
 	return b, entry
+}
+
+// covers holds the outline entry's mapped covers to the blueprint: each id is unique in the entry,
+// each is claimed by a section or a disposition, and each id a section or disposition names is in
+// the entry. A string entry has no id, so the whole read judges it.
+func (c *projectCheck) covers(file string, b *Blueprint, entry Page) {
+	declared := map[string]bool{}
+	for _, cv := range entry.Covers {
+		if cv.ID == "" {
+			continue
+		}
+		line := cmp.Or(cv.Lines["id"], cv.Line)
+		if declared[cv.ID] {
+			c.add(c.Outline, line, plan.SeverityError, checkCovers,
+				fmt.Sprintf("covers id %q is used twice in the entry for %s", cv.ID, entry.Path), "give each covers entry its own id")
+		}
+		declared[cv.ID] = true
+	}
+	claimed := map[string]bool{}
+	claim := func(line int, id, what string) {
+		if !declared[id] {
+			c.add(file, line, plan.SeverityError, checkCovers,
+				fmt.Sprintf("%s names the covers id %q, which the outline entry for %s does not declare", what, id, entry.Path),
+				"name an id from the entry's covers list in "+c.Outline)
+		}
+		claimed[id] = true
+	}
+	for _, s := range b.Sections {
+		for _, id := range s.Covers {
+			claim(cmp.Or(s.Lines["covers"], s.Line), id, fmt.Sprintf("section %q", s.ID))
+		}
+	}
+	for _, x := range b.Dispositions {
+		if x.Covers != "" {
+			claim(x.Lines["covers"], x.Covers, "a disposition")
+		}
+	}
+	for _, cv := range entry.Covers {
+		if cv.ID != "" && !claimed[cv.ID] {
+			c.add(c.Outline, cmp.Or(cv.Lines["id"], cv.Line), plan.SeverityError, checkCovers,
+				fmt.Sprintf("covers id %q of %s is claimed by no section and no disposition", cv.ID, entry.Path),
+				"add the id to a section's covers, or disposition it in the blueprint")
+		}
+	}
 }
 
 // framing requires the framing record to plan the page's introduction. The decoder does not, so a

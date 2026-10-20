@@ -489,7 +489,7 @@ func blueprintHandoffs(c *config.Config, root, head string, args []string) ([]ha
 func entryJSON(o *blueprint.Outline, p blueprint.Page, brief string) map[string]any {
 	e := map[string]any{
 		"path": p.Path, "slug": p.Slug, "title": p.Title, "pageType": p.Type, "job": p.Job,
-		"covers": nonNil(p.Covers), "outOfScope": nonNil(p.OutOfScope), "figure": p.Figure,
+		"covers": nonNil(blueprint.CoverStrings(p.Covers)), "outOfScope": nonNil(p.OutOfScope), "figure": p.Figure,
 		"anatomy": o.AnatomyOf(p.Type), "brief": brief,
 	}
 	if len(o.Tracks) == 0 {

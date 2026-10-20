@@ -71,6 +71,7 @@
           "anchor": { "type": "string", "minLength": 1, "description": "The heading's slug, when the blueprint pins it." },
           "why": { "type": "string", "minLength": 1, "description": "Why the section is here and sits where it does. drafter check requires one." },
           "opens": { "type": "string", "minLength": 1, "description": "The section's first sentence." },
+          "covers": { "type": "array", "items": { "$ref": "#/$defs/id" }, "description": "Ids of the outline entry's covers this section carries." },
           "items": {
             "type": "array",
             "description": "The section's items. Empty only for a level-2 section that the next section, at level 3, fills; the decoder enforces that rule.",
@@ -111,9 +112,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["fact", "disposition", "reason"],
+        "required": ["disposition", "reason"],
+        "oneOf": [{ "required": ["fact"] }, { "required": ["covers"] }],
         "properties": {
-          "fact": { "type": "string", "minLength": 1 },
+          "fact": { "type": "string", "minLength": 1, "description": "The fact id left out. Name this or covers, never both." },
+          "covers": { "$ref": "#/$defs/id", "description": "The outline covers id left out. Name this or fact, never both." },
           "disposition": { "enum": ["subordinated", "cut"] },
           "reference": { "type": "string", "minLength": 1, "description": "The link target that carries the fact. Required when the disposition is subordinated." },
           "reason": { "type": "string", "minLength": 1 }

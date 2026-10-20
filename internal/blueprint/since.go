@@ -261,7 +261,9 @@ func itemFacts(it *Item) []string {
 func dispositionFacts(b *Blueprint) []string {
 	var ids []string
 	for _, d := range b.Dispositions {
-		ids = append(ids, d.Fact)
+		if d.Fact != "" {
+			ids = append(ids, d.Fact)
+		}
 	}
 	return ids
 }

@@ -72,7 +72,7 @@ why: |
 | `preconditions` | list of strings | no | State tokens the reader brings to the page. |
 | `exemplars` | list | no | Published pages to imitate. |
 | `sections` | list | yes | The page's sections, in page order. At least one. |
-| `dispositions` | list | no | Facts the blueprint keeps out of the page body. |
+| `dispositions` | list | no | Facts, and outline covers entries, the blueprint keeps out of the page body. |
 | `constraints` | list of strings | no | Rules specific to this page. |
 | `review` | string | no | `human` for a page that must never merge unread. |
 
@@ -85,7 +85,8 @@ settings.
 The `introduction` mapping holds `covers`, `priorKnowledge`, `notCovered`, and an optional list
 of `facts`, as in the plan format. `dispositions` and `constraints` work as they do there, except
 that `constraints` holds only rules specific to the page and never a copy of a register rule.
-Each disposition has a `fact`, a `disposition` of `cut` or `subordinated`, a `reason`, and, for
+Each disposition names exactly one of `fact` (a fact left out) and `covers` (the id of an outline
+covers entry left out). It has a `disposition` of `cut` or `subordinated`, a `reason`, and, for
 `subordinated`, a `reference` to the link target that now carries the fact.
 
 An `orderReason` explains the order of the sections as a whole. The reason for each section's
@@ -130,6 +131,7 @@ manifest. The `take` field says what to take from the page and what to leave.
 | `anchor` | string | no | The heading's slug, when the blueprint pins it. |
 | `why` | string | by check | Why the section is here and sits where it does. |
 | `opens` | string | yes | The section's first sentence. |
+| `covers` | list of strings | no | Ids of the outline entry's `covers` entries this section carries. See [outline.yaml](#outlineyaml). |
 | `items` | list | yes | The section's items. Empty only above a level-3 section. |
 | `styleNotes` | list | no | Style-only human edits, each with `old` and `new` wording. |
 
@@ -261,10 +263,24 @@ Each entry of `pages` has these fields.
 | `title` | The page's H1. |
 | `type` | A declared type. |
 | `job` | What the reader accomplishes with the page. |
-| `covers` | What the page covers. |
+| `covers` | What the page covers. Each entry is a string, or a mapping with an `id` and `text`. |
 | `outOfScope` | What the page leaves to other pages. |
 | `figure` | `true` for a page that carries a figure. Defaults to `false`. |
 | `managed` | `false` for a page drafter never drafts. Defaults to `true`. |
+
+A `covers` entry is a string, or a mapping with an `id` and `text`. The `id` follows the item id
+pattern. A mapped entry is one the blueprint must account for: a section lists its `id` in the
+section's `covers`, or a disposition names it in the disposition's `covers`, and `drafter check`
+reports an entry that neither does. A string entry has no id and needs no claim. Every reader
+outside drafter's own decoder sees an entry as one string: the `text` of a string entry, and
+`<id>: <text>` for a mapping.
+
+```yaml
+covers:
+  - Generate and verify a new key.
+  - id: key-sizes
+    text: Which key sizes the service accepts.
+```
 
 A managed page needs `slug`, `title`, `type`, and `job`. A page with `managed: false` needs only
 `path`, which covers a historical record whose text must not change. Each entry of `crossLinks`
@@ -426,6 +442,7 @@ as an example item.
 | `types` | The page's `type` is one `types` declares, and the type's `anatomy` isn't empty. Each declared type's `anatomy` is a stock name or an entry in its track's register. | error, or warning when the outline declares no `tracks` |
 | `tracks` | Each managed page matches exactly one track, and each track names a known `standard`, an existing `register`, and well-formed globs. | error, or warning for a track that matches no managed page |
 | `framing` | The blueprint has a `framing` with an `introPlan`. | error |
+| `covers` | Every mapped `covers` entry in the page's outline entry has a unique `id` and is claimed by a section's `covers` or a disposition's `covers`, and every id a section or disposition names is in the entry. String entries are left to the whole read. | error |
 | `lock` | An entry with a `page` id names a page on disk, and an entry with only an `accepted` id names a page the outline lists. | error |
 | `convention` | `blueprints.root` is `blueprints`, and `facts.dir` is `<root>/facts`. | warning |
 | `handler` | A `failure`'s handler gives the reader a next action. A `handledBy` that names only a `fact` item, a `sentence` with `mode: verbatim`, or a `link` or `handoff` that sends the reader back to the section holding the failure's `from` step warns. The message carries the fix: hand off to the step or section that gives the reader a next action. | warning |

@@ -205,9 +205,25 @@ func join(where, name string) string {
 	return where + "." + name
 }
 
+// ScalarForm is implemented by a struct type that decodes from a mapping or from a bare string.
+// The decoder reads a string through the checks a prose field gets and hands it, with its line,
+// to FromScalar; a mapping decodes as the struct's own fields.
+type ScalarForm interface {
+	FromScalar(text string, line int)
+}
+
 func (d *decoder) value(n *yaml.Node, f reflect.Value, s fieldSpec, where string) {
 	if n.Kind == yaml.AliasNode {
 		d.add(n.Line, at(where, "aliases are not supported"), "write the value out")
+		return
+	}
+	if sf, ok := reflect.TypeAssert[ScalarForm](f.Addr()); ok && n.Kind != yaml.MappingNode {
+		var text string
+		before := len(d.findings)
+		d.str(n, reflect.ValueOf(&text).Elem(), s, where)
+		if len(d.findings) == before {
+			sf.FromScalar(text, n.Line)
+		}
 		return
 	}
 	switch f.Kind() {
@@ -303,6 +319,7 @@ func (d *decoder) validate(p *Plan) {
 	for i := range p.Dispositions {
 		x := &p.Dispositions[i]
 		where := fmt.Sprintf("dispositions[%d]", i)
+		ValidateDispositionTarget(&Reporter{d}, x, where)
 		switch x.Disposition {
 		case "":
 		case "cut":
@@ -343,5 +360,22 @@ func (d *decoder) item(it *Item, where string) {
 	}
 	if line, ok := it.Lines["mode"]; ok && it.Mode != "verbatim" && it.Mode != "claim" {
 		d.add(line, at(where, fmt.Sprintf("unknown mode %q", it.Mode)), "use verbatim or claim")
+	}
+}
+
+// ValidateDispositionTarget reports a disposition that names both a fact and a covers id, or
+// neither, and a covers id that is not a lowercase token. where is the disposition's path, such
+// as dispositions[0].
+func ValidateDispositionTarget(r *Reporter, x *Disposition, where string) {
+	_, hasFact := x.Lines["fact"]
+	_, hasCovers := x.Lines["covers"]
+	switch {
+	case hasFact && hasCovers:
+		r.Add(x.Lines["covers"], where+": names both a fact and a covers id", "name one: fact for a fact left out, covers for an outline covers entry left out")
+	case !hasFact && !hasCovers:
+		r.Add(x.Line, where+": names neither a fact nor a covers id", "add fact: or covers:")
+	}
+	if hasCovers && !r.Faulted(x.Lines["covers"]) && !idPattern.MatchString(x.Covers) {
+		r.Add(x.Lines["covers"], fmt.Sprintf("%s: covers %q is not a lowercase token", where, x.Covers), "use lowercase letters, digits, - and _")
 	}
 }
