@@ -18,7 +18,8 @@ vet:
 lint:
 	golangci-lint run ./...
 
-# The three Node tests read the agent definitions from a workstation checkout (WORKSTATION_DIR).
+# The Node tests read the agent definitions from a workstation checkout (WORKSTATION_DIR); the last
+# one runs the built binary.
 chain-test: build
 	node tests/docs-page-chain-derivation.test.mjs
 	node tests/docs-page-chain-outline.test.mjs

@@ -327,9 +327,10 @@ pages:
           text: A step the reader needs is missing.
 ```
 
-An accept that writes `accepted` removes `blocked`, so a later accept of that page leaves an entry
-with only `accepted`. A draft writes a full entry, which holds no `blocked`. The walk that finds
-the commit that introduced an entry ignores `blocked`, as it ignores `accepted`. `drafter check`
+An accept that writes `accepted` removes `blocked`. A later accept of that page then leaves an
+entry with only `accepted`. A read with `--since` that accepts writes nothing: its `blocked` and
+earlier `accepted` stay. A draft writes a full entry with no `blocked`. The walk that finds the
+commit that introduced an entry ignores both `blocked` and `accepted`. `drafter check`
 reports an entry that holds `blocked` or `accepted` for a page the outline doesn't list. A
 `drafted.lock` that doesn't decode stops `drafter read` and `drafter page` before any request, and
 the error names the file.
