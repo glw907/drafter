@@ -89,7 +89,7 @@ return {
 
 The seat names are `draft`, `structure`, `editor`, `fact`, `reader`, `blueprint`, and
 `coherence`. The module needs a builder for each of these seats that runs. drafter builds the
-`coverage` and `consistency` prompts itself, so a module never defines them. Asking for a seat the
+`coverage`, `consistency`, and `facttruth` prompts itself, so a module never defines them. Asking for a seat the
 module doesn't define fails with an error that lists the seats it does define.
 
 A builder that throws, and a builder that returns anything other than a string, are errors that

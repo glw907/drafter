@@ -253,7 +253,7 @@ func TestReadWritesTheBarOnAWholeBlock(t *testing.T) {
 		t.Fatalf("exit %d, pages %+v, want 1 with a whole read that blocked\n%s", code, got.Pages, errOut)
 	}
 	want := &blueprint.Blocked{Commit: start, Findings: []blueprint.BlockedFinding{
-		{Location: "two", Text: "Say why the reader continues."}, {Location: "one", Text: "Name what the reader needs first."}}}
+		{Location: "two", Text: "Say why the reader continues.", Seat: "blueprint"}, {Location: "one", Text: "Name what the reader needs first.", Seat: "blueprint"}}}
 	e := p.lock().Pages["docs/a.md"]
 	if !reflect.DeepEqual(e.Blocked, want) || e.Accepted != "" || e.Page != "" {
 		t.Errorf("entry = %+v (bar %+v), want a bar-only entry %+v", e, e.Blocked, want)

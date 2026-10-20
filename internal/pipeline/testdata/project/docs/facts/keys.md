@@ -2,7 +2,7 @@
 
 ## Lifetimes
 
-- `lumen-key-ttl` A Lumen API key lives for 90 days. Source: the key policy. [verified]
+- `lumen-key-ttl` A Lumen API key lives for 90 days. Source: `src/keys.js:2`. [verified]
 - `lumen-grace` The old key keeps working for one hour after a rotation. Source: the key
   policy, which the vendor publishes with every release.
   [external: the vendor's rotation guide]

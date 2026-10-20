@@ -30,6 +30,8 @@ const (
 	AnswerConsistency Answer = "consistency"
 	// AnswerBlueprint is the blueprint read's verdict: a read whose findings carry no kind.
 	AnswerBlueprint Answer = "blueprint"
+	// AnswerFactTruth is the fact-truth read's verdicts, one per fact.
+	AnswerFactTruth Answer = "facttruth"
 )
 
 // Input is what Build assembles a request from.
@@ -143,6 +145,10 @@ func inputBlocks(ctx context.Context, in Input, seat config.Seat) ([]string, err
 		return r.pageBlocks(in.Page)
 	case AnswerEdits:
 		return r.pageBlocks(in.Page, in.Brief)
+	case AnswerFactTruth:
+		// The prompt quotes the bullets, whose pointers would otherwise inline whole files; the
+		// excerpts are the whole evidence.
+		return r.excerptBlocks(in.Facts, in.FactIDs)
 	}
 
 	texts := []string{in.Prompt}

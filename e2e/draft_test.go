@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -78,6 +79,9 @@ func newDraftStub(t *testing.T) *draftStub {
 			refuse := s.failFrom > 0 && len(s.kinds) >= s.failFrom
 			text := s.answers[kind]
 			s.mu.Unlock()
+			if kind == "facttruth" && text == "" {
+				text = holdsAnswer(body)
+			}
 			if refuse {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusBadRequest)
@@ -108,6 +112,18 @@ func newDraftStub(t *testing.T) *draftStub {
 	return s
 }
 
+var factListed = regexp.MustCompile("(?:\\\\n|\n)- `([^`]+)` ")
+
+// holdsAnswer is the fact-truth answer that finds true every fact the request body lists.
+func holdsAnswer(body []byte) string {
+	facts := []map[string]string{}
+	for _, m := range factListed.FindAllSubmatch(body, -1) {
+		facts = append(facts, map[string]string{"id": string(m[1]), "verdict": "holds", "excerpt": "", "fix": ""})
+	}
+	b, _ := json.Marshal(map[string]any{"facts": facts})
+	return string(b)
+}
+
 // schemaKind names the answer a request asks for by the properties of its output schema.
 func schemaKind(body []byte) string {
 	var req struct {
@@ -134,6 +150,8 @@ func schemaKind(body []byte) string {
 		return "reader1"
 	case p["conflicts"] != nil:
 		return "consistency"
+	case p["facts"] != nil:
+		return "facttruth"
 	case p["items"] != nil:
 		return "coverage"
 	}

@@ -89,7 +89,7 @@ func TestReadBarMechanismOffline(t *testing.T) {
 	if r.code != 1 || !s.Pages[0].WholeBlocked || s.Pages[0].Scope != nil {
 		t.Fatalf("step 1: exit %d, page %+v, want 1 and a whole read that blocked\n%s", r.code, s.Pages[0], r.stderr)
 	}
-	want := &blueprint.Blocked{Commit: start, Findings: []blueprint.BlockedFinding{{Location: "add-items", Text: barFinding}}}
+	want := &blueprint.Blocked{Commit: start, Findings: []blueprint.BlockedFinding{{Location: "add-items", Text: barFinding, Seat: "blueprint"}}}
 	if got := e.lockEntry(); got.Blocked == nil || got.Blocked.Commit != want.Commit || !slices.Equal(got.Blocked.Findings, want.Findings) || got.Accepted != "" {
 		t.Fatalf("step 1: entry = %+v, want only the bar %+v", got, want)
 	}

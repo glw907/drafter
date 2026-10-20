@@ -31,7 +31,7 @@ type Shape struct {
 // runs on it, so a live run costs cents.
 const Model = "claude-haiku-5-5"
 
-// seatAnswers lists the nine seats, the blueprint and coherence seats last, each with the answer its production
+// seatAnswers lists the ten seats, the blueprint, coherence, and facttruth seats last, each with the answer its production
 // request asks for. The reader's second turn shares the read schema, so one shape per seat
 // covers every schema production sends.
 var seatAnswers = []struct {
@@ -48,6 +48,7 @@ var seatAnswers = []struct {
 	{"consistency", assemble.AnswerConsistency, "low"},
 	{"blueprint", assemble.AnswerBlueprint, "medium"},
 	{"coherence", assemble.AnswerRead, "medium"},
+	{"facttruth", assemble.AnswerFactTruth, "medium"},
 }
 
 const (

@@ -207,8 +207,12 @@ type Blocked struct {
 	Findings []BlockedFinding `yaml:"findings"`
 }
 
-// BlockedFinding is one blocking finding of a blocked read.
+// BlockedFinding is one blocking finding of a blocked read. Seat names the read seat that raised
+// it and Kind its kind. A bar none of whose findings has a seat was written before the
+// fact-truth seat existed.
 type BlockedFinding struct {
 	Location string `yaml:"location"`
 	Text     string `yaml:"text"`
+	Seat     string `yaml:"seat,omitempty"`
+	Kind     string `yaml:"kind,omitempty"`
 }

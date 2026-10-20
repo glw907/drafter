@@ -282,6 +282,14 @@ func (r *runner) addPages() error {
 		if from := r.o.BarFrom[h.Page.Path]; from != "" {
 			p.w.Bar, p.w.BarFrom, p.w.Since = r.o.Bars[h.Page.Path], from, from
 		}
+		if ids := r.o.BarFacts[h.Page.Path]; len(ids) > 0 {
+			p.w.Rec.FactTruth = &factTruthRecord{BarFacts: ids}
+		}
+		if p.blueprint && !r.o.Draft && r.cfg.Facts.Dir != "" {
+			if err := r.cfg.ValidateSeat("facttruth"); err != nil {
+				return fmt.Errorf("drafter read needs the facttruth seat: %w", err)
+			}
+		}
 		p.w.Draft, p.w.SkipRead = r.o.Draft, r.o.SkipRead[h.Page.Path]
 		r.state.Pages[p.key] = p.ps
 		r.pages = append(r.pages, p)

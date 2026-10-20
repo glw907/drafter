@@ -351,6 +351,26 @@ func finding(location, text string) map[string]any {
 	return map[string]any{"location": location, "finding": text, "rewrite": "rewrite " + text, "blocking": true}
 }
 
+var factLine = regexp.MustCompile("(?m)^- `([^`]+)`")
+
+// factTruthText is a fact-truth answer with one entry per row: id, verdict, excerpt, fix.
+func factTruthText(rows ...[4]string) string {
+	facts := []map[string]string{}
+	for _, r := range rows {
+		facts = append(facts, map[string]string{"id": r[0], "verdict": r[1], "excerpt": r[2], "fix": r[3]})
+	}
+	return jsonText(map[string]any{"facts": facts})
+}
+
+// holdsAll is the fact-truth answer that finds every listed fact true.
+func holdsAll(r batch.Request) string {
+	var rows [][4]string
+	for _, m := range factLine.FindAllStringSubmatch(r.Messages[0].Text, -1) {
+		rows = append(rows, [4]string{m[1], "holds", "", ""})
+	}
+	return factTruthText(rows...)
+}
+
 // defaultAnswer is the accepting answer for a request, chosen by its schema.
 func defaultAnswer(r batch.Request) string {
 	schema := string(r.Schema)
@@ -360,6 +380,8 @@ func defaultAnswer(r batch.Request) string {
 		return `{"edits":[],"resolutions":[]}`
 	case strings.Contains(schema, `"conflicts"`):
 		return `{"conflicts":[]}`
+	case strings.Contains(schema, `"excerpt"`):
+		return holdsAll(r)
 	case strings.Contains(schema, `"paraphrase"`):
 		return `{"paraphrase":"p","summary":"s"}`
 	case strings.Contains(schema, `"quote"`):

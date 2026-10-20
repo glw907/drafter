@@ -30,8 +30,8 @@ func TestSummaryCarriesTheReadsFindings(t *testing.T) {
 			scope:      scopedFacts(nil),
 			status:     StatusAccepted,
 			findings: []FindingResult{
-				{Location: "intro", Text: "Nit: the opening repeats the title."},
-				{Location: "rotate", Text: "Already present: the step has no timeout."},
+				{Location: "intro", Text: "Nit: the opening repeats the title.", Seat: "blueprint"},
+				{Location: "rotate", Text: "Already present: the step has no timeout.", Seat: "blueprint"},
 			},
 			warnings: []string{"Unplaced: scope difference"},
 		},
@@ -41,8 +41,8 @@ func TestSummaryCarriesTheReadsFindings(t *testing.T) {
 			scope:     scopedFacts(nil),
 			status:    StatusEscalated,
 			findings: []FindingResult{
-				{Location: "rotate", Text: "A step the page needs is missing.", Blocking: true},
-				{Location: "intro", Text: "Nit: the opening repeats the title."},
+				{Location: "rotate", Text: "A step the page needs is missing.", Blocking: true, Seat: "blueprint"},
+				{Location: "intro", Text: "Nit: the opening repeats the title.", Seat: "blueprint"},
 			},
 		},
 		{

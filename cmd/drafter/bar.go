@@ -140,13 +140,14 @@ func scopedKept(w io.Writer, s pipeline.Summary, kept map[string]string) {
 	}
 }
 
-// barOf is the bar a blocked whole read leaves: its blocking findings, in order. It is nil when
-// none blocks, since a bar with no finding holds the next read to nothing.
+// barOf is the bar a blocked whole read leaves: its blocking findings, in order, each with the
+// seat and kind that raised it. It is nil when none blocks, since a bar with no finding holds the
+// next read to nothing.
 func barOf(start string, fs []pipeline.FindingResult) *blueprint.Blocked {
 	var out []blueprint.BlockedFinding
 	for _, f := range fs {
 		if f.Blocking {
-			out = append(out, blueprint.BlockedFinding{Location: f.Location, Text: f.Text})
+			out = append(out, blueprint.BlockedFinding{Location: f.Location, Text: f.Text, Seat: f.Seat, Kind: f.Kind})
 		}
 	}
 	if len(out) == 0 {
@@ -155,13 +156,32 @@ func barOf(start string, fs []pipeline.FindingResult) *blueprint.Blocked {
 	return &blueprint.Blocked{Commit: start, Findings: out}
 }
 
-// renderBar is the bar as the blueprint seat gets it: one line per finding, numbered from 1.
+// renderBar is the bar as the blueprint seat gets it: one line per finding, numbered from 1. The
+// fact-truth seat's findings are left out, since the blueprint seat has no excerpts to judge them
+// by; the fact-truth read gets those facts through barFactIDs.
 func renderBar(b *blueprint.Blocked) string {
-	lines := make([]string, len(b.Findings))
-	for i, f := range b.Findings {
-		lines[i] = fmt.Sprintf("%d. [%s] %s", i+1, f.Location, f.Text)
+	var lines []string
+	for _, f := range b.Findings {
+		if f.Seat != factTruthSeat {
+			lines = append(lines, fmt.Sprintf("%d. [%s] %s", len(lines)+1, f.Location, f.Text))
+		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// factTruthSeat is the Seat of the findings the fact-truth read raises, whose Location is "fact "
+// and the fact's id.
+const factTruthSeat = "facttruth"
+
+// barFactIDs lists the ids of the facts the bar's fact-truth findings name, in order.
+func barFactIDs(b *blueprint.Blocked) []string {
+	var ids []string
+	for _, f := range b.Findings {
+		if id, ok := strings.CutPrefix(f.Location, "fact "); ok && f.Seat == factTruthSeat {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 // shortSHA is the abbreviated form of a commit sha a status line shows.
@@ -180,6 +200,8 @@ type barMaps struct {
 	changes map[string]string
 	bars    map[string]string
 	barFrom map[string]string
+	// barFacts holds the fact ids each bar page's fact-truth findings name.
+	barFacts map[string][]string
 }
 
 // applyBar decides the read of a page whose lock entry holds the bar b, and records it in m.
@@ -202,6 +224,9 @@ func applyBar(c *config.Config, root, head string, h handoff.Handoff, b *bluepri
 		return &r
 	case blueprint.ScopeScoped:
 		m.changes[p], m.bars[p], m.barFrom[p] = change, renderBar(b), b.Commit
+		if ids := barFactIDs(b); len(ids) > 0 {
+			m.barFacts[p] = ids
+		}
 	}
 	m.scopes[p] = sc
 	return nil
@@ -217,7 +242,7 @@ func heldPage(path string, b *blueprint.Blocked) pipeline.PageResult {
 	why := fmt.Sprintf("unchanged since the blocked read at %s; fix its %d %s and commit", shortSHA(b.Commit), len(b.Findings), noun)
 	r := pipeline.PageResult{Path: path, Status: statusHeld, Scope: &blueprint.Scope{Kind: blueprint.ScopeUnchanged, Why: why}}
 	for _, f := range b.Findings {
-		r.Findings = append(r.Findings, pipeline.FindingResult{Location: f.Location, Text: f.Text, Blocking: true})
+		r.Findings = append(r.Findings, pipeline.FindingResult{Location: f.Location, Text: f.Text, Blocking: true, Seat: f.Seat, Kind: f.Kind})
 	}
 	return r
 }

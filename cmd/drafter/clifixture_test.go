@@ -147,8 +147,8 @@ func TestReadDryRunRequestGolden(t *testing.T) {
 	if code, out, errOut := f.read("--dry-run", f.blueprint()); code != 0 {
 		t.Fatalf("read --dry-run exit %d\n%s%s", code, out, errOut)
 	}
-	if len(f.stub.counts) != 2 {
-		t.Fatalf("count_tokens requests = %d, want the consistency read and the blueprint read", len(f.stub.counts))
+	if len(f.stub.counts) != 3 {
+		t.Fatalf("count_tokens requests = %d, want the consistency read, the blueprint read, and the fact-truth read", len(f.stub.counts))
 	}
 	var got string
 	for _, body := range f.stub.counts {

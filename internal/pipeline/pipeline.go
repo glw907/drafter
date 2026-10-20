@@ -77,6 +77,10 @@ type Options struct {
 	// blueprint seat gets the bar as the context's findings. Both are recorded in the pages' state.
 	Bars    map[string]string
 	BarFrom map[string]string
+	// BarFacts holds, keyed by page path, the ids of the facts the bar's fact-truth findings named.
+	// A bar read judges them again beside the facts the change touched. It is recorded in the
+	// pages' state.
+	BarFacts map[string][]string
 	// ReadScopes and ReadChanges hold, keyed by page path, the scope and change block of a page
 	// whose blueprint read judges something other than its draft: drafter page sets them for a
 	// bar page, whose read is the change since the bar's commit while its draft follows Scopes.
@@ -137,11 +141,14 @@ type PageResult struct {
 	Since string `json:"since,omitempty"`
 }
 
-// FindingResult is one finding of a page's blueprint read.
+// FindingResult is one finding of a page's blueprint read or fact-truth read. Seat names the read
+// seat that raised it, blueprint or facttruth, and Kind is the kind the seat gave it, if any.
 type FindingResult struct {
 	Location string `json:"location"`
 	Text     string `json:"text"`
 	Blocking bool   `json:"blocking"`
+	Seat     string `json:"seat,omitempty"`
+	Kind     string `json:"kind,omitempty"`
 }
 
 // Estimate is one request of a dry run.

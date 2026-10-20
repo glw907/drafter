@@ -31,6 +31,7 @@ type record struct {
 	Friction     []string          `json:"friction"`
 	Warnings     []string          `json:"warnings"`
 	Escalation   *escalation       `json:"escalation"`
+	FactTruth    *factTruthRecord  `json:"fact_truth,omitempty"`
 	Cost         float64           `json:"cost"`
 	FinalStatus  string            `json:"final_status"`
 	FinalHashes  map[string]string `json:"final_hashes"`
@@ -116,23 +117,29 @@ const alreadyPresentPrefix = "Already present:"
 // fact nor a with.
 const unplacedPrefix = "Unplaced:"
 
+// isBlueprintReadSeat reports whether the seat's findings reach the summary and a bar: the
+// blueprint read's and the fact-truth read's. The consistency read's conflicts are an
+// escalation's detail, not findings.
+func isBlueprintReadSeat(seat string) bool { return seat == "blueprint" || seat == "facttruth" }
+
 // alreadyPresent counts the blueprint read's findings that report an older defect.
 func (r *record) alreadyPresent() int {
 	n := 0
 	for _, f := range r.Findings {
-		if f.Seat == "blueprint" && strings.HasPrefix(strings.TrimSpace(f.Text), alreadyPresentPrefix) {
+		if isBlueprintReadSeat(f.Seat) && strings.HasPrefix(strings.TrimSpace(f.Text), alreadyPresentPrefix) {
 			n++
 		}
 	}
 	return n
 }
 
-// blueprintFindings lists the blueprint read's findings for the summary, nil when it made none.
+// blueprintFindings lists the findings of the blueprint read and the fact-truth read for the
+// summary, nil when they made none. Each carries its seat, which a bar keeps.
 func (r *record) blueprintFindings() []FindingResult {
 	var out []FindingResult
 	for _, f := range r.Findings {
-		if f.Seat == "blueprint" {
-			out = append(out, FindingResult{Location: f.Location, Text: f.Text, Blocking: f.Blocking})
+		if isBlueprintReadSeat(f.Seat) {
+			out = append(out, FindingResult{Location: f.Location, Text: f.Text, Blocking: f.Blocking, Seat: f.Seat, Kind: f.Kind})
 		}
 	}
 	return out
