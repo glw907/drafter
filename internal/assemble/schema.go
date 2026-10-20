@@ -17,7 +17,9 @@ func answerSchema(a Answer) (json.RawMessage, string, error) {
 	case AnswerDraft:
 		return marshal(draftSchema()), "Answer with the page as Markdown in page, its sentence-to-fact brief as a JSON string in brief, and any friction you met, a list of short notes, in friction.", nil
 	case AnswerRead, AnswerReader2:
-		return marshal(readSchema()), "Answer with a verdict, each finding with its location, the finding, a rewrite, and whether it blocks, a summary, and any friction you met in friction.", nil
+		return marshal(readSchema(true)), reviewContract, nil
+	case AnswerBlueprint:
+		return marshal(readSchema(false)), "Answer with a verdict, each finding with its location, the finding, a rewrite, and whether it blocks, a summary, and any friction you met in friction.", nil
 	case AnswerReader1:
 		return marshal(reader1Schema()), "Answer with your paraphrase of the page, a summary, and any friction you met in friction.", nil
 	case AnswerEdits:
@@ -77,13 +79,38 @@ func draftSchema() map[string]any {
 	}, "friction")
 }
 
-func readSchema() map[string]any {
-	finding := obj(map[string]any{
+// kinds are the values a review finding's kind takes. The first four are the small kinds, which
+// the pipeline lets one scoped fix answer without another review.
+var kinds = []string{"link", "handoff", "heading", "citation", "fact", "claim", "code", "voice", "step", "placement", "other"}
+
+// reviewContract closes a review request. It defines each kind in one clause, since the schema
+// carries only the enum.
+const reviewContract = "Answer with a verdict, each finding with its location, the finding, a rewrite, whether it blocks, and its kind, a summary, and any friction you met in friction. " +
+	"A finding's kind is one of these: link, a link that is missing, broken, or points to the wrong place; " +
+	"handoff, a pointer to the next page or task that is missing or wrong; " +
+	"heading, a section heading whose wording or level is wrong; " +
+	"citation, a brief sentence that is missing from the page or cites the wrong fact; " +
+	"fact, a fact the page states wrongly or leaves out; " +
+	"claim, a claim the page cannot support or overstates; " +
+	"code, a code sample that is wrong or missing; " +
+	"voice, the tone, voice, or word choice of the prose; " +
+	"step, a step that is missing, extra, or out of order; " +
+	"placement, content in the wrong section, or a section that is missing; " +
+	"other, anything the kinds above do not name."
+
+// readSchema is the schema of a read's verdict. The blueprint read's findings carry no kind, so
+// its request bytes stay as they were before kinds existed.
+func readSchema(withKind bool) map[string]any {
+	props := map[string]any{
 		"location": str("Where on the page the finding applies."),
 		"finding":  str("What is wrong."),
 		"rewrite":  str("The rewrite that fixes it."),
 		"blocking": map[string]any{"type": "boolean", "description": "Whether the page must not ship until this is fixed."},
-	})
+	}
+	if withKind {
+		props["kind"] = map[string]any{"type": "string", "enum": kinds, "description": "What the finding is about, one of the kinds the closing instructions define."}
+	}
+	finding := obj(props)
 	return obj(map[string]any{
 		"verdict": map[string]any{"type": "string", "enum": []string{"ok", "fix"}, "description": "ok when the page needs no change; fix otherwise."},
 		"findings": map[string]any{

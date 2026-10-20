@@ -62,7 +62,7 @@ func walk(t *testing.T, where string, node any) int {
 
 func TestSchemasKeepToStructuredOutputLimits(t *testing.T) {
 	f := newFixture(t)
-	for _, a := range []Answer{AnswerDraft, AnswerRead, AnswerReader1, AnswerReader2, AnswerEdits, AnswerCoverage, AnswerConsistency} {
+	for _, a := range []Answer{AnswerDraft, AnswerRead, AnswerBlueprint, AnswerReader1, AnswerReader2, AnswerEdits, AnswerCoverage, AnswerConsistency} {
 		t.Run(string(a), func(t *testing.T) {
 			in := f.input(f.config(), "p")
 			in.Answer = a
@@ -86,12 +86,14 @@ func TestSchemaShapes(t *testing.T) {
 		answer   Answer
 		required []string
 		optional []string
+		absent   []string
 	}{
-		{AnswerDraft, []string{`"page"`, `"brief"`}, []string{"friction"}},
-		{AnswerRead, []string{`"verdict"`, `"findings"`, `"summary"`, `"location"`, `"finding"`, `"rewrite"`, `"blocking"`}, []string{"friction"}},
-		{AnswerReader1, []string{`"paraphrase"`, `"summary"`}, []string{"friction"}},
-		{AnswerReader2, []string{`"verdict"`, `"findings"`}, []string{"friction"}},
-		{AnswerConsistency, []string{`"conflicts"`, `"facts"`, `"with"`, `"conflict"`}, nil},
+		{AnswerDraft, []string{`"page"`, `"brief"`}, []string{"friction"}, nil},
+		{AnswerRead, []string{`"verdict"`, `"findings"`, `"summary"`, `"location"`, `"finding"`, `"rewrite"`, `"blocking"`, `"kind"`}, []string{"friction"}, nil},
+		{AnswerReader1, []string{`"paraphrase"`, `"summary"`}, []string{"friction"}, nil},
+		{AnswerReader2, []string{`"verdict"`, `"findings"`, `"summary"`, `"location"`, `"finding"`, `"rewrite"`, `"blocking"`, `"kind"`}, []string{"friction"}, nil},
+		{AnswerBlueprint, []string{`"verdict"`, `"findings"`, `"summary"`, `"location"`, `"finding"`, `"rewrite"`, `"blocking"`}, []string{"friction"}, []string{`"kind"`}},
+		{AnswerConsistency, []string{`"conflicts"`, `"facts"`, `"with"`, `"conflict"`}, nil, nil},
 	}
 	for _, tt := range tests {
 		t.Run(string(tt.answer), func(t *testing.T) {
@@ -114,6 +116,11 @@ func TestSchemaShapes(t *testing.T) {
 			for _, want := range tt.required {
 				if !required[strings.Trim(want, `"`)] {
 					t.Errorf("%s is not in any required array", want)
+				}
+			}
+			for _, name := range tt.absent {
+				if strings.Contains(string(schema), name) {
+					t.Errorf("schema holds %s, want it absent", name)
 				}
 			}
 			for _, name := range tt.optional {

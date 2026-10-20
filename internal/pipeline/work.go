@@ -30,6 +30,9 @@ const (
 	stSection      = "section"
 	stCoherence    = "coherence"
 	stCoherenceFix = "coherencefix"
+	// stSmall asks the one scoped fix of small findings that a fix verdict in round 2, or a miss
+	// in the coverage check after the redraft, opens in place of an escalation.
+	stSmall = "small"
 )
 
 // Stage tokens in a custom_id, the spec's stage numbers.
@@ -40,20 +43,23 @@ const (
 	s4 = "s4"
 	s5 = "s5"
 	s6 = "s6"
-	s7 = "s7"
-	s8 = "s8"
+	// s6b is the small-finding fix, which runs after round 2 or in its place.
+	s6b = "s6b"
+	s7  = "s7"
+	s8  = "s8"
 )
 
 // Exchange kinds. A draft exchange is the gate-fix conversation after the draft; a redraft
 // exchange answers round 1's findings; a final exchange answers the final reader's. A section
 // exchange redrafts a section redraft's changed sections, and a coherence exchange answers the
-// coherence read's findings.
+// coherence read's findings. A small exchange answers the open small findings alone.
 const (
 	exDraft     = "draft"
 	exRedraft   = "redraft"
 	exFinal     = "final"
 	exSection   = "section"
 	exCoherence = "coherence"
+	exSmall     = "small"
 )
 
 // exchange is one edit-contract conversation: the turns so far, every numbered finding it
@@ -69,8 +75,8 @@ type exchange struct {
 	GateFix bool `json:"gate_fix,omitempty"`
 }
 
-// coverageState is where a coverage check stands: its phase (initial, redraft, or final), the
-// mechanical misses, and whether the model's read of the claims is in.
+// coverageState is where a coverage check stands: its phase (initial, redraft, final, coherence,
+// or small), the mechanical misses, and whether the model's read of the claims is in.
 type coverageState struct {
 	Phase    string       `json:"phase"`
 	MechDone bool         `json:"mech_done,omitempty"`
