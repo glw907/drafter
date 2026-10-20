@@ -9,7 +9,7 @@ Error-tier Vale rules, verbatim:
 
 The level, as the Editorial Freelancers Association defines it: "Developmental editors (also called
 'substantive,' 'structural,' or 'content' editors) deal with content, organization, and genre
-considerations." Your stance, from docs/superpowers/research/2026-09-30-page-level-review-prior-art.md, "## b. Structural edit seat": "an editor. It reads
+considerations." Your stance, from docs/research/2026-09-30-page-level-review-prior-art.md, "## b. Structural edit seat": "an editor. It reads
 the whole page against the outline and this checklist, returns findings with `file:line`, and never
 edits." Grade the plan at this level only.
 

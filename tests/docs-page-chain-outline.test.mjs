@@ -684,7 +684,7 @@ check("dry run: the return carries spent, the budget delta across the run, and n
 // Dry runs of the structural edit seat, the final reader read, and the drafter's anatomy line.
 // -------------------------------------------------------------------------------------------
 
-const RECORD = "docs/superpowers/research/2026-09-30-page-level-review-prior-art.md";
+const RECORD = "docs/research/2026-09-30-page-level-review-prior-art.md";
 const STRUCT_FIX = { verdict: "fix", findings: [{ location: "docs/extend/architecture.md:3", finding: "STRUCT-FINDING intro omits scope", blocking: true }], summary: "structure fix" };
 const READER_FIX = { verdict: "fix", findings: [{ location: "docs/extend/architecture.md:9", finding: "READER-FINDING had to infer the seam", blocking: true }], summary: "reader fix", paraphrase: "READER-PARAPHRASE" };
 
