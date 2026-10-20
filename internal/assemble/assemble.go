@@ -148,7 +148,11 @@ func inputBlocks(ctx context.Context, in Input, seat config.Seat) ([]string, err
 	case AnswerFactTruth:
 		// The prompt quotes the bullets, whose pointers would otherwise inline whole files; the
 		// excerpts are the whole evidence.
-		return r.excerptBlocks(in.Facts, in.FactIDs)
+		blocks, err := r.excerptBlocks(in.Facts, in.FactIDs)
+		if err != nil {
+			return nil, err
+		}
+		return sharedBlocks(blocks), nil
 	}
 
 	texts := []string{in.Prompt}

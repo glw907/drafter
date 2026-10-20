@@ -39,6 +39,31 @@ func FactTruthPrompt(path string, facts []plan.Fact) string {
 	return b.String()
 }
 
+// sharedBlocks keeps the first block of each excerpt body whole and replaces each later block
+// whose body is the same with one line naming that first block. Facts that cite one declaration
+// or one small file would otherwise carry its lines once each, which doubles the request on a
+// large blueprint. A "no excerpt:" body is short and kept as it is.
+func sharedBlocks(blocks []string) []string {
+	first := map[string]string{}
+	out := make([]string, len(blocks))
+	for i, b := range blocks {
+		head, rest, _ := strings.Cut(b, "\n")
+		body := rest[:strings.LastIndex(rest, "\n")+1]
+		label, seen := first[body]
+		switch {
+		case strings.HasPrefix(body, "no excerpt:"):
+			out[i] = b
+		case seen:
+			out[i] = head + "\nThe same lines as the block above labelled \"" + label + "\".\n" + rest[len(body):]
+		default:
+			_, l, _ := strings.Cut(head, ": ")
+			first[body] = strings.TrimSuffix(l, " ===")
+			out[i] = b
+		}
+	}
+	return out
+}
+
 func factTruthSchema() map[string]any {
 	item := obj(map[string]any{
 		"id":      str("The fact's id, as listed."),

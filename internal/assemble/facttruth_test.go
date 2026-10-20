@@ -1,6 +1,7 @@
 package assemble
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -36,6 +37,27 @@ func TestFactTruthPrompt(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("prompt lacks %q:\n%s", want, got)
 		}
+	}
+}
+
+func TestSharedBlocks(t *testing.T) {
+	blocks := []string{
+		block("excerpt", "a.ts#run (fact f:a) lines 1-3", "one\ntwo\nthree"),
+		block("excerpt", "b.ts:4 (fact f:a) lines 1-2", "other"),
+		block("excerpt", "a.ts#run (fact f:b) lines 1-3", "one\ntwo\nthree"),
+		block("excerpt", "c.md (fact f:a)", "no excerpt: prose"),
+		block("excerpt", "c.md (fact f:b)", "no excerpt: prose"),
+	}
+	got := sharedBlocks(blocks)
+	want := []string{
+		blocks[0],
+		blocks[1],
+		"=== excerpt: a.ts#run (fact f:b) lines 1-3 ===\nThe same lines as the block above labelled \"a.ts#run (fact f:a) lines 1-3\".\n=== end excerpt: a.ts#run (fact f:b) lines 1-3 ===",
+		blocks[3],
+		blocks[4],
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("sharedBlocks =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }
 
