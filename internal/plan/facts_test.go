@@ -150,6 +150,21 @@ func TestCheckFactsDir(t *testing.T) {
 	}
 }
 
+func TestFactRaw(t *testing.T) {
+	md := "## Facts\n\n- `f:wrap` The key  rotates\n  every 90 days. Source: `src/key.ts:12-18`, `src/key.ts#rotate`.\n    [verified: 2026-10-01]\n"
+	f, ok := ParseFacts(map[string]string{"a.md": md}, "/nowhere").Get("f:wrap")
+	if !ok {
+		t.Fatal("Get(f:wrap) = false")
+	}
+	want := "`f:wrap` The key rotates every 90 days. Source: `src/key.ts:12-18`, `src/key.ts#rotate`. [verified: 2026-10-01]"
+	if f.Raw != want {
+		t.Errorf("Raw = %q, want %q", f.Raw, want)
+	}
+	if f.Tag != "verified" {
+		t.Errorf("Tag = %q, want verified", f.Tag)
+	}
+}
+
 func TestFactSourcesAndGet(t *testing.T) {
 	root := t.TempDir()
 	if err := os.Mkdir(filepath.Join(root, ".git"), 0o755); err != nil {

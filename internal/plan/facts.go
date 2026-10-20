@@ -47,6 +47,10 @@ type Fact struct {
 	// parentheses and brackets and name a path inside the facts store's repository. A span
 	// naming a command, a URL, or commentary, and an [external: ...] part, are left out.
 	Sources []string
+	// Raw is the whole bullet after its "- " marker, its lines joined and every whitespace run
+	// collapsed to one space. Unlike Text and Sources, it keeps the tag's qualifier and each
+	// pointer's anchor or line span.
+	Raw string
 }
 
 // Citable reports whether a page may cite the fact: its tag is well formed and one of verified,
@@ -166,7 +170,7 @@ func ParseFacts(files map[string]string, root string) *Facts {
 			if m == nil {
 				continue
 			}
-			f := Fact{ID: m[1], File: name, Line: b.line}
+			f := Fact{ID: m[1], File: name, Line: b.line, Raw: strings.Join(strings.Fields(b.text), " ")}
 			f.Tag, f.Problem = checkTag(b.text)
 			f.Text, f.Sources = parseBody(b.text[len(m[0]):], root)
 			fs.byID[f.ID] = append(fs.byID[f.ID], f)
