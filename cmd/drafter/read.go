@@ -28,8 +28,8 @@ import (
 const statusUnchanged = "unchanged"
 
 type readFlags struct {
-	resume, since      string
-	dryRun, sync, json bool
+	resume, since             string
+	dryRun, sync, batch, json bool
 }
 
 func newReadCmd() *cobra.Command {
@@ -37,9 +37,10 @@ func newReadCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "read [flags] <blueprint>...",
 		Short: "Check blueprints and read them through the API",
-		Long: `Run stage 1 of the pipeline on each blueprint: the local check, then one batch holding the
-consistency read, when the project has a facts store, and the blueprint read. A blueprint that
-passes both is accepted, and when the whole run ends with no stop, drafter records each
+		Long: `Run stage 1 of the pipeline on each blueprint: the local check, then the consistency read,
+when the project has a facts store, the fact-truth read, when the blueprint cites facts, and the
+blueprint read. The reads go out as ordinary Messages calls; --batch sends them as one batch
+instead, which costs less and waits longer. A blueprint that passes every read is accepted, and when the whole run ends with no stop, drafter records each
 accepted blueprint's blob id in drafted.lock. It writes no page. The tree must be clean, so each
 read runs on a committed blueprint, and every input is read from the commit the run starts at.
 
@@ -57,6 +58,11 @@ diff against is read as a whole. A change read that accepts records the blueprin
 drafted.lock only when the page's entry holds no bar and records as accepted the blueprint at
 <rev>, so the change is all that is new since that accept; otherwise the entry stays, and a
 line on stderr says why. A resume takes no --since: the run recorded each page's scope.
+
+A page whose accepted blueprint is unchanged but whose recorded facts differ from the current
+ones is read as a lapse: the read judges the facts that changed since the accepted read, and an
+accept records the current facts in drafted.lock without moving the accepted blueprint. A page
+whose entry records no facts reads whole.
 
 The output has one line per blueprint with its verdict, scope, and cost. Under it, one line per
 finding of the blueprint read, marked blocking or non-blocking, then one per warning and the
@@ -76,6 +82,9 @@ could not start or hit an error, and 3 when the run stopped and can be resumed, 
 			if f.since != "" && f.resume != "" {
 				return usageError(cmd, "--since and --resume cannot be used together; the run recorded its scope")
 			}
+			if f.sync && f.batch {
+				return usageError(cmd, "--sync and --batch cannot be used together")
+			}
 			return runRead(cmd, args, &f)
 		},
 	}
@@ -83,7 +92,8 @@ could not start or hit an error, and 3 when the run stopped and can be resumed, 
 	cmd.Flags().StringVar(&f.resume, "resume", "", "continue the stopped run with this ID")
 	cmd.Flags().StringVar(&f.since, "since", "", "read the change in each blueprint since this revision")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "estimate the stage and submit nothing")
-	cmd.Flags().BoolVar(&f.sync, "sync", false, "send ordinary Messages calls instead of a batch")
+	cmd.Flags().BoolVar(&f.sync, "sync", false, "send ordinary Messages calls; this is the default")
+	cmd.Flags().BoolVar(&f.batch, "batch", false, "send the reads as one batch instead of ordinary Messages calls")
 	cmd.Flags().BoolVar(&f.json, "json", false, "print the result as one JSON object")
 	return cmd
 }
@@ -98,7 +108,7 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 	if err != nil {
 		return cannot(err)
 	}
-	c, err := config.Load(root, config.Flags{Sync: f.sync, JSON: f.json})
+	c, err := config.Load(root, config.Flags{Sync: !f.batch, Batch: f.batch, JSON: f.json})
 	if err != nil {
 		return cannot(err)
 	}
@@ -161,10 +171,11 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 	if err != nil {
 		msg := err.Error()
 		if s.RunID != "" {
-			msg += "; resume with " + pipeline.ResumeCommand("drafter read", c.Mode == "sync", s.RunID, args)
+			msg += "; resume with " + pipeline.ResumeCommand("drafter read", c.Mode, s.RunID, args)
 		}
 		return cannot(errors.New(msg))
 	}
+	stampFacts(c, root, head, handoffs, &s)
 	kept, lockErr := recordAccepted(c, root, head, s, scopeBases(root, handoffs, s), f.dryRun)
 	if lockErr == nil {
 		scopedKept(cmd.ErrOrStderr(), s, kept)
@@ -176,7 +187,7 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 	if lockErr != nil {
 		msg := lockErr.Error()
 		if s.RunID != "" {
-			msg += "; resume with " + pipeline.ResumeCommand("drafter read", c.Mode == "sync", s.RunID, args)
+			msg += "; resume with " + pipeline.ResumeCommand("drafter read", c.Mode, s.RunID, args)
 		}
 		return cannot(errors.New(msg))
 	}
@@ -185,18 +196,22 @@ func runRead(cmd *cobra.Command, args []string, f *readFlags) error {
 
 // readBars applies each page's read bar, as committed at head, for a read with no --since. A
 // page whose entry holds a bar reads the change since the bar's commit; a page held by its bar is
-// returned among the skipped, and every other page reads whole, as before.
+// returned among the skipped. A page whose accepted blueprint is unchanged and whose recorded facts
+// differ reads as a lapse (lapseRead), and every other page reads whole, as before.
 func readBars(c *config.Config, root, head string, handoffs []handoff.Handoff, m barMaps, warn io.Writer) (kept []handoff.Handoff, held []pipeline.PageResult, err error) {
 	lock, err := committedLock(c, root, head)
 	if err != nil {
 		return nil, nil, err
 	}
 	for _, h := range handoffs {
-		if b := lock.Pages[h.Page.Path].Blocked; b != nil {
+		e := lock.Pages[h.Page.Path]
+		if b := e.Blocked; b != nil {
 			if r := applyBar(c, root, head, h, b, m, warn); r != nil {
 				held = append(held, *r)
 				continue
 			}
+		} else if sc, block, ok := lapseRead(c, root, head, h, e); ok {
+			m.scopes[h.Page.Path], m.changes[h.Page.Path] = sc, block
 		}
 		kept = append(kept, h)
 	}

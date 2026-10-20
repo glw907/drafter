@@ -1,6 +1,7 @@
 package blueprint
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -77,6 +78,22 @@ func TestSeedMatchesConversion(t *testing.T) {
 	}
 	if g.Accepted != accepted || g.Page == "" {
 		t.Errorf("seeded entry %+v should keep accepted %q and set page", g, accepted)
+	}
+}
+
+func TestSeedKeepsFacts(t *testing.T) {
+	b := seedTwinB(t)
+	facts := map[string]string{"f:a": "0123456789ab"}
+	setSeedEntry(t, b, LockEntry{Accepted: git(t, b, "rev-parse", "HEAD:"+seedBP), Facts: facts})
+	if _, err := Seed(b, testLayout, []string{seedBP}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadLock(seedLockFile(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e := got.Pages[convertPage]; e.Page == "" || !maps.Equal(e.Facts, facts) {
+		t.Errorf("seeded entry %+v, want the page set and facts %v kept", e, facts)
 	}
 }
 

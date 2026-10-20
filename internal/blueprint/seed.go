@@ -105,6 +105,6 @@ func seedEntry(root string, layout Layout, lock *Lock, bp string) (string, LockE
 		return "", LockEntry{}, err
 	}
 	entry := newLockEntry(b, pageBlob, pageBytes, bpBlob)
-	entry.Accepted = old.Accepted
+	entry.Accepted, entry.Facts = old.Accepted, old.Facts
 	return page, entry, nil
 }

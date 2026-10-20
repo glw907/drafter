@@ -3,15 +3,18 @@ package main
 import (
 	"fmt"
 	"io"
+	"maps"
 	"path"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/glw907/drafter/internal/blueprint"
 	"github.com/glw907/drafter/internal/config"
 	"github.com/glw907/drafter/internal/handoff"
 	"github.com/glw907/drafter/internal/pipeline"
+	"github.com/glw907/drafter/internal/plan"
 	runstate "github.com/glw907/drafter/internal/run"
 )
 
@@ -76,10 +79,23 @@ func updateLock(c *config.Config, root string, edit func(*blueprint.Lock) (bool,
 // that change is all that is new: the entry holds no bar, which the read never saw, and its
 // accepted id is bases[path], the blueprint's blob at the commit the read diffed from. Otherwise
 // the entry stays, and kept maps the page to the reason.
+//
+// The entry's facts follow finding 12 of the blueprint-first plan: they change only on an accept
+// that judged every bullet they hold, so a result's Facts is set only by drafter read. A whole
+// accept and a lapse accept write them; a bar accept writes them only when the bar's findings
+// carry a seat, since a bar written before the fact-truth seat existed leaves bullets no seat
+// ever judged; a scoped accept and any accept inside drafter page leave them as they were. A lapse
+// accept keeps the accepted id, and counts only while the entry still holds the id the read
+// started from.
 func recordReads(lock *blueprint.Lock, start string, s pipeline.Summary, bases map[string]string) (changed bool, kept map[string]string) {
 	for _, r := range s.Pages {
 		e := lock.Pages[r.Path]
 		switch {
+		case r.Lapse && r.Status == pipeline.StatusAccepted && r.Facts != nil:
+			if e.Accepted != r.Accepted || e.Blocked != nil || maps.Equal(e.Facts, r.Facts) {
+				continue
+			}
+			e.Facts = nilIfEmpty(r.Facts)
 		case scopedAccept(r):
 			if why := scopedRefusal(e, bases[r.Path]); why != "" {
 				if kept == nil {
@@ -93,10 +109,14 @@ func recordReads(lock *blueprint.Lock, start string, s pipeline.Summary, bases m
 			}
 			e.Accepted = r.Accepted
 		case r.Status == pipeline.StatusAccepted && r.Accepted != "":
-			if e.Accepted == r.Accepted && e.Blocked == nil {
+			facts := e.Facts
+			if r.Facts != nil && (r.BarFrom == "" || barJudgedFacts(e.Blocked)) {
+				facts = nilIfEmpty(r.Facts)
+			}
+			if e.Accepted == r.Accepted && e.Blocked == nil && maps.Equal(e.Facts, facts) {
 				continue
 			}
-			e.Accepted, e.Blocked = r.Accepted, nil
+			e.Accepted, e.Blocked, e.Facts = r.Accepted, nil, facts
 		case r.WholeBlocked:
 			b := barOf(start, r.Findings)
 			if b == nil || reflect.DeepEqual(e.Blocked, b) {
@@ -113,6 +133,20 @@ func recordReads(lock *blueprint.Lock, start string, s pipeline.Summary, bases m
 		changed = true
 	}
 	return changed, kept
+}
+
+// barJudgedFacts reports whether the bar was written by a read with the fact-truth seat, which sets
+// the seat on every finding it writes.
+func barJudgedFacts(b *blueprint.Blocked) bool {
+	return b != nil && slices.ContainsFunc(b.Findings, func(f blueprint.BlockedFinding) bool { return f.Seat != "" })
+}
+
+// nilIfEmpty is m, or nil when it holds nothing, which is how an entry holds no facts.
+func nilIfEmpty(m map[string]string) map[string]string {
+	if len(m) == 0 {
+		return nil
+	}
+	return m
 }
 
 // scopedRefusal is why a scoped accept cannot advance the entry e, whose read diffed from the
@@ -245,4 +279,135 @@ func heldPage(path string, b *blueprint.Blocked) pipeline.PageResult {
 		r.Findings = append(r.Findings, pipeline.FindingResult{Location: f.Location, Text: f.Text, Blocking: true, Seat: f.Seat, Kind: f.Kind})
 	}
 	return r
+}
+
+// readSet is a blueprint's facts as committed at a start commit: the facts store, every id the
+// blueprint places, cites, or disposes, and the hash of each.
+type readSet struct {
+	bp     *blueprint.Blueprint
+	facts  *plan.Facts
+	ids    []string
+	hashes map[string]string
+}
+
+// readSetAt builds the read set of h at rev. It reports false when the blueprint at rev does not
+// decode, which the blueprint check reports on its own.
+func readSetAt(c *config.Config, root, rev string, h handoff.Handoff) (readSet, bool) {
+	r := revisionAt(c, root, rev, h)
+	b, _ := blueprint.Decode(h.Plan, r.Blueprint)
+	if b == nil {
+		return readSet{}, false
+	}
+	ids := blueprint.CitedFacts(b, r.Facts)
+	return readSet{bp: b, facts: r.Facts, ids: ids, hashes: blueprint.FactsHashes(ids, r.Facts)}, true
+}
+
+// lapseRead decides whether a page's read is a lapse read, and builds its scope and change block
+// when it is. The page's entry holds no bar, its accepted id is the blueprint committed at head,
+// and it holds a facts map that differs from the read set at head. An entry with no facts map
+// reads whole, once, so it is not a lapse read.
+func lapseRead(c *config.Config, root, head string, h handoff.Handoff, e blueprint.LockEntry) (blueprint.Scope, string, bool) {
+	if e.Blocked != nil || len(e.Facts) == 0 || e.Accepted == "" {
+		return blueprint.Scope{}, "", false
+	}
+	if blob, err := blueprint.CommitBlobID(root, head, h.Plan); err != nil || blob != e.Accepted {
+		return blueprint.Scope{}, "", false
+	}
+	rs, ok := readSetAt(c, root, head, h)
+	if !ok || blueprint.FactsMatch(e.Facts, rs.hashes) {
+		return blueprint.Scope{}, "", false
+	}
+	changed := blueprint.ChangedFacts(e.Facts, rs.hashes)
+	held := []string{}
+	for _, id := range changed {
+		if _, ok := rs.hashes[id]; ok {
+			held = append(held, id)
+		}
+	}
+	sc := blueprint.Scope{
+		Kind: blueprint.ScopeScoped, IDs: blueprint.SectionsCiting(rs.bp, held),
+		Facts: held, Bullets: slices.Clone(held), Joined: []string{},
+	}
+	return sc, lapseBlock(changed, rs), true
+}
+
+// lapseBlock is the change block of a lapse read: the facts that changed since the accepted read,
+// each with its current bullet, or the note that the blueprint no longer cites it.
+func lapseBlock(changed []string, rs readSet) string {
+	var b strings.Builder
+	b.WriteString("The change this read judges follows. The blueprint is the one the last accepted read judged, and the facts below changed after that read. It adds to the blueprint and the facts above.\n\n=== changed facts ===\n")
+	for _, id := range changed {
+		fmt.Fprintf(&b, "- %s\n", id)
+		switch _, held := rs.hashes[id]; {
+		case held:
+			f, _ := rs.facts.Get(id)
+			fmt.Fprintf(&b, "  changed since the accepted read: %s\n", f.Raw)
+		case slices.Contains(rs.ids, id):
+			b.WriteString("  changed since the accepted read: the facts store no longer holds it as one bullet\n")
+		default:
+			b.WriteString("  no longer cited by the blueprint\n")
+		}
+	}
+	b.WriteString("=== end changed facts ===")
+	return b.String()
+}
+
+// lapseResult reports whether a drafter read result is the result of a lapse read: a scoped read
+// that compared against no revision and no bar.
+func lapseResult(r pipeline.PageResult) bool {
+	return r.Scope != nil && r.Scope.Kind == blueprint.ScopeScoped && r.Since == "" && r.BarFrom == "" && r.ReadScope == nil
+}
+
+// stampFacts sets Lapse and Facts on each accepted result of a drafter read whose read judged
+// every fact the lock would record: a whole read, a bar read, and a lapse read. A change read
+// judged only the facts it touched, so its result carries none.
+func stampFacts(c *config.Config, root, head string, handoffs []handoff.Handoff, s *pipeline.Summary) {
+	for i := range s.Pages {
+		r := &s.Pages[i]
+		if r.Status != pipeline.StatusAccepted || r.Accepted == "" {
+			continue
+		}
+		r.Lapse = lapseResult(*r)
+		if scopedAccept(*r) && !r.Lapse {
+			continue
+		}
+		for _, h := range handoffs {
+			if h.Page.Path != r.Path {
+				continue
+			}
+			if rs, ok := readSetAt(c, root, head, h); ok {
+				r.Facts = rs.hashes
+				if r.Facts == nil {
+					r.Facts = map[string]string{}
+				}
+			}
+		}
+	}
+}
+
+// lapsedPages lists, one line per page, the pages of a drafter page run whose lock entry no longer
+// matches the facts at head: an entry holding a facts map that differs from the read set whatever
+// its accepted id, and an entry whose accepted id is the committed blueprint but records no facts
+// while the blueprint has some.
+func lapsedPages(c *config.Config, root, head string, handoffs []handoff.Handoff, lock *blueprint.Lock) []string {
+	var lines []string
+	for _, h := range handoffs {
+		e := lock.Pages[h.Page.Path]
+		rs, ok := readSetAt(c, root, head, h)
+		if !ok {
+			continue
+		}
+		blob, _ := blueprint.CommitBlobID(root, head, h.Plan)
+		var why string
+		switch {
+		case len(e.Facts) > 0 && !blueprint.FactsMatch(e.Facts, rs.hashes):
+			why = "facts changed since it: " + strings.Join(blueprint.ChangedFacts(e.Facts, rs.hashes), ", ")
+		case len(e.Facts) == 0 && e.Accepted != "" && e.Accepted == blob && len(rs.hashes) > 0:
+			why = "no facts recorded"
+		default:
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s: the accepted read lapsed; %s. Run drafter read %s.", h.Page.Path, why, h.Plan))
+	}
+	return lines
 }

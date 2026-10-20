@@ -11,6 +11,7 @@ import (
 
 	"github.com/glw907/drafter/internal/blueprint"
 	"github.com/glw907/drafter/internal/coverage"
+	"github.com/glw907/drafter/internal/plan"
 	runstate "github.com/glw907/drafter/internal/run"
 )
 
@@ -84,9 +85,36 @@ func (e *draftEnv) firstDraft() (firstPage string) {
 			e.t.Fatalf("row 1 lock section %s = %s, want %s", k, got.Sections[k], v)
 		}
 	}
+	if got.Facts != nil {
+		e.t.Fatalf("row 1 lock entry holds facts %v, but a drafter page run never writes them", got.Facts)
+	}
 	e.gate()
+	e.recordFacts()
 	e.commit("row 1", draftPage, draftBrief, draftLock)
 	return e.read(draftPage)
+}
+
+// recordFacts writes the lock entry's facts map, the way a drafter read that judged the facts does.
+// A drafter page run's own read never writes it, and the next drafter page refuses a page that
+// has none.
+func (e *draftEnv) recordFacts() {
+	e.t.Helper()
+	b, _ := blueprint.Decode(draftBP, []byte(e.read(draftBP)))
+	facts, err := plan.LoadFacts(filepath.Dir(filepath.Join(e.dir, draftFacts)))
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	file := filepath.Join(e.dir, draftLock)
+	l, err := blueprint.ReadLock(file)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	entry := l.Pages[draftPage]
+	entry.Facts = blueprint.FactsHashes(blueprint.CitedFacts(b, facts), facts)
+	l.Pages[draftPage] = entry
+	if err := blueprint.WriteLock(file, l); err != nil {
+		e.t.Fatal(err)
+	}
 }
 
 func TestDraftFixtureDraftsRedraftsAndSettles(t *testing.T) {
@@ -179,6 +207,8 @@ func TestDraftFactEditSkipsTheBlueprintRead(t *testing.T) {
 	facts := e.read(draftFacts)
 	e.write(draftFacts, strings.Replace(facts, "in the current directory.", "in the directory where you run it.", 1))
 	e.commit("edit the shared fact", draftFacts)
+	e.recordFacts()
+	e.commit("record the fact read", draftLock)
 	e.stub.reset(0)
 	e.stub.setAnswer("edits", mustRead(t, filepath.Join("testdata", "cli-answers", "edits-fact.json")))
 	e.stub.setAnswer("coverage", strings.Replace(mustRead(t, filepath.Join("testdata", "cli-answers", "coverage.json")), "in the current directory.", "in the directory where you run it.", 1))

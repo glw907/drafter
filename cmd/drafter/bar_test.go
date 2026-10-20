@@ -614,7 +614,7 @@ func TestPageScopeWithABar(t *testing.T) {
 		editTallySentence(f)
 		l, _ := blueprint.ReadLock(filepath.Join(f.root, tallyLock))
 		e := l.Pages[tallyPage]
-		e.Accepted = f.rev("HEAD:" + tallyBP)
+		e.Accepted, e.Facts = f.rev("HEAD:"+tallyBP), f.factsMap()
 		l.Pages[tallyPage] = e
 		if err := blueprint.WriteLock(filepath.Join(f.root, tallyLock), l); err != nil {
 			t.Fatal(err)

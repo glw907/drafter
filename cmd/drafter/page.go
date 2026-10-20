@@ -142,7 +142,7 @@ func runPage(cmd *cobra.Command, args []string, f *pageFlags) error {
 	if err != nil {
 		msg := err.Error()
 		if s.RunID != "" {
-			msg += "; resume with " + pipeline.ResumeCommand("drafter page", c.Mode == "sync", s.RunID, resumeArgs)
+			msg += "; resume with " + pipeline.ResumeCommand("drafter page", c.Mode, s.RunID, resumeArgs)
 		}
 		return exitError{code: exitCannotRun, msg: msg}
 	}

@@ -283,6 +283,9 @@ pages:
     page: 6f1ed002ab5595859014ebf0951522d9a1b2c3d4
     blueprint: 8d4c0f9b1a2e3d4c5b6a79881726354433221100
     accepted: 8d4c0f9b1a2e3d4c5b6a79881726354433221100
+    facts:
+      key-rotation-command: 3f9a0c2b7d1e
+      key-lifetime: c41e88a07b5d
     sections:
       _intro: sha256:3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b
       rotate: sha256:5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9
@@ -295,6 +298,7 @@ Each entry is keyed on the page path and holds these fields.
 | `page` | The git blob id of the page at drafter's last write. |
 | `blueprint` | The git blob id of the blueprint at drafter's last write. |
 | `accepted` | The blob id of the blueprint that the blueprint read last accepted. |
+| `facts` | One hash per fact the blueprint places, cites, or disposes, as the last read that judged the facts saw them. |
 | `sections` | One hash per section id, and `_intro` for the text above the first section. |
 | `blocked` | The read bar: the outcome of the last whole read that blocked. |
 
@@ -312,9 +316,35 @@ Hashes follow three rules.
 An entry with only `accepted` set belongs to a page that isn't drafted yet. A missing
 `drafted.lock` is valid and reads as no entries.
 
+`facts` maps each fact id in the blueprint's read set to the first 12 hex digits of the SHA-256 of
+that fact's whole bullet: the claim, every source pointer with its line span or anchor, and the
+status tag with its qualifier. The read set is every fact the blueprint places in a `fact` item,
+cites in an item's or the introduction's `facts` list or in the framing, or disposes in
+`dispositions`. A fact that more than one bullet holds is a facts error, which `drafter check`
+reports before any read. Editing a bullet in any of those parts, including moving a pointer's span,
+changes its hash. An entry holds `facts` only when a fact-truth read judged every bullet in it, so
+one accept writes it and a read of the change since some revision does not:
+
+| The accept | `facts` |
+|---|---|
+| A read of the whole blueprint | Written, with `accepted`. |
+| A [lapse read](#lapse) | Written, and `accepted` stays. |
+| A read of the change since a bar, when the bar's findings carry a `seat` | Written, with `accepted`. |
+| A read of the change since a bar written before the fact-truth seat existed | Not written. `accepted` is written and the bar clears, so the next read is whole. |
+| A read with `--since` | Not written. |
+| Any accept inside `drafter page` | Not written. |
+
+A read compares `facts` with the current read set. An id whose hash differs, an id the map lacks,
+and an id the map holds that the blueprint no longer cites are the facts that changed since the
+accepted read. An entry with `accepted` but no `facts` is read whole, once. A missing `facts`
+matches an empty read set, so a project with no facts directory, or a blueprint that cites no fact,
+has no lapse.
+
 `blocked` holds two fields. `commit` is the full sha of the commit the whole read ran against.
-`findings` lists its blocking findings in the order the read gave them, each with a `location` and
-a `text`. A page with
+`findings` lists its blocking findings in the order the read gave them, each with a `location`, a
+`text`, and the `seat` (`blueprint`, `consistency`, or `facttruth`) and `kind` of the read that
+raised it. A bar none of whose findings has a `seat` was written before the fact-truth seat
+existed. A page with
 no entry gets an entry that holds only `blocked`:
 
 ```yaml
@@ -332,7 +362,8 @@ These rules govern `blocked`:
 
 - An accept that writes `accepted` removes `blocked`, and a later accept of that page leaves an
   entry with only `accepted`.
-- A read with `--since` that accepts writes nothing, so its `blocked` and earlier `accepted` stay.
+- A read with `--since` that accepts writes nothing, so its `blocked`, earlier `accepted`, and
+  `facts` stay.
 - A draft writes a full entry with no `blocked`.
 - The walk that finds the commit that introduced an entry ignores both `blocked` and `accepted`.
 - `drafter check` reports an entry that holds `blocked` or `accepted` for a page the outline
@@ -574,13 +605,43 @@ lines. Which lines block in a change read, and which come back as "Nit:", is set
 ## What `drafter read` does with a blueprint
 
 `drafter read` runs the checks above on the blueprint as committed at the run's start, then sends
-one batch holding the consistency read, when the project has a facts store, and the blueprint
-read. The blueprint read grades the blueprint as a plan: order, pace, and the introduction, the
+the consistency read, when the project has a facts store, the fact-truth read, when the blueprint
+cites facts, and the blueprint read. The reads go out as ordinary Messages calls, one request each
+at a time. `--batch` sends them as one Message Batch instead, which costs less and takes longer,
+and a stopped batch read prints a resume command that carries `--batch`. Neither `mode` nor
+`DRAFTER_MODE` changes what `drafter read` sends; they govern `drafter page`. The blueprint read grades the blueprint as a plan: order, pace, and the introduction, the
 completeness of steps and failures, what a reader can know at each step, recovery before and
 after diagnosis, a `use` that restates its fact, durable fields that narrate planning history,
 and a human-origin item the blueprint would bury. A blocking finding sets the blueprint aside.
 When the run ends with every blueprint decided, the accepted blueprints' blob ids go into the
-`accepted` field of `drafted.lock`.
+`accepted` field of `drafted.lock`, with the `facts` hashes the accept earns.
+
+The fact-truth read checks each fact against the source its pointers name. It receives each fact's
+whole bullet and the source lines the pointers quote, and returns one verdict per fact:
+
+| Verdict | Meaning | Blocks |
+|---|---|---|
+| `holds` | The excerpts show everything the bullet claims. | No. |
+| `wider` | The bullet claims more than the excerpts show, such as a count, a list, or a scope. | Yes. |
+| `contradicts` | An excerpt shows the claim is false. | Yes. |
+| `no-excerpt` | No pointer of the fact yields an excerpt. | For a `verified` fact. An `external` or `vendor` fact passes. |
+
+A fact none of whose pointers yields an excerpt gets `no-excerpt` without a request. The seat judges
+the claim against the excerpts alone, and a finding states the claim the code supports and leaves
+the bullet to its author. A whole read judges every fact in the read set. A read with `--since`
+judges the facts the change touched or joined. Every finding of a read carries its `seat` and
+`kind`. The seat never runs inside `drafter page`.
+
+<a id="lapse"></a>A page whose entry holds no bar, whose `accepted` id equals the blueprint as
+committed at the run's start, and whose `facts` map differs from the current read set gets a lapse
+read: the blueprint hasn't changed, but a fact it rests on has. The read judges the facts that
+changed, and the blueprint read receives them as a changed-facts block. The block gives each changed
+fact's current bullet, marked "changed since the accepted read", and lists a fact the blueprint no
+longer cites as "no longer cited by the blueprint". The fact-truth read gets only the changed facts
+the blueprint still cites. The consistency read blocks only on a conflict that touches a changed
+fact. A lapse read that accepts writes the new `facts` and keeps `accepted`. One that blocks writes
+nothing, so the next read lapses again over the same change. Run with `--since` or `--resume`, a
+read doesn't look for a lapse.
 
 With `--since <rev>`, the read judges the change as a code reviewer judges a pull request. It
 still reads the whole blueprint, and it also receives the diff of the blueprint, the changed fact
@@ -627,7 +688,9 @@ change didn't fix blocks, whatever its class, and its text starts "Still open:".
 change adds or causes blocks too, and any other defect is non-blocking and starts "Already
 present:". The summary names the bar's commit as `bar_from`.
 
-An accept on that read writes `accepted` and removes the bar. A read that blocks again leaves the
+An accept on that read writes `accepted` and removes the bar. It writes `facts` as well when any
+finding of the bar carries a `seat`; a bar written before the fact-truth seat existed leaves facts
+no seat judged, so that accept writes no `facts` and the next read is whole. A read that blocks again leaves the
 bar as it was, so each later read judges every change since the first blocked whole read, including
 a defect an earlier fix added. Commit `drafted.lock` with the fix, because the run
 reads the lock as committed at its start.
@@ -651,8 +714,21 @@ one that ends in `.md` is a page, and anything else is a [handoff file](handoff.
 of argument, not a mix, and don't combine blueprints with `--workflow-run`.
 
 A run starts on a clean worktree and reads every input from the commit it starts at: the blueprint,
-the outline, the facts, the page, and its brief. For each page it first decides what to run, by
-comparing the blueprint with the entry in `drafted.lock`.
+the outline, the facts, the page, and its brief. Before it decides anything, it refuses the whole
+call when any page's accepted read has lapsed, with no request sent and exit status 2. A page has
+lapsed when its entry holds a `facts` map that differs from the current read set, whatever its
+`accepted` id, or when `accepted` equals the blueprint and the entry records no `facts`. The refusal
+prints one line per lapsed page:
+
+```text
+docs/extend/rotate-the-key.md: the accepted read lapsed; facts changed since it: key-lifetime. Run drafter read blueprints/docs/extend/rotate-the-key.blueprint.yaml.
+```
+
+An entry with no map says `no facts recorded` where the example names the facts. Run `drafter read`
+on the blueprint, commit `drafted.lock`, and run `drafter page` again. A read inside `drafter page`
+never judges facts, so it never writes `facts`: a page whose entry has none is refused on its next
+run. For each page it then decides what to run, by comparing the blueprint with the entry in
+`drafted.lock`.
 
 | The page | The run |
 |---|---|

@@ -109,10 +109,12 @@ type Blueprints struct {
 	BriefPath string
 }
 
-// Flags holds the only two settings that have command-line flags.
+// Flags holds the only settings that have command-line flags. Sync and Batch each set mode, and
+// Batch wins only when Sync is false; a caller that offers both rejects the pair.
 type Flags struct {
-	Sync bool
-	JSON bool
+	Sync  bool
+	Batch bool
+	JSON  bool
 }
 
 // Source is one setting's resolved value and where it came from.

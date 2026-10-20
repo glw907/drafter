@@ -320,7 +320,7 @@ func TestResumeHintNamesTheCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Stop == "" || !strings.HasPrefix(s.ResumeLine, "drafter read --resume ") {
+	if s.Stop == "" || !strings.HasPrefix(s.ResumeLine, "drafter read --batch --resume ") {
 		t.Errorf("stop %q, resume line %q, want a stop that names drafter read", s.Stop, s.ResumeLine)
 	}
 }

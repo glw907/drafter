@@ -188,6 +188,11 @@ type Lock struct {
 // blueprint the blueprint read last accepted. An entry with only Accepted set is a page not
 // drafted yet.
 //
+// Facts maps each fact id in the blueprint's read set to the hash [FactsHashes] gives its bullets
+// at the read that last judged them, and is present only when a fact-truth read judged every bullet
+// in it. A read compares it with the current read set to find the facts that changed since the
+// accept.
+//
 // Blocked is the read bar: the outcome of the read that last judged the whole blueprint and
 // blocked it. A later read judges the change since Blocked.Commit against its findings, and an
 // accept clears it. An entry with only Blocked set is a page whose blueprint has never been
@@ -196,6 +201,7 @@ type LockEntry struct {
 	Page      string            `yaml:"page,omitempty"`
 	Blueprint string            `yaml:"blueprint,omitempty"`
 	Accepted  string            `yaml:"accepted,omitempty"`
+	Facts     map[string]string `yaml:"facts,omitempty"`
 	Sections  map[string]string `yaml:"sections,omitempty"`
 	Blocked   *Blocked          `yaml:"blocked,omitempty"`
 }

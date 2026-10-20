@@ -44,6 +44,7 @@ with each dot replaced by `_`. The key `mode` is `DRAFTER_MODE`, and `gate.proto
 setting's, such as `DRAFTER_API_KEY`, changes nothing here. Tables and lists have no variable.
 
 Only two settings have flags. `--sync` sets `mode` to `sync`, and `--json` sets `output` to `json`.
+`drafter read` also takes `--batch`, which sets `mode` to `batch`.
 
 ### Paths
 
@@ -214,7 +215,9 @@ all five of the model's rates.
 
 `mode` is `batch` or `sync`. In `batch` mode drafter sends each stage as a Message Batch, which
 costs less and takes longer. In `sync` mode it sends streamed Messages calls one at a time. The
-flag is `--sync`.
+flag is `--sync`. `mode` governs `drafter page`. `drafter read` is `sync` unless you pass `--batch`,
+whatever `mode` and `DRAFTER_MODE` say, so a read returns while you wait; `--batch` sends the
+read as one Message Batch instead. Give `--sync` or `--batch`, not both.
 
 `output` is `human` or `json`, and the flag is `--json`.
 

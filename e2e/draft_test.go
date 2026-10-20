@@ -33,9 +33,11 @@ const (
 // are canned files under testdata/cli-answers, and the test sets the edits answer per row.
 type draftStub struct {
 	*httptest.Server
-	mu       sync.Mutex
-	kinds    []string
-	bodies   []string
+	mu     sync.Mutex
+	kinds  []string
+	bodies []string
+	paths  []string // the path of every POST the stub got
+
 	answers  map[string]string
 	failFrom int // refuse every Messages request from the nth on, as a spend limit does
 }
@@ -62,6 +64,11 @@ func newDraftStub(t *testing.T) *draftStub {
 	s.answers["coverage"] = answer("coverage.json")
 	s.answers["edits"] = answer("edits-sentence.json")
 	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			s.mu.Lock()
+			s.paths = append(s.paths, r.URL.Path)
+			s.mu.Unlock()
+		}
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/models":
 			w.Header().Set("Content-Type", "application/json")
@@ -164,6 +171,13 @@ func (s *draftStub) sent() []string {
 	return slices.Clone(s.kinds)
 }
 
+// sentPaths returns the path of every POST the stub got, count_tokens calls included.
+func (s *draftStub) sentPaths() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.paths)
+}
+
 // sentBodies returns the body of every Messages request, in the order sent.
 func (s *draftStub) sentBodies() []string {
 	s.mu.Lock()
@@ -174,7 +188,7 @@ func (s *draftStub) sentBodies() []string {
 func (s *draftStub) reset(failFrom int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.kinds, s.bodies, s.failFrom = nil, nil, failFrom
+	s.kinds, s.bodies, s.paths, s.failFrom = nil, nil, nil, failFrom
 }
 
 func (s *draftStub) setAnswer(kind, text string) {

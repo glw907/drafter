@@ -12,6 +12,7 @@ import (
 
 	"github.com/glw907/drafter/internal/blueprint"
 	"github.com/glw907/drafter/internal/config"
+	"github.com/glw907/drafter/internal/plan"
 )
 
 const (
@@ -116,7 +117,11 @@ func (f *cliFixture) draft(brief, accepted string) {
 	f.t.Helper()
 	f.write(tallyPage, tallyDraft)
 	f.write(tallyBrief, brief)
-	e, err := blueprint.DraftedEntry(f.root, f.rev("HEAD"), tallyBP, tallyPage, accepted)
+	var facts map[string]string
+	if accepted != "" {
+		facts = f.factsMap()
+	}
+	e, err := blueprint.DraftedEntry(f.root, f.rev("HEAD"), tallyBP, tallyPage, accepted, facts)
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -125,6 +130,42 @@ func (f *cliFixture) draft(brief, accepted string) {
 		f.t.Fatal(err)
 	}
 	f.commit("draft", tallyPage, tallyBrief, tallyLock)
+}
+
+// factsMap is the lock's facts map for the fixture blueprint and facts as committed at HEAD.
+func (f *cliFixture) factsMap() map[string]string {
+	f.t.Helper()
+	data, err := gitShow(f.root, "HEAD", tallyBP)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	b, _ := blueprint.Decode(tallyBP, data)
+	if b == nil {
+		f.t.Fatal("the fixture blueprint does not decode")
+	}
+	facts, err := plan.LoadFacts(filepath.Join(f.root, path.Dir(tallyFacts)))
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	return blueprint.FactsHashes(blueprint.CitedFacts(b, facts), facts)
+}
+
+// recordFacts commits the facts the fixture holds at HEAD as the lock entry's facts map, the way a
+// lapse accept does.
+func (f *cliFixture) recordFacts() {
+	f.t.Helper()
+	file := filepath.Join(f.root, tallyLock)
+	lock, err := blueprint.ReadLock(file)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	e := lock.Pages[tallyPage]
+	e.Facts = f.factsMap()
+	lock.Pages[tallyPage] = e
+	if err := blueprint.WriteLock(file, lock); err != nil {
+		f.t.Fatal(err)
+	}
+	f.commit("record facts", tallyLock)
 }
 
 // scope runs the lock scoping on the fixture's blueprint at HEAD.
@@ -311,7 +352,7 @@ func TestDraftScopeFromTheLock(t *testing.T) {
 			t.Fatal(err)
 		}
 		e := lock.Pages[tallyPage]
-		e.Accepted = f.rev("HEAD:" + tallyBP)
+		e.Accepted, e.Facts = f.rev("HEAD:"+tallyBP), f.factsMap()
 		lock.Pages[tallyPage] = e
 		if err := blueprint.WriteLock(filepath.Join(f.root, tallyLock), lock); err != nil {
 			t.Fatal(err)
@@ -352,6 +393,7 @@ func TestSkipReadWithAFactOnlyChange(t *testing.T) {
 	f := newCLIFixture(t)
 	f.draft(tallyBriefJSON(t), f.rev("HEAD:"+tallyBP))
 	f.editFact()
+	f.recordFacts()
 	d := f.scope()
 	if !d.skipRead[tallyPage] {
 		t.Error("a fact-only change leaves the blueprint equal to accepted, so the read is skipped")
@@ -360,6 +402,7 @@ func TestSkipReadWithAFactOnlyChange(t *testing.T) {
 	f = newCLIFixture(t)
 	f.draft(tallyBriefJSON(t), "a-stale-id")
 	f.editFact()
+	f.recordFacts()
 	d = f.scope()
 	if d.skipRead[tallyPage] {
 		t.Error("a stale accepted id must not skip the read")
