@@ -152,6 +152,36 @@ type work struct {
 	// retest after its fix.
 	Section         bool `json:"section,omitempty"`
 	CoherenceRetest bool `json:"coherence_retest,omitempty"`
+	// WholeBlocked says the blueprint read judged the whole blueprint and returned fix. Bar is the
+	// rendered bar a bar read's blueprint seat gets as its findings, and BarFrom the commit of the
+	// blocked read it came from.
+	WholeBlocked bool   `json:"whole_blocked,omitempty"`
+	Bar          string `json:"bar,omitempty"`
+	BarFrom      string `json:"bar_from,omitempty"`
+	// ReadScope and ReadChange are the blueprint read's own scope and change block, set when the
+	// read judges something other than the draft's Scope and Change. readScope and readChange
+	// say which pair a read uses.
+	ReadScope  *blueprint.Scope `json:"read_scope,omitempty"`
+	ReadChange string           `json:"read_change,omitempty"`
+}
+
+// readScope is the scope the blueprint read judges: ReadScope when the page has one, else the
+// draft's Scope.
+func (w *work) readScope() *blueprint.Scope {
+	if w.ReadScope != nil {
+		return w.ReadScope
+	}
+	return w.Scope
+}
+
+// readChange is the change block the blueprint read judges, paired with readScope: a page with a
+// read scope of its own reads its ReadChange, empty when that scope is not scoped, and never the
+// draft's Change.
+func (w *work) readChange() string {
+	if w.ReadScope != nil {
+		return w.ReadChange
+	}
+	return w.Change
 }
 
 // readerState is the final reader's two-turn conversation.

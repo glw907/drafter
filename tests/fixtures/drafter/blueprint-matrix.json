@@ -1,0 +1,1147 @@
+{
+  "host": {
+    "args": {},
+    "resolved": {
+      "pages": [
+        {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        {
+          "path": "docs/claude-code/drive-widgets-from-an-agent.md",
+          "slug": "drive-widgets-from-an-agent",
+          "title": "Drive widgets from an agent",
+          "pageType": "concept",
+          "job": "Learn how an agent session drives the widget CLI.\n",
+          "covers": [
+            "What the agent runs."
+          ],
+          "outOfScope": [],
+          "figure": false,
+          "anatomy": "Concept",
+          "brief": "notes/briefs/claude-code/drive-widgets-from-an-agent.json",
+          "standard": "google"
+        },
+        {
+          "path": "docs/admin/check-widget-health.md",
+          "slug": "check-widget-health",
+          "title": "Check widget health",
+          "pageType": "reference",
+          "job": "Look up what each widget health signal means.\n",
+          "covers": [
+            "Every health signal."
+          ],
+          "outOfScope": [],
+          "figure": false,
+          "anatomy": "Reference",
+          "brief": "notes/briefs/admin/check-widget-health.json",
+          "standard": "google"
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "blueprint/whole",
+      "seat": "blueprint",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {},
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "blueprint/change",
+      "seat": "blueprint",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {},
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "intro,steps",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "blueprint/change-bar",
+      "seat": "blueprint",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {},
+        "round": 1,
+        "findings": "1. [steps/rotate] The rotate step relies on a deployed Worker no step produces.\n2. [intro] Nit-class: the introduction's order buries the prerequisite.",
+        "afterFinalRead": false,
+        "scope": "intro,steps",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "draft/whole",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "draft/section",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 1,
+        "findings": "- [BLOCKING] verify: the section must now say how to confirm the new key signs.",
+        "afterFinalRead": false,
+        "scope": "verify,rotate",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "draft/round-2",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 2,
+        "findings": "## structural edit: fix\nThe verify section is missing.\n- [BLOCKING] Verify: the page drops the verify section.",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "draft/final",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": "final",
+        "findings": "## final reader read: fix\nreader fix\n- [BLOCKING] Rotate the key: step 3 leaves the reader guessing which key is live.",
+        "afterFinalRead": true,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "draft/claude-code",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "path": "docs/claude-code/drive-widgets-from-an-agent.md",
+          "slug": "drive-widgets-from-an-agent",
+          "title": "Drive widgets from an agent",
+          "pageType": "concept",
+          "job": "Learn how an agent session drives the widget CLI.\n",
+          "covers": [
+            "What the agent runs."
+          ],
+          "outOfScope": [],
+          "figure": false,
+          "anatomy": "Concept",
+          "brief": "notes/briefs/claude-code/drive-widgets-from-an-agent.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Learn how an agent session drives the widget CLI.\n",
+          "pageType": "concept",
+          "registerSections": [],
+          "exemplarSources": [
+            "extenders/agent-cli-guide/"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:ccc333"
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "draft/admin",
+      "seat": "draft",
+      "context": {
+        "page": {
+          "path": "docs/admin/check-widget-health.md",
+          "slug": "check-widget-health",
+          "title": "Check widget health",
+          "pageType": "reference",
+          "job": "Look up what each widget health signal means.\n",
+          "covers": [
+            "Every health signal."
+          ],
+          "outOfScope": [],
+          "figure": false,
+          "anatomy": "Reference",
+          "brief": "notes/briefs/admin/check-widget-health.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Look up what each widget health signal means.\n",
+          "pageType": "reference",
+          "registerSections": [],
+          "exemplarSources": [],
+          "claimInventory": [],
+          "factIds": [
+            "f:ddd444"
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "structure/round-1",
+      "seat": "structure",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "structure/round-1-scoped",
+      "seat": "structure",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "verify,rotate",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "structure/round-2-narrow",
+      "seat": "structure",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": {
+          "baseline": "0123456789abcdef0123456789abcdef01234567",
+          "own": {
+            "verdict": "fix",
+            "findings": [
+              {
+                "location": "Rotate the key",
+                "finding": "ROUND-ONE-FINDING: the rotate step comes before its prerequisite.",
+                "rewrite": "Move it.",
+                "blocking": true
+              }
+            ],
+            "summary": "round-one fix"
+          }
+        },
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "editor/round-1",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "editor/round-1-scoped",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "verify,rotate",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "editor/round-2-narrow",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": {
+          "baseline": "0123456789abcdef0123456789abcdef01234567",
+          "own": {
+            "verdict": "fix",
+            "findings": [
+              {
+                "location": "Rotate the key",
+                "finding": "ROUND-ONE-FINDING: the rotate step comes before its prerequisite.",
+                "rewrite": "Move it.",
+                "blocking": true
+              }
+            ],
+            "summary": "round-one fix"
+          }
+        },
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "editor/final-scoped",
+      "seat": "editor",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": "final",
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "## final reader read: fix\nreader fix\n- [BLOCKING] Rotate the key: step 3 leaves the reader guessing which key is live.",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "fact/round-1",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "fact/round-1-scoped",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "verify,rotate",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "fact/round-2-narrow",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": {
+          "baseline": "0123456789abcdef0123456789abcdef01234567",
+          "own": {
+            "verdict": "ok",
+            "findings": [],
+            "summary": "fact ok"
+          }
+        },
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "fact/final-scoped",
+      "seat": "fact",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": "final",
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "## final reader read: fix\nreader fix\n- [BLOCKING] Rotate the key: step 3 leaves the reader guessing which key is live.",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "reader/turn-1",
+      "seat": "reader",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 1,
+        "facts": true
+      }
+    },
+    {
+      "name": "reader/turn-2",
+      "seat": "reader",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "",
+        "where": "",
+        "narrow": null,
+        "turn": 2,
+        "facts": true
+      }
+    },
+    {
+      "name": "coherence/read",
+      "seat": "coherence",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 1,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "verify,rotate",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    },
+    {
+      "name": "coherence/retest",
+      "seat": "coherence",
+      "context": {
+        "page": {
+          "path": "docs/extend/rotate-the-widget-key.md",
+          "slug": "rotate-the-widget-key",
+          "title": "Rotate the widget key",
+          "pageType": "task guide",
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "covers": [
+            "The rotation steps.",
+            "How to confirm the new key signs."
+          ],
+          "outOfScope": [
+            "Creating the first key (install-widget)."
+          ],
+          "figure": false,
+          "anatomy": "Task guide",
+          "brief": "notes/briefs/extend/rotate-the-widget-key.json",
+          "standard": "google"
+        },
+        "inputs": {
+          "job": "Rotate the widget's signing key without downtime.\n",
+          "pageType": "task guide",
+          "registerSections": [],
+          "exemplarSources": [
+            "operators/widget-create-token/",
+            "docs/extend/how-widgets-work.md"
+          ],
+          "claimInventory": [],
+          "factIds": [
+            "f:aaa111",
+            "f:bbb222"
+          ]
+        },
+        "round": 2,
+        "findings": "",
+        "afterFinalRead": false,
+        "scope": "verify,rotate",
+        "where": "",
+        "narrow": null,
+        "turn": 0,
+        "facts": true
+      }
+    }
+  ]
+}

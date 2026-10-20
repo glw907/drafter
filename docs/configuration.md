@@ -359,6 +359,7 @@ the track's name. drafter records the list and `drafter config` prints it.
 | `blueprints.root` | project, local | `blueprints` | None. |
 | `blueprints.required` | project, local | `false` | None. |
 | `blueprints.outline` | project, local | `<blueprints.root>/outline.yaml` | None. |
+| `blueprints.brief_path` | project, local | Unset. The brief sits beside the blueprint. | None. |
 
 `blueprints.root` is the directory that holds the project's blueprints, relative to the project
 root. `blueprints.outline` is the path of the outline file, also relative to the project root.
@@ -367,6 +368,14 @@ a managed page with no blueprint as an error. When it is `false`, the report is 
 lets a project convert its pages one at a time. `drafter check` also warns when the root or the
 facts directory departs from the convention in [Blueprint format](blueprint-format.md). The
 blueprint settings have no environment variable.
+
+`blueprints.brief_path` is a template for a page's brief path, relative to the project root. In
+it, `{dir}` stands for the base name of the page's directory and `{name}` for the page's file name
+without `.md`. With `brief_path = "notes/briefs/{dir}/{name}.json"`, the brief for
+`docs/guide/start.md` is `notes/briefs/guide/start.json`. The template must contain `{name}`, so
+pages in one directory never share a brief, and it must stay inside the project. Use it when a
+project's own tooling already reads briefs from another place, until the project moves to the
+convention.
 
 ## Example
 

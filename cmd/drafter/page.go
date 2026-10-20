@@ -20,8 +20,8 @@ import (
 )
 
 type pageFlags struct {
-	workflowRun, resume string
-	dryRun, sync, json  bool
+	workflowRun, resume       string
+	dryRun, sync, json, whole bool
 }
 
 func newPageCmd() *cobra.Command {
@@ -39,7 +39,8 @@ mapped to its blueprint. The command reads each blueprint, drafts the page from 
 the page in drafted.lock when it is accepted. A page whose blueprint, facts, and outline entry
 match its lock entry is not run, and the command says it is up to date. After a blueprint change,
 only the sections the change touched are redrafted, and a read of the whole page for coherence
-follows. Give handoff files or blueprints and pages, not both.
+follows. --whole drafts each page whole, whatever its lock entry says, which is how a page
+converted to a blueprint is first drafted. Give handoff files or blueprints and pages, not both.
 
 --dry-run assembles the first stage's requests, counts their tokens, prints each request's size
 and the stage's worst-case cost, and submits nothing. --resume continues a stopped run; give the
@@ -55,6 +56,7 @@ not start or hit an error, and 3 when the run stopped and can be resumed, which 
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "estimate the first stage and submit nothing")
 	cmd.Flags().BoolVar(&f.sync, "sync", false, "send ordinary Messages calls instead of a batch")
 	cmd.Flags().BoolVar(&f.json, "json", false, "print the result as one JSON object")
+	cmd.Flags().BoolVar(&f.whole, "whole", false, "draft each page whole, whatever its lock entry says")
 	return cmd
 }
 
@@ -73,10 +75,10 @@ func exitCodeFor(s pipeline.Summary) int {
 }
 
 // dryExitCode is the exit status of a dry run: no page is accepted or stopped in one, so only a
-// page the plan check already escalated makes it nonzero.
+// page the plan check already escalated, or one its read bar holds, makes it nonzero.
 func dryExitCode(s pipeline.Summary) int {
 	for _, p := range s.Pages {
-		if p.Status == pipeline.StatusEscalated {
+		if p.Status == pipeline.StatusEscalated || p.Status == statusHeld {
 			return exitFindings
 		}
 	}
@@ -101,6 +103,12 @@ func runPage(cmd *cobra.Command, args []string, f *pageFlags) error {
 		return usageError(cmd, "give handoff files, or blueprints and pages, not both")
 	case bp > 0 && f.workflowRun != "":
 		return usageError(cmd, "give blueprints and pages or --workflow-run, not both")
+	case f.whole && f.resume != "":
+		return usageError(cmd, "--whole and --resume cannot be used together; the run recorded each page's scope")
+	case f.whole && f.workflowRun != "":
+		return usageError(cmd, "--whole drafts blueprints and pages, not a --workflow-run")
+	case f.whole && bp == 0:
+		return usageError(cmd, "--whole drafts blueprints and pages, not handoff files")
 	case bp > 0:
 		return runPageBlueprints(cmd, args, f)
 	}
@@ -237,6 +245,11 @@ func writeSummaryText(w io.Writer, c *config.Config, s pipeline.Summary, dry boo
 	for _, p := range s.Pages {
 		if p.Status == statusUnchanged {
 			fmt.Fprintf(&b, "%s: %s\n", p.Path, p.Scope.Why)
+			continue
+		}
+		if p.Status == statusHeld {
+			fmt.Fprintf(&b, "%s: held: %s\n", p.Path, p.Scope.Why)
+			writeFindings(&b, p)
 			continue
 		}
 		fmt.Fprintf(&b, "%s: %s", p.Path, p.Status)

@@ -187,9 +187,28 @@ type Lock struct {
 // key _intro holds the text above the first section), and Accepted is the blob id of the
 // blueprint the blueprint read last accepted. An entry with only Accepted set is a page not
 // drafted yet.
+//
+// Blocked is the read bar: the outcome of the read that last judged the whole blueprint and
+// blocked it. A later read judges the change since Blocked.Commit against its findings, and an
+// accept clears it. An entry with only Blocked set is a page whose blueprint has never been
+// accepted or drafted.
 type LockEntry struct {
 	Page      string            `yaml:"page,omitempty"`
 	Blueprint string            `yaml:"blueprint,omitempty"`
 	Accepted  string            `yaml:"accepted,omitempty"`
 	Sections  map[string]string `yaml:"sections,omitempty"`
+	Blocked   *Blocked          `yaml:"blocked,omitempty"`
+}
+
+// Blocked is a blocked whole read as the lock keeps it: the full sha of the commit the read read,
+// and its blocking findings in the order the read gave them.
+type Blocked struct {
+	Commit   string           `yaml:"commit"`
+	Findings []BlockedFinding `yaml:"findings"`
+}
+
+// BlockedFinding is one blocking finding of a blocked read.
+type BlockedFinding struct {
+	Location string `yaml:"location"`
+	Text     string `yaml:"text"`
 }

@@ -71,6 +71,19 @@ type Options struct {
 	// because the lock's accepted id already matches the blueprint. Both Draft and SkipRead are
 	// recorded in the pages' state, so a resume needs neither.
 	SkipRead map[string]bool
+	// Bars holds the read bar of each page whose read judges the change since a blocked whole
+	// read, keyed by page path: that read's blocking findings, rendered one per line. BarFrom holds
+	// the blocked read's commit. A bar page's read is a change read since that commit, and its
+	// blueprint seat gets the bar as the context's findings. Both are recorded in the pages' state.
+	Bars    map[string]string
+	BarFrom map[string]string
+	// ReadScopes and ReadChanges hold, keyed by page path, the scope and change block of a page
+	// whose blueprint read judges something other than its draft: drafter page sets them for a
+	// bar page, whose read is the change since the bar's commit while its draft follows Scopes.
+	// A page with no entry reads with its Scopes and Changes entries. Both are recorded in the
+	// pages' state.
+	ReadScopes  map[string]blueprint.Scope
+	ReadChanges map[string]string
 	// Command names the command that started the run, for the resume hint; "drafter page" when
 	// empty.
 	Command string
@@ -111,6 +124,14 @@ type PageResult struct {
 	Warnings []string `json:"warnings,omitempty"`
 	// Detail is what an escalation says beyond its rule, such as the conflicts that blocked.
 	Detail string `json:"detail,omitempty"`
+	// WholeBlocked says the page's blueprint read judged the whole blueprint and returned fix,
+	// which is the read a bar records.
+	WholeBlocked bool `json:"whole_blocked,omitempty"`
+	// BarFrom is the commit of the blocked read whose bar the page's read judged against.
+	BarFrom string `json:"bar_from,omitempty"`
+	// ReadScope is what the page's blueprint read was limited to when it differs from Scope, the
+	// draft's: set only for a page given a read scope of its own.
+	ReadScope *blueprint.Scope `json:"read_scope,omitempty"`
 }
 
 // FindingResult is one finding of a page's blueprint read.
@@ -244,6 +265,7 @@ func (r *runner) summary() Summary {
 		if p.ps.Status == StatusAccepted {
 			res.Accepted = p.w.Accepted
 		}
+		res.WholeBlocked, res.BarFrom, res.ReadScope = p.w.WholeBlocked, p.w.BarFrom, p.w.ReadScope
 		s.Pages = append(s.Pages, res)
 	}
 	if r.stop != "" {

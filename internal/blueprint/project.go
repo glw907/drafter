@@ -15,13 +15,15 @@ import (
 // Project says where a documentation project keeps its blueprint tree. Root is the project root
 // on disk. BlueprintRoot and Outline are slash paths relative to it, FactsDir is an absolute
 // directory or empty when the project has no facts store, and Required makes a managed page
-// with no blueprint an error instead of a warning.
+// with no blueprint an error instead of a warning. BriefPath is the brief path template that
+// [BriefPath] takes.
 type Project struct {
 	Root          string
 	BlueprintRoot string
 	Outline       string
 	FactsDir      string
 	Required      bool
+	BriefPath     string
 }
 
 // loaded is what a command reads before it looks at any blueprint: the outline, the lock, and the

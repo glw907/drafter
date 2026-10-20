@@ -12,9 +12,6 @@
 
 ## Medium
 
-- [ ] **#13** Give a whole read a stable bar on a base that reads clean `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
-  Four whole reads of the edit-quality test base each blocked on a different finding after the previous one was fixed, so a base can't be driven to an accept. The change read is unaffected because it labels base defects "Already present:". `claude/.claude/workflows/docs-page-chain.js`
-
 - [ ] **#6** Stop an unplaceable consistency answer from blocking a change read `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
   A base conflict between two recurring facts escalates whenever a tweak re-cites one of them (the rerun's tweak 5). `internal/pipeline/blueprint.go`
   The first case, a conflict with empty `facts` and `with`, closed in the skill-rules pass: a change read records it as an "Unplaced:" warning and never blocks. Evidence is the unplaced rows of `TestChangeReadConsistency` and format-test runs 20261018T223440Z-9f9c8f61 and 20261018T224305Z-769284ec, each of which recorded an "Unplaced:" warning. `--json`'s `demoted` counts unplaced and already-present conflicts together, so only `record.json` tells them apart.
@@ -68,7 +65,23 @@
 - [ ] **#22** Let a stopped pre-B3 run resume across the new `coherence` seat `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
   The fingerprint hashes every configured seat, so a run stopped before B3 refuses to resume with "the configuration changed since the run started (seat.coherence.…)". Fixing it edits `fingerprint.go`, which needs the auth-data bar. Resume such a run with the old binary before installing the new one. `internal/pipeline/fingerprint.go`
 
+- [ ] **#23** Hold a page whose gate red names only a sibling page of the same run `#bug` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  In B3c's wave 2, two pages went to a gate-fix draft for a `check:symbols` line in a third page of the run, spending a draft attempt each on a defect they could not fix. A red line that names another page in the run should hold the page as a foreign red does. `internal/pipeline/check.go`
+
+- [ ] **#24** Keep a heading that another page links to, or show the links to the gate-fix step `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  Twice in B3c a redraft dropped a heading another page linked to, and the run stopped "tree red outside drafter's pages". The pass worked around it with a pre-run sweep of inbound anchors against blueprint ids. The draft or gate-fix prompt could carry the inbound anchors instead.
+
+- [ ] **#25** Let a scoped accept advance the lock, or skip the s1 re-read after one `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  A `--since` read that accepts writes nothing, so a later `page --whole` re-reads the blueprint whole at s1 and can block on findings the scoped read never weighed. B3c's rotate probe blocked that way. `cmd/drafter/read.go`
+
+- [ ] **#26** Raise the stock `seat.draft.max_tokens` above 64000 `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
+  Two of cairn's longest task guides stopped at 64000 tokens of page, brief, and thinking; at 128000 the same drafts fit. `internal/config/stock.toml`
+
 ## Done
+
+- [x] **#13** Give a whole read a stable bar on a base that reads clean `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18 → 2026-10-19)*
+  Four whole reads of the edit-quality test base each blocked on a different finding after the previous one was fixed, so a base can't be driven to an accept. The change read is unaffected because it labels base defects "Already present:". `claude/.claude/workflows/docs-page-chain.js`
+  B3c landed the bar: a whole read that blocks records `blocked` in `drafted.lock`, and the next read is scoped to the change since that commit. Observed live on cairn's security-model page: the first read was whole and blocked, a fix followed, and a bar read accepted and cleared `blocked`. `cmd/drafter/bar.go`, `internal/pipeline/blueprint.go`
 
 - [x] **#12** Stop a base-only fact conflict from escalating a change read `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18 → 2026-10-18)*
   A change read no longer blocks on a conflict between store facts that the base already carried. `Scope` gains `Bullets` (facts whose bullet changed) and `Joined` (facts the change brought onto the page), and a conflict with a fact in neither comes back as "Already present:". A conflict whose bullet changed, or whose fact the change newly placed or cited, still blocks, and a scoped state saved before the fields existed keeps the old rule. Replay, offline against the four conflicts the edit-quality rerun saved: every one has both sides cited at the base, and `Bullets` and `Joined` came back empty for all four, so the rule demotes each to "Already present:" where the old rule blocked on the re-cited side. `internal/pipeline/blueprint.go`, `internal/blueprint/since.go`

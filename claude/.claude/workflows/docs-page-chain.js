@@ -314,12 +314,12 @@
 // Under `DRAFTER_HOST`, `resolvePages()` returns `DRAFTER_HOST.resolved` without a probe, and the
 // script returns `DRAFTER_SEATS` just before the slot pool, so no page runs.
 //
-// `DRAFTER_SEATS` maps `draft`, `structure`, `editor`, `fact`, `reader`, and `blueprint` to
-// functions of one seat context object, each adapting it to the builder the chain itself calls
-// (`blueprint` has no chain counterpart and reads only `scope`, which drafter sets to the
-// comma-separated ids of the sections a blueprint read may block on, or leaves empty for a whole
-// read; drafter loads the module for a blueprint read with no chain args, so the args guard below
-// runs only outside `DRAFTER_HOST`):
+// `DRAFTER_SEATS` maps `draft`, `structure`, `editor`, `fact`, `reader`, `blueprint`, and
+// `coherence` to functions of one seat context object, each adapting it to the builder the chain
+// itself calls (`blueprint` and `coherence` have no chain counterpart; `blueprint` reads only
+// `scope`, which drafter sets to the comma-separated ids of the sections a blueprint read may block
+// on, or leaves empty for a whole read, and `findings`, the bar below; drafter loads the module for
+// a blueprint read with no chain args, so the args guard below runs only outside `DRAFTER_HOST`):
 //
 //   page            the page's resolved config (an entry of `resolved.pages`)
 //   inputs          the page-inputs record: job, pageType, factIds, claimInventory
@@ -340,6 +340,43 @@
 // steps 1 and 2 to step 3 into the one prompt it sends. drafter sends the parts as two turns, so
 // the first turn holds no job text. Turn 2 inlines `page.job` where the chain's step 3 names the
 // outline file, and names the page's path.
+//
+// The module has two modes under `DRAFTER_HOST`. Handoff mode, with a chain handoff's args (so
+// `args.worktree` is set), renders exactly what the chain sends, as above. Blueprint mode, with no
+// `args.worktree`, is how drafter loads the module for a blueprint page, whose `page` is the
+// outline entry drafter builds (`path`, `slug`, `title`, `pageType`, `job`, `covers`,
+// `outOfScope`, `figure`, `anatomy`, `brief`, `standard`, and no `track`) and whose `inputs` carry
+// `exemplarSources` and `factIds` and an empty claim inventory. drafter sends each prompt to the
+// API, writes the files a draft returns, and runs cairn's gate, so in blueprint mode every
+// back-half seat:
+//
+//   - names no checkout, gate, index-link command, commit, or command to run;
+//   - reads the blueprint, which drafter inlines after the facts block, as the page plan: its
+//     `framing` block stands in for the framing record and its items for the claim inventory, and
+//     it names no page plan or framing record path;
+//   - reads the register sections of the track the page's directory under docs/ names (`extend`,
+//     `admin`, `editors`, `reference`; a docs/claude-code/ page reads extend's), and throws on any
+//     other directory, as `registerSectionsFor` does;
+//   - names the brief at `page.brief`, and the draft states the brief's schema cairn's provenance
+//     check reads (`page`, `sentences`, optional `cuts` and `local`);
+//   - names each exemplar as the file the cairn-docs-outline helper's rule gives, from
+//     `inputs.exemplarSources`, with its take line in the blueprint.
+//
+// The `draft` and `editor` renders override the agent definitions drafter sends as their system
+// prompts, which assume a seat that holds tools: no command runs, drafter writes the files and runs
+// the gate, the blueprint's `dispositions` stand in for the plan's cut dispositions, the track is
+// the page path's directory, and Vale's output arrives as an input. In blueprint mode `scope` at
+// rounds 1 and 2 is drafter's comma-separated ids of a section redraft's changed sections: the
+// draft changes only those, and the reads grade them against their neighbors. At round "final"
+// `scope` is the final reader's findings, as in handoff mode. The verdicts are "fix" and "ok", the
+// values drafter's answer schema allows.
+//
+// `coherence` runs after a section redraft: it reads the whole page against the register's drafting
+// brief for the page's track, reads the sections `scope` names against their neighbors, and may
+// raise a finding anywhere. At round 2 it is the retest after its fix. `blueprint` gains the bar
+// paragraph when `findings` is set: drafter sets it, as lines `<n>. [<location>] <text>`, on a
+// change read held to an earlier whole read that blocked, and a listed finding the change didn't
+// fix blocks whatever its class.
 //
 // Every agent starts with zero context. The runner renders each stage's prompt from args and
 // the page record; nothing load-bearing may live only in the invoking session's conversation.
@@ -602,6 +639,9 @@ if (a.backHalf !== undefined && a.backHalf !== "drafter") {
 const BACK_HALF_DRAFTER = a.backHalf === "drafter";
 // Defined only when drafter loads this script to render prompts; the workflow runtime has none.
 const HOST = typeof DRAFTER_HOST === "undefined" || !DRAFTER_HOST ? undefined : DRAFTER_HOST;
+// Blueprint mode: drafter loads the module for a blueprint page with no chain args, so no
+// worktree. Handoff mode (a chain handoff's args) renders exactly as it did before blueprint mode.
+const BLUEPRINT_MODE = Boolean(HOST) && !WT;
 const OPTION_MAP = a.optionMap || "docs/internal/option-map.json";
 // The runtime's budget is absent outside it (a dry run), so `spent` is guarded, not assumed.
 const HAS_BUDGET = typeof budget !== "undefined" && budget !== null && typeof budget.spent === "function";
@@ -1786,7 +1826,23 @@ ${entryRead}
 ${plan ? "" : `${framingReadLine(p)}\n`}${roundTwoNote(p, narrow, "structural edit")}
 Cross-links are the page's "See-also, next steps, related resources" ("## e. Outline fields").
 
-Read the section "## The page anatomies" of ${REGISTER}, by its exact heading. The introduction it
+${structureChecklist()}
+
+${CAP_SCOPE}
+${HANDOFF_OWNER}
+
+A checklist item the ${plan ? "plan" : "page"} fails is a blocking finding: its file:line as location, the item it fails
+and how, and in rewrite a suggestion for how to address it. Verdict "fix" if any blocking finding
+exists; otherwise "accept".`;
+}
+
+/**
+ * The structural edit seat's checklist, from the anatomy line through Google's two blocks, quoted
+ * verbatim. Both modes' structure seats send it unchanged.
+ * @returns {string}
+ */
+function structureChecklist() {
+  return `Read the section "## The page anatomies" of ${REGISTER}, by its exact heading. The introduction it
 requires for this page's type is "the second half of the same check" as Google's introduction items
 below, and its ending is the page's closing section.
 
@@ -1827,14 +1883,7 @@ in your overview. Does your introduction provide an accurate overview of the top
 - links to what to learn next"
 "Most readers appreciate at least a brief introduction under each heading to provide some context."
 "Structure your outline so that your document introduces information when it's most relevant to your
-reader."
-
-${CAP_SCOPE}
-${HANDOFF_OWNER}
-
-A checklist item the ${plan ? "plan" : "page"} fails is a blocking finding: its file:line as location, the item it fails
-and how, and in rewrite a suggestion for how to address it. Verdict "fix" if any blocking finding
-exists; otherwise "accept".`;
+reader."`;
 }
 
 /**
@@ -2263,9 +2312,10 @@ async function chain(p) {
  * drafter's change block names the sections, so every scoped render is byte-identical and shares one
  * prompt cache entry.
  * @param {string} [scope]
+ * @param {string} [findings] - a bar read's earlier findings; appends the bar paragraph
  * @returns {string}
  */
-function blueprintPrompt(scope) {
+function blueprintPrompt(scope, findings) {
   return `Blueprint read. The blueprint below is a documentation page's durable plan, a YAML file with
 an \`id\` and a \`why\` on each section, items of several kinds, and a \`framing\` block. No prose exists
 yet: read the blueprint, never a page. The page's job, type, and what it covers sit in its outline
@@ -2369,13 +2419,560 @@ read, this rule replaces the blocking rule above for order, pace, heading form, 
 restating \`use\`: return each as a non-blocking finding starting "Nit:". A Nit never makes the
 verdict "fix". Every other defect is non-blocking: set blocking to false and start its finding with
 "Already present:". The standard sends an existing problem to a bug ("encourage the author to file a
-bug"), so report it and let it pass. A non-blocking finding never makes the verdict "fix".` : ""}`;
+bug"), so report it and let it pass. A non-blocking finding never makes the verdict "fix".` : ""}${findings ? `
+
+${barParagraph(findings)}` : ""}`;
 }
 
+/**
+ * The bar paragraph a change read carries when an earlier whole read of the blueprint blocked:
+ * the change answers that read's findings, each quoted whole, and a listed finding the change
+ * didn't fix blocks whatever its class, which overrides the change read's Nit rule.
+ * @param {string} findings - the bar, one line per finding: `<n>. [<location>] <text>`
+ * @returns {string}
+ */
+function barParagraph(findings) {
+  return `Earlier findings. An earlier read of the whole blueprint blocked on the findings below, quoted
+in full, and this change answers them:
+
+${findings}
+
+For each finding listed, judge whether the change fixed it. A listed finding the change didn't fix
+is a blocking finding at its location, and its text starts "Still open:". A listed finding the change
+didn't fix blocks whatever its class. This overrides the change read's Nit rule: an unfixed listed
+finding on order, pace, heading form, field placement, or a restating \`use\` still blocks and makes
+the verdict "fix", though a Nit never does. A defect the change adds or causes blocks, as the change
+read's rule says. Any other defect stays non-blocking, and its text starts "Already present:".`;
+}
+
+// === BLUEPRINT MODE ===
+// The back-half seats drafter renders for a blueprint page. drafter sends each prompt to the API,
+// inlines the blueprint, its outline entry, and the facts block after it, writes the files a draft
+// returns, and runs cairn's gate. No seat can run a command, so no prompt here names a command, a
+// commit, or a checkout, and since drafter inlines every repository path a prompt names, none names
+// a file its seat should not read.
+
+// The register track each directory under docs/ reads. A docs/claude-code/ page reads the extend
+// track's sections until the register carries a claude-code entry.
+const BLUEPRINT_TRACKS = { extend: "extend", admin: "admin", editors: "editors", reference: "reference", "claude-code": "extend" };
+
+// The exemplar capture root the cairn-docs-outline helper resolves a capture directory against.
+const EXEMPLAR_ROOT = "~/.local/share/cairn/exemplars";
+
+/**
+ * The directory under docs/ a page's path names, or "" for a path with none.
+ * @param {{ path?: string }} p
+ * @returns {string}
+ */
+function docsDir(p) {
+  const m = /^docs\/([^/]+)\//.exec(String(p.path || ""));
+  return m ? m[1] : "";
+}
+
+/**
+ * The register track a blueprint page reads, from the directory its path names.
+ * @param {{ path?: string }} p
+ * @returns {string}
+ * @throws {Error} on a directory with no register track section
+ */
+function registerTrackOf(p) {
+  const dir = docsDir(p);
+  if (!Object.hasOwn(BLUEPRINT_TRACKS, dir)) throw new Error(`unknown track "${dir}": no register track section for ${p.path}`);
+  return BLUEPRINT_TRACKS[dir];
+}
+
+/**
+ * The file an exemplar source names, by the cairn-docs-outline helper's rule: a capture directory
+ * is read as the page.md inside it, under the capture root, and a source ending .md is itself.
+ * @param {string} source
+ * @returns {string}
+ */
+function exemplarFile(source) {
+  const s = String(source);
+  if (s.endsWith(".md")) return s;
+  const dir = s.startsWith("/") || s.startsWith("~/") ? s : `${EXEMPLAR_ROOT}/${s}`;
+  return `${dir.replace(/\/+$/, "")}/page.md`;
+}
+
+/**
+ * The section ids a comma-joined scope names, each in code font, joined for a sentence.
+ * @param {string} scope
+ * @returns {string}
+ */
+function idList(scope) {
+  return String(scope || "").split(",").map((s) => s.trim()).filter(Boolean).map((id) => `\`${id}\``).join(", ");
+}
+
+/**
+ * The page's brief as a prompt names it: by its path when the entry carries one.
+ * @param {{ brief?: string }} p
+ * @returns {string}
+ */
+function briefOf(p) {
+  return p.brief ? `the brief at ${p.brief}` : "the page's brief";
+}
+
+// What every blueprint-mode page read is sent besides its prompt.
+const BP_INLINED = "the blueprint it was drafted from, the page's outline entry, and the facts the blueprint places or cites";
+
+const BP_HANDOFF_OWNER = "Section hand-offs belong to the blueprint: a hand-off the blueprint places is not a tell, and a read of the page grades its wording, never whether it is there or where it sits.";
+
+/**
+ * The friction instruction for a seat with no tools: a note in the answer's friction list.
+ * @returns {string}
+ */
+function bpFriction() {
+  return `Design friction: when stating the code as it is takes a hedge, a caveat, an exception, a
+workaround, a surprising default, or two seams naming or behaving the same thing differently, name
+it in friction, one short note each, with the fact ids involved. A note never blocks the page: the
+page documents the code as it is.`;
+}
+
+/**
+ * The sentences that override the drafter's agent definition, which drafter sends as the draft
+ * seat's system prompt and which assumes a seat that holds tools.
+ * @param {{ path?: string }} p
+ * @returns {string}
+ */
+function bpDraftOverride(p) {
+  return `This prompt overrides your agent definition where the two differ, since the definition
+assumes a run that holds tools and this one has none. drafter sends this prompt to the API, writes
+the page and the brief you return to their files, and runs the docs gate itself, so run no command
+and commit nothing. Where the definition names the page plan, read the blueprint. Where it says to
+mirror the plan's cut dispositions in \`cuts\`, the blueprint's \`dispositions\` entries stand in for
+them. Where it says to take \`<track>\` from the dispatch, the track is the directory under docs/ in
+the page's path: \`${docsDir(p)}\`.`;
+}
+
+/**
+ * The sentences that override the register editor's agent definition, which drafter sends as the
+ * editor seat's system prompt and which says to run tellgrader.
+ * @returns {string}
+ */
+function bpEditorOverride() {
+  return `No command runs in this read. drafter sends this prompt to the API, and you hold no tools,
+so this prompt overrides your agent definition where the two differ. Where the definition says to
+run \`tellgrader\` or any other command, run nothing and judge the tells it names by reading the
+page. Vale's alerts on the page arrive as an input instead, inlined below under the command that
+printed them.`;
+}
+
+/**
+ * The paragraph that says how a drafting seat reads the blueprint as the page plan.
+ * @returns {string}
+ */
+function bpBlueprintAsPlan() {
+  return `The blueprint, inlined after the facts block, is the page plan: the source of the page's
+order, each section's claim, and each fact's placement. Read it whole before you draft. Draft its
+sections in its order, each under its \`heading\` verbatim, at its \`level\`, and each opening on the
+sentence its \`opens\` field gives. Each item is content its section carries. A \`fact\` item places a
+fact, and its \`use\` says which part of the fact the placement carries. A \`sentence\` item with
+\`mode: verbatim\` appears word for word, and one with \`mode: claim\` states its point in your
+words. A \`step\` is a numbered step, in order. A \`failure\` item is a symptom with the recovery its
+\`handledBy\` names. An \`example\` or \`code\` item is a worked example, a \`link\` item a Markdown
+link to its \`target\`, and a \`handoff\` the lead-in to what the reader does next. A prose field
+names another section as [[section-id]]. An item marked \`origin: human\` carries a person's edit:
+give its point full weight. A section's \`styleNotes\` give wording a person fixed, so use each
+\`new\` wording. \`constraints\` are rules for this page.
+
+The register's drafting brief is the source of voice. Voice comes only from the register's drafting
+brief and its primary exemplar, docs/extend/choose-an-ai-posture.md; the page's exemplars below
+supply structure and detail per step, never voice or wording.`;
+}
+
+/**
+ * The blueprint's framing block as the drafter's source of the introduction.
+ * @returns {string}
+ */
+function bpFramingDraftLine() {
+  return `The blueprint's \`framing\` block is the source of the introduction: read it whole before you
+draft. Write the introduction from \`framing.introPlan\`, naming each reader's reason
+\`framing.readers\` names and carrying the background \`framing.background\` decides, with the fact
+ids each part cites. The introduction opens on a statement, never an imperative and never a
+sentence about the page; it may run two or three paragraphs, and it keeps the three parts of the
+blueprint's \`introduction\`: what the page covers, the prior knowledge it expects, and what it leaves
+out. The body stays fact-driven, drafted from the blueprint's sections.`;
+}
+
+/**
+ * The instruction a page read gets to grade the introduction against the blueprint's framing.
+ * @returns {string}
+ */
+function bpFramingReadLine() {
+  return `The blueprint's \`framing\` block decides the introduction: \`readers\` (who arrives, from where,
+and why), \`background\` (the background the page rests on), \`placeInDocSet\` (the page's place in
+the doc set), and \`introPlan\` (how the introduction opens and what it promises). Read it before the
+page, and grade the introduction against it and the register's "${INTRO_HEADING}" section. Each of
+these is a blocking finding: a reader's reason \`framing.readers\` names that the introduction omits;
+background \`framing.background\` decides that the introduction drops; a departure from
+\`framing.introPlan\`; an opening on an imperative or on a sentence about the page itself.`;
+}
+
+/**
+ * The brief's schema as cairn's provenance check reads it, and the sentence rules the handoff
+ * draft prompt states.
+ * @param {{ path?: string, brief?: string }} p
+ * @returns {string}
+ */
+function bpBriefRules(p) {
+  return `Write the introduction, the section hand-off lead-ins, and the ending the register's page
+anatomies require for this page's type; the removal rule does not cut them, nor a sentence that
+carries a section's claim from the blueprint. In the brief, record each of those sentences
+"no-claim" when it carries no extractable fact, and cite its fact id when it does: the docs gate's
+provenance check fails a no-claim sentence that holds one ("a no-claim sentence cites nothing, so
+any extractable fact in it fails").
+
+The brief. drafter writes the brief you return to ${p.brief || "the page's brief path"}, and the docs gate's provenance check
+reads it there. The brief is one JSON object with these fields:
+- "page": the page's path, exactly "${p.path}".
+- "sentences": one { "text", "id" } entry per sentence of the page's prose, in page order, "text"
+  the sentence as the page has it. A sentence's "id" is one fact id, an array of the fact ids it
+  synthesizes when it states two or more together, or "no-claim". Cite only the fact ids above.
+- "cuts", optional: one { "id", "reason" } entry per fact the blueprint's \`dispositions\` list cuts
+  or subordinates, its reason verbatim.
+- "local", optional: ["<a path or name the page has the reader create>"]. List there each
+  site-invented path or name the page has the reader create, so a sentence naming it passes the
+  provenance check. You are \`local\`'s one writer, and an entry never names an engine export.
+File no fact, new or retagged. A claim the page needs whose fact is not among the ids above stays
+off the page: name the missing fact in friction.`;
+}
+
+/**
+ * The draft seat in blueprint mode: the whole page at round 1 with no findings; otherwise a redraft
+ * of the page as it stands, bounded to the sections `scope` names when it names any.
+ * @param {Record<string, any>} c - the seat context object
+ * @returns {string}
+ */
+function bpDraftPrompt(c) {
+  const p = c.page || {};
+  const inputs = c.inputs || {};
+  const scope = c.scope || "";
+  const findings = c.findings || "";
+  const brief = briefOf(p);
+  const asStands = `The page and ${brief} as they stand are inlined below, with the blueprint, the
+page's outline entry, and the facts the blueprint places or cites.`;
+  let head;
+  if (c.round === 1 && !findings) {
+    head = `Draft the page ${p.path} at its final path, from its blueprint and the page inputs below and
+nothing else, and write ${brief}. The blueprint, the page's outline entry, and the facts the
+blueprint places or cites are inlined below.`;
+  } else if (c.afterFinalRead) {
+    head = `Redraft ${p.path} once, on the final reader read's findings below, and keep ${brief} in
+step. Change only the spots they cite and leave the rest of the page as it stands. ${asStands}`;
+  } else if (c.round === 1 && scope) {
+    head = `Redraft the sections ${idList(scope)} of ${p.path}, and keep ${brief} in step. The blueprint
+entries of those sections changed: the change block after the blueprint shows how, and each finding
+below names a section the page must now carry as its blueprint entry stands. ${asStands}`;
+  } else {
+    head = `Redraft ${p.path} once, on the combined findings below, and keep ${brief} in step. Fix every
+blocking finding; take a non-blocking one when it is right. Do not widen the page. ${asStands}`;
+  }
+  const bound = scope
+    ? `This is a section redraft. Change only the sections in scope: ${idList(scope)}. The blueprint
+names each section's id beside its heading. Leave the text before the first heading, every heading
+line, and every other section as they stand, line for line, and leave the brief's sentences for
+those parts unchanged. A finding from the coherence read is the exception: fix it where it lies.`
+    : "";
+  const sources = (inputs.exemplarSources || []).map((s) => `- ${exemplarFile(s)}`).join("\n");
+  const exemplars = `Exemplar sources: read each in full, and imitate its anatomy and its detail per step, never its
+voice, wording, terms, or product names. Each one's \`take\` line, beside its \`source\` in the
+blueprint's \`exemplars\` list, says what to take from it:
+${sources || "(none named; follow the register's anatomy)"}`;
+  const job = String(inputs.job || p.job || "").trim();
+  const pageType = String(inputs.pageType || p.pageType || "");
+  return [
+    head,
+    bound,
+    bpDraftOverride(p),
+    registerLine({ track: registerTrackOf(p) }, "drafter"),
+    bpBlueprintAsPlan(),
+    bpFramingDraftLine(),
+    p.title ? `The page's H1, verbatim: # ${p.title}` : "",
+    `The page's job: ${job}\nPage type: ${pageType}`,
+    scopeLines(p).trim(),
+    exemplars,
+    `Fact ids to draw on: ${(inputs.factIds || []).join(", ") || "(none)"}
+The blueprint's items stand in for a claim inventory: a \`fact\` item's fact sits in its section, a
+fact the blueprint's \`dispositions\` list cuts stays off the page, and a subordinated one appears
+only as the link its \`reference\` names.`,
+    bpBriefRules(p),
+    bpFriction(),
+    findings ? `Findings:\n${findings}` : ""
+  ].filter(Boolean).join("\n\n");
+}
+
+/**
+ * The narrowing a blueprint-mode review read carries: the final reader's spots at round final, the
+ * section redraft's changed sections at rounds 1 and 2, and the seat's own round-1 findings with
+ * the redraft's diff at round 2.
+ * @param {Record<string, any>} c - the seat context object
+ * @param {string} name - the seat's name in its round-1 findings
+ * @returns {string}
+ */
+function bpNarrowing(c, name) {
+  if (c.round === "final") {
+    if (!c.scope) return "";
+    return `This read is scoped. ${c.where || "The page changed only at the spots the final reader read cites below"}.
+"Changed sentences get both reviews, scoped to those sentences" (the draft-docs approach design,
+"Edits after the chain"). Grade the changed sentences, and leave the rest of the page as the earlier
+reads graded it. ${CAP_SCOPE}
+
+${c.scope}`;
+  }
+  const parts = [];
+  if (c.scope) {
+    parts.push(`This read is narrowed to a section redraft. The sections ${idList(c.scope)} changed, and the
+rest of the page stands as it was accepted. Read the whole page for context, and grade the changed
+sections and how each sits with the sections around it. A defect outside them that the change
+didn't cause is advisory: set blocking to false and start its finding with "Already present:".`);
+  }
+  if (c.round === 2 && c.narrow) {
+    const own = c.narrow.own;
+    let task;
+    if (own && own.verdict === "fix") {
+      task = `1. Verify each of your blocking round-1 findings below: fixed, or still open (still blocking).
+   Read around a finding's location only as far as judging its fix needs.
+2. Read only the changed sentences, for a new defect under your checklist, a defect a fix
+   introduced included.`;
+    } else if (own) {
+      task = `You returned "ok" in round 1. Read only the changed sentences, for a defect the fixes
+introduced, under your checklist.`;
+    } else {
+      task = "Read only the changed sentences, for a defect under your checklist.";
+    }
+    const findings = own
+      ? combined([[name, { verdict: own.verdict || "", summary: own.summary || "", findings: own.findings || [] }]])
+      : "";
+    parts.push(`This is a round-2 read, narrowed to the redraft. Do not re-read the whole page. drafter
+inlines below, under the command that printed it, the diff of the page against the page as round 1
+read it; no diff output means the redraft changed nothing, so every blocking round-1 finding
+stands. A deleted line is a changed line: judge what its removal costs.
+${task}
+An unchanged sentence stays as round 1 graded it.${findings ? `\n\nYour round-1 findings:\n${findings}` : ""}`);
+  }
+  return parts.join("\n\n");
+}
+
+/**
+ * The structural edit seat in blueprint mode: the handoff prompt's method, with the blueprint in
+ * place of the page plan and the framing record.
+ * @param {Record<string, any>} c - the seat context object
+ * @returns {string}
+ */
+function bpStructurePrompt(c) {
+  const p = c.page || {};
+  const bullets = (xs) => (xs || []).map((x) => `- ${x}`).join("\n") || "(none listed)";
+  return [
+    `Structural edit of ${p.path}. The page is inlined below with ${briefOf(p)}, ${BP_INLINED}.`,
+    `The level, as the Editorial Freelancers Association defines it: "Developmental editors (also called
+'substantive,' 'structural,' or 'content' editors) deal with content, organization, and genre
+considerations." Your stance, from the page-level review prior-art record's "## b. Structural edit
+seat": "an editor. It reads the whole page against the outline and this checklist, returns findings
+with \`file:line\`, and never edits." Grade the page at this level only.`,
+    `The page's outline entry:
+Job: ${String(p.job || "").trim()}
+Page type: ${p.pageType || "(none given)"}
+What the page covers:
+${bullets(p.covers)}
+Out of scope, owned by another page:
+${bullets(p.outOfScope)}`,
+    `The page's blueprint carries its order and the reason for it (\`orderReason\`, and each section's
+\`why\`), each section's claim, and each fact's placement: Google's outline "as the narrative for your
+document" (${GOOGLE_LARGE_DOCS}). Read it whole before the page, then grade the page against its
+blueprint and this checklist. The page carries each blueprint section in the blueprint's order,
+under its heading, opening on its \`opens\` sentence and carrying its items: a section that is missing
+or out of order, or an item a section drops, is a blocking finding. The introduction is still
+compared to the entry: \`job\` is the page's purpose, \`covers\` what it delivers, and \`outOfScope\`
+its "doesn't cover" list.`,
+    bpFramingReadLine(),
+    bpNarrowing(c, "structural edit"),
+    structureChecklist(),
+    `${CAP_SCOPE}\n${BP_HANDOFF_OWNER}`,
+    `A checklist item the page fails is a blocking finding: its location (the section heading, and the
+sentence when it applies), the item it fails and how, and in rewrite a suggestion for how to address
+it. Verdict "fix" if any blocking finding exists; otherwise "ok".`
+  ].filter(Boolean).join("\n\n");
+}
+
+/**
+ * The register editor in blueprint mode: the handoff prompt's method, with Vale's alerts arriving
+ * as an input.
+ * @param {Record<string, any>} c - the seat context object
+ * @returns {string}
+ */
+function bpEditorPrompt(c) {
+  const p = c.page || {};
+  const narrowed = c.round === 2 && c.narrow;
+  return [
+    `Adversarial register edit of ${p.path}. The page is inlined below with ${briefOf(p)}, ${BP_INLINED}.`,
+    bpEditorOverride(),
+    registerLine({ track: registerTrackOf(p) }, "editor"),
+    bpFramingReadLine(),
+    bpNarrowing(c, "register editor"),
+    `S1 governs over your definition's cap line: ${CAP_SCOPE}\n${BP_HANDOFF_OWNER}`,
+    `Read every alert in Vale's output${narrowed ? " (on a narrowed read, grade only the alerts on changed lines)" : ""}. Read the page, then grade the
+drafting brief's structure checklist, its tells, and Vale's alerts together, with the Names section,
+logic, and facts-adjacent phrasing. Return ranked findings with a proposed rewrite each, and a
+verdict: "fix" if any finding is blocking, otherwise "ok".`
+  ].filter(Boolean).join("\n\n");
+}
+
+/**
+ * The fact read in blueprint mode: the handoff prompt's method, with the blueprint's items in
+ * place of the claim inventory and the option-map rows arriving as an input.
+ * @param {Record<string, any>} c - the seat context object
+ * @returns {string}
+ */
+function bpFactPrompt(c) {
+  const p = c.page || {};
+  const inputs = c.inputs || {};
+  const store = c.facts
+    ? "the facts the blueprint places or cites and, after them, the source excerpt each fact names"
+    : "the facts the blueprint places or cites";
+  return [
+    `Fact read of ${p.path}. The page and ${briefOf(p)} are inlined below, with the blueprint the page
+was drafted from, the page's outline entry, and ${store}. The brief maps each sentence of the page
+to the fact ids it rests on, or to "no-claim".`,
+    `The blueprint's items stand in for the claim inventory: each \`fact\` item places a fact in its
+section, and the blueprint's \`dispositions\` list cuts a fact or subordinates it to the link its
+\`reference\` names.
+The page's fact ids: ${(inputs.factIds || []).join(", ") || "(none)"}
+Each one must be cited on the page (see the brief) or appear in the blueprint's \`dispositions\`
+with a reason. An id that is neither is a blocking finding. A fact the blueprint places in a section
+that the page omits is a blocking finding.`,
+    bpNarrowing(c, "fact read"),
+    `Check every claim on the page against its cited fact id, and retrace every cited fact against its
+source excerpt. A claim on the page with no cited fact behind it, a cited fact that no longer
+matches its source, or a placed fact the page dropped is a blocking finding (location, claim, what
+is wrong). For a cited fact that no longer matches its source, name the fact id and quote the
+excerpt.`,
+    `The option-map rows still pending this page's slug, "${p.slug || slugOf({ path: String(p.path || "") })}", arrive as an input, inlined
+below under the command that printed them; no matching line means no row is pending. Each such row
+is a blocking finding, located at the option map and the row's key, whoever left it pending.`,
+    bpFriction(),
+    `Verdict "fix" if any blocking finding exists; otherwise "ok", with the count of claims traced in
+summary.`
+  ].filter(Boolean).join("\n\n");
+}
+
+/**
+ * The final reader read's steps 1 and 2 in blueprint mode: the page alone, run nowhere.
+ * @param {Record<string, any>} p
+ * @param {string} pageType
+ * @returns {string}
+ */
+function bpReaderOpening(p, pageType) {
+  const type = String(pageType || "");
+  let first;
+  if (/concept/i.test(type)) {
+    first = `Part V's paraphrase test: "Ask the participant to read to a specific stopping point, known as
+a cue. Each time the participant reaches a cue, ask the participant to tell you in his or her own
+words what that section means." Each section's end is a cue: write in your own words what that
+section means, and keep each paraphrase in summary.`;
+  } else if (/task|tutorial|how-to/i.test(type)) {
+    first = `DigitalOcean's test for a tutorial: "We ask that you thoroughly test it by reading through it and
+following it as a reader would." Follow the page as the draft-docs design's cold reader does,
+"logging every point where it had to infer". You have no terminal in this read, so run nothing:
+read each step as the reader about to run it, and log what you had to infer to understand it.`;
+  } else {
+    first = `Read the page once, whole.`;
+  }
+  return `Final reader read of ${p.path}. You are the reader: you have this page, inlined below, and
+nothing else. Read nothing else until step 3.
+
+The method is the Federal Plain Language Guidelines, Part V, "Test", and you are its participant.
+
+Step 1. ${first}
+
+Step 2. Answer Part V's open-ended questions:
+  What would you do if you got this document?
+  What do you think the writer was trying to do with this document?
+  Thinking of other people you know who might get this document:
+    What about the document might work well for them?
+    What about the document might cause them problems?
+Return your answer to the second question as paraphrase, and the other answers in summary.`;
+}
+
+/**
+ * The final reader read in blueprint mode: turn 1 holds steps 1 and 2, turn 2 step 3 with the job.
+ * @param {Record<string, any>} c - the seat context object
+ * @returns {string}
+ */
+function bpReaderPrompt(c) {
+  const p = c.page || {};
+  const inputs = c.inputs || {};
+  if (c.turn === 1) {
+    return `${bpReaderOpening(p, inputs.pageType || p.pageType)}\n\nStep 3 follows in the next turn.`;
+  }
+  if (c.turn === 2) {
+    return `Step 3 of the final reader read of ${p.path}. You have read the page and answered steps 1
+and 2.
+
+Step 3. Only now, read the page's job:
+
+${String(p.job || inputs.job || "").trim()}
+
+Each mismatch between your paraphrase and that job is a blocking finding: "wherever participants
+misunderstood the message, the document has a problem that you should fix" (Part V). Each point
+where you had to infer is a finding, blocking when it is an unstated step or an unclassified error
+(the draft-docs design's cold-reader row). Give each its location: the section heading, and the
+sentence when it applies. Verdict "fix" if any blocking finding exists; otherwise "ok".`;
+  }
+  throw new Error(`docs-page-chain: the reader seat needs turn 1 or 2, not ${JSON.stringify(c.turn)}`);
+}
+
+/**
+ * The coherence read: after a section redraft, the whole page as one argument against the
+ * register's drafting brief for its track, the changed sections read first against their
+ * neighbors. Any round but 1 is the retest after its fix.
+ * @param {Record<string, any>} c - the seat context object
+ * @returns {string}
+ */
+function coherencePrompt(c) {
+  const p = c.page || {};
+  const track = BLUEPRINT_MODE ? registerTrackOf(p) : p.track;
+  const brief = registerSectionsFor(track, "drafter")[0];
+  return [
+    `Coherence read of ${p.path}. A section redraft changed the sections ${idList(c.scope)}, and the
+rest of the page stands as it was accepted. The page is inlined below with ${briefOf(p)}, ${BP_INLINED}.`,
+    c.round !== 1
+      ? `This is the retest, after a fix that answered your earlier findings. Read the page as it stands,
+for the same three things.`
+      : "",
+    `Read the section "${brief}" of ${REGISTER}, by its exact heading. Read the whole page as one
+argument, from the introduction to the close, against that drafting brief and the blueprint's
+\`argument\` and \`orderReason\`. Check three things:
+- Transitions: each section leads into the next, and no lead-in promises what the next section no
+  longer delivers.
+- Repetition: no point is made twice across sections, as when a changed section restates what a
+  neighbor already says.
+- Flow: the argument builds in order, and no section relies on something only a later section
+  explains.`,
+    `Read each changed section against its neighbors first, the section before it and the section after
+it, since a redraft that reads well alone can break the seams around it. A finding may lie anywhere
+on the page, in a changed section or not: locate it where its fix belongs.`,
+    `Leave line style, the anatomy, and the claims to the reads that have already passed the page. A
+finding blocks when a reader reading straight through would lose the thread; otherwise it is
+advisory. A finding names its location (the section heading, and the sentence when it applies),
+what is wrong, a rewrite that fixes it, and whether it blocks. Verdict "fix" if any blocking finding
+exists; otherwise "ok".`
+  ].filter(Boolean).join("\n\n");
+}
+// === END BLUEPRINT MODE ===
+
 // The back-half seats drafter renders prompts from: one function of the seat context object per
-// seat, each adapting it to the builder the chain calls. The header comment documents the object.
-const DRAFTER_SEATS = {
-  blueprint: (c) => blueprintPrompt(c.scope || undefined),
+// seat. In handoff mode each adapts the object to the builder the chain calls; in blueprint mode
+// each is a blueprint-mode builder above. The header comment documents the object and both modes.
+const DRAFTER_SEATS = BLUEPRINT_MODE ? {
+  blueprint: (c) => blueprintPrompt(c.scope || undefined, c.findings || undefined),
+  draft: bpDraftPrompt,
+  structure: bpStructurePrompt,
+  editor: bpEditorPrompt,
+  fact: bpFactPrompt,
+  reader: bpReaderPrompt,
+  coherence: coherencePrompt
+} : {
+  blueprint: (c) => blueprintPrompt(c.scope || undefined, c.findings || undefined),
   draft: (c) => draftPrompt(c.page, c.inputs, c.round === 1 ? 1 : 2, c.findings, c.afterFinalRead === true),
   structure: (c) => structurePrompt(c.page, "page", c.narrow || undefined),
   editor: (c) => editorPrompt(c.page, c.scope || undefined, c.where || undefined, c.narrow || undefined),
@@ -2384,7 +2981,8 @@ const DRAFTER_SEATS = {
     if (c.turn === 1) return readerTurnOne(c.page, c.inputs.pageType || c.page.pageType);
     if (c.turn === 2) return readerTurnTwo(c.page);
     throw new Error(`docs-page-chain: the reader seat needs turn 1 or 2, not ${JSON.stringify(c.turn)}`);
-  }
+  },
+  coherence: coherencePrompt
 };
 if (HOST) return DRAFTER_SEATS;
 

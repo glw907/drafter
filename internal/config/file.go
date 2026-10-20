@@ -85,9 +85,10 @@ type seatFile struct {
 }
 
 type blueprintsFile struct {
-	Root     *string `toml:"root"`
-	Required *bool   `toml:"required"`
-	Outline  *string `toml:"outline"`
+	Root      *string `toml:"root"`
+	Required  *bool   `toml:"required"`
+	Outline   *string `toml:"outline"`
+	BriefPath *string `toml:"brief_path"`
 }
 
 type factsFile struct {
