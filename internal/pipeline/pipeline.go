@@ -133,6 +133,13 @@ type PageResult struct {
 	WholeBlocked bool `json:"whole_blocked,omitempty"`
 	// BarFrom is the commit of the blocked read whose bar the page's read judged against.
 	BarFrom string `json:"bar_from,omitempty"`
+	// Facts maps each fact id in the page's read set to its hash, set by drafter read on a result
+	// whose read judged every fact in the map, even when the map is empty. The lock records it
+	// with the accept.
+	Facts map[string]string `json:"facts,omitempty"`
+	// Lapse says the page's read judged only the facts that changed since the accepted read,
+	// because the accepted blueprint was unchanged.
+	Lapse bool `json:"lapse,omitempty"`
 	// ReadScope is what the page's blueprint read was limited to when it differs from Scope, the
 	// draft's: set only for a page given a read scope of its own.
 	ReadScope *blueprint.Scope `json:"read_scope,omitempty"`
@@ -286,17 +293,21 @@ func (r *runner) summary() Summary {
 
 // resumeCommand is the command that continues the stopped run.
 func (r *runner) resumeCommand() string {
-	return ResumeCommand(r.command(), r.cfg.Mode == "sync", r.state.RunID, r.o.ResumeArgs)
+	return ResumeCommand(r.command(), r.cfg.Mode, r.state.RunID, r.o.ResumeArgs)
 }
 
-// ResumeCommand is the command line that continues a stopped run: the sync flag when the run's mode
-// is sync, since a resume under another mode fails the configuration check, then args as the
-// command was given them.
-func ResumeCommand(command string, sync bool, runID string, args []string) string {
+// ResumeCommand is the command line that continues a stopped run: the flag that selects the run's
+// mode, since a resume under another mode fails the configuration check, then args as the command
+// was given them. Mode is "sync" or "batch". Drafter read defaults to sync, so it names a batch run
+// with --batch; drafter page follows its configured mode and names only a sync run.
+func ResumeCommand(command, mode, runID string, args []string) string {
 	var b strings.Builder
 	b.WriteString(command)
-	if sync {
+	switch {
+	case mode == "sync":
 		b.WriteString(" --sync")
+	case command == "drafter read":
+		b.WriteString(" --batch")
 	}
 	b.WriteString(" --resume " + runID)
 	for _, a := range args {

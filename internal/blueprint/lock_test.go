@@ -38,7 +38,7 @@ func TestPathRule(t *testing.T) {
 
 func TestLockRoundTrip(t *testing.T) {
 	want := &Lock{Version: Version, Pages: map[string]LockEntry{
-		"docs/z.md": {Page: "p3", Blueprint: "b3", Accepted: "b3", Sections: map[string]string{IntroKey: "sha256:aa", "two": "sha256:bb", "one": "sha256:cc"}},
+		"docs/z.md": {Page: "p3", Blueprint: "b3", Accepted: "b3", Facts: map[string]string{"f:b": "0123456789ab", "f:a": "ba9876543210"}, Sections: map[string]string{IntroKey: "sha256:aa", "two": "sha256:bb", "one": "sha256:cc"}},
 		"docs/a.md": {Page: "p1", Blueprint: "b1"},
 		"docs/m.md": {Accepted: "b2"},
 	}}
@@ -60,6 +60,9 @@ func TestLockRoundTrip(t *testing.T) {
 	}
 	if one, two := strings.Index(text, "one:"), strings.Index(text, "two:"); one > two {
 		t.Errorf("section keys are not sorted:\n%s", text)
+	}
+	if a, b := strings.Index(text, "f:a:"), strings.Index(text, "f:b:"); a < 0 || a > b {
+		t.Errorf("fact keys are missing or not sorted:\n%s", text)
 	}
 	if err := WriteLock(file, got); err != nil {
 		t.Fatal(err)
@@ -83,12 +86,25 @@ pages:
         sections:
             _intro: sha256:aa
 `
+	const withFacts = `# Written by drafter; do not edit by hand.
+version: 1
+pages:
+    docs/a.md:
+        page: p1
+        blueprint: b1
+        accepted: b1
+        facts:
+            f:a: 0123456789ab
+        sections:
+            _intro: sha256:aa
+`
 	tests := []struct {
 		name  string
 		entry LockEntry
 		want  string // the bytes WriteLock must give, or "" to check the round trip only
 	}{
 		{"an entry without a bar encodes as before", LockEntry{Page: "p1", Blueprint: "b1", Accepted: "b1", Sections: map[string]string{IntroKey: "sha256:aa"}}, noBar},
+		{"an entry with facts writes them after accepted", LockEntry{Page: "p1", Blueprint: "b1", Accepted: "b1", Facts: map[string]string{"f:a": "0123456789ab"}, Sections: map[string]string{IntroKey: "sha256:aa"}}, withFacts},
 		{"a drafted entry with a bar", LockEntry{Page: "p1", Blueprint: "b1", Sections: map[string]string{IntroKey: "sha256:aa"},
 			Blocked: &Blocked{Commit: "0123abcd", Findings: []BlockedFinding{{Location: "steps", Text: "A step is missing."}, {Location: "intro", Text: "Say what the page leaves out."}}}}, ""},
 		{"a bar-only entry", LockEntry{Blocked: &Blocked{Commit: "0123abcd", Findings: []BlockedFinding{{Location: "steps", Text: "A step is missing."}}}}, ""},

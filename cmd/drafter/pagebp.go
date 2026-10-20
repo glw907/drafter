@@ -88,7 +88,7 @@ func runPageBlueprints(cmd *cobra.Command, args []string, f *pageFlags) error {
 	if err != nil {
 		msg := err.Error()
 		if s.RunID != "" {
-			msg += "; resume with " + pipeline.ResumeCommand("drafter page", c.Mode == "sync", s.RunID, args)
+			msg += "; resume with " + pipeline.ResumeCommand("drafter page", c.Mode, s.RunID, args)
 		}
 		return cannot(errors.New(msg))
 	}
@@ -100,7 +100,7 @@ func runPageBlueprints(cmd *cobra.Command, args []string, f *pageFlags) error {
 	if lockErr != nil {
 		msg := lockErr.Error()
 		if s.RunID != "" {
-			msg += "; resume with " + pipeline.ResumeCommand("drafter page", c.Mode == "sync", s.RunID, args)
+			msg += "; resume with " + pipeline.ResumeCommand("drafter page", c.Mode, s.RunID, args)
 		}
 		return cannot(errors.New(msg))
 	}
@@ -205,11 +205,11 @@ func recordDrafted(c *config.Config, root, start string, handoffs []handoff.Hand
 				continue
 			}
 			prior := lock.Pages[r.Path]
-			e, err := blueprint.DraftedEntry(root, start, bp, r.Path, prior.Accepted)
+			e, err := blueprint.DraftedEntry(root, start, bp, r.Path, prior.Accepted, prior.Facts)
 			if err != nil {
 				return false, err
 			}
-			if e.Page == prior.Page && e.Blueprint == prior.Blueprint && e.Accepted == prior.Accepted && maps.Equal(e.Sections, prior.Sections) && prior.Blocked == nil {
+			if e.Page == prior.Page && e.Blueprint == prior.Blueprint && e.Accepted == prior.Accepted && maps.Equal(e.Facts, prior.Facts) && maps.Equal(e.Sections, prior.Sections) && prior.Blocked == nil {
 				continue
 			}
 			if lock.Pages == nil {

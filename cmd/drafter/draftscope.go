@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -67,7 +68,8 @@ type pageScope struct {
 const wholeOnRequest = "drafted whole on request (--whole)"
 
 // scopeFromLock compares each blueprint page with the lock entry committed at head and decides how
-// the run treats it. With whole set, every page drafts whole and none is up to date. A page whose
+// the run treats it. Before any decision it refuses, with one line per page, a page whose accepted
+// read has lapsed (lapsedPages), since its draft would rest on facts no read has judged. With whole set, every page drafts whole and none is up to date. A page whose
 // read is not skipped and whose entry holds a bar reads the change since the bar's commit, while
 // its draft keeps the scope decided here; a page its bar holds is not run. A lock that does not
 // decode is an error, since every entry, bar, and skipped read would be lost with it.
@@ -79,6 +81,9 @@ func scopeFromLock(c *config.Config, root, head string, handoffs []handoff.Hando
 	lock, err := committedLock(c, root, head)
 	if err != nil {
 		return d, err
+	}
+	if lines := lapsedPages(c, root, head, handoffs, lock); len(lines) > 0 {
+		return d, errors.New(strings.Join(lines, "\n"))
 	}
 	for _, h := range handoffs {
 		e := lock.Pages[h.Page.Path]

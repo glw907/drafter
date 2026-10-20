@@ -142,8 +142,12 @@ func checkIgnored(root, path string) error {
 
 func flagLayer(flags Flags) *layer {
 	l := &layer{label: "flag", f: &file{}}
-	if flags.Sync {
+	switch {
+	case flags.Sync:
 		mode := "sync"
+		l.f.Mode = &mode
+	case flags.Batch:
+		mode := "batch"
 		l.f.Mode = &mode
 	}
 	if flags.JSON {

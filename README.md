@@ -109,14 +109,15 @@ page's `drafted.lock` entry. It leaves every section's `why` for a person to wri
 ### read
 
 ```sh
-drafter read [--resume <run-id>] [--dry-run] [--sync] [--json] <blueprint>...
+drafter read [--resume <run-id>] [--dry-run] [--sync | --batch] [--json] <blueprint>...
 ```
 
-The command runs stage 1 of the pipeline on each blueprint: the local check, then one batch
-holding the consistency read and the blueprint read. It needs a clean tree and `[seat.blueprint]`
+The command runs stage 1 of the pipeline on each blueprint: the local check, then the consistency
+read, the fact-truth read, and the blueprint read. It sends ordinary Messages calls unless you pass
+`--batch`, which sends the reads as one batch. It needs a clean tree and `[seat.blueprint]`
 in the configuration, and it reads every input from the commit the run started at. When the run
-ends with every blueprint decided, it records each accepted blueprint's blob id in
-`drafted.lock`. For each whole read that blocked, it also records a
+ends with every blueprint decided, it records each accepted blueprint's blob id, and the hash of
+each fact the read judged, in `drafted.lock`. For each whole read that blocked, it also records a
 [read bar](docs/blueprint-format.md#the-read-bar): the read's blocking findings, which the next
 read checks the change against. The exit status is the same as `page`'s.
 

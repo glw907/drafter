@@ -139,6 +139,8 @@ func TestFlagsOverrideEnvironment(t *testing.T) {
 	}{
 		{"env alone", map[string]string{"DRAFTER_MODE": "sync"}, Flags{}, "sync", "env DRAFTER_MODE", "human", "default"},
 		{"sync flag over env", map[string]string{"DRAFTER_MODE": "batch"}, Flags{Sync: true}, "sync", "flag --sync", "human", "default"},
+		{"batch flag over env", map[string]string{"DRAFTER_MODE": "sync"}, Flags{Batch: true}, "batch", "flag --batch", "human", "default"},
+		{"sync flag wins over batch flag", nil, Flags{Sync: true, Batch: true}, "sync", "flag --sync", "human", "default"},
 		{"json flag over env", map[string]string{"DRAFTER_OUTPUT": "human"}, Flags{JSON: true}, "batch", "default", "json", "flag --json"},
 	}
 	for _, tt := range tests {

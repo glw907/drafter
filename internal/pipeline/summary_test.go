@@ -103,18 +103,20 @@ func TestResumeCommand(t *testing.T) {
 	tests := []struct {
 		name    string
 		command string
-		sync    bool
+		mode    string
 		args    []string
 		want    string
 	}{
-		{"workflow run", "drafter page", false, []string{"--workflow-run", "runs/wf.json"}, "drafter page --resume r1 --workflow-run runs/wf.json"},
-		{"handoff files, sync", "drafter page", true, []string{"a.json", "b.json"}, "drafter page --sync --resume r1 a.json b.json"},
-		{"path with a space", "drafter read", false, []string{"my pages/a.yaml"}, "drafter read --resume r1 'my pages/a.yaml'"},
-		{"path with a quote", "drafter read", false, []string{"it's.yaml"}, `drafter read --resume r1 'it'\''s.yaml'`},
+		{"workflow run", "drafter page", "batch", []string{"--workflow-run", "runs/wf.json"}, "drafter page --resume r1 --workflow-run runs/wf.json"},
+		{"handoff files, sync", "drafter page", "sync", []string{"a.json", "b.json"}, "drafter page --sync --resume r1 a.json b.json"},
+		{"read, sync", "drafter read", "sync", []string{"a.yaml"}, "drafter read --sync --resume r1 a.yaml"},
+		{"read, batch", "drafter read", "batch", []string{"a.yaml"}, "drafter read --batch --resume r1 a.yaml"},
+		{"path with a space", "drafter read", "sync", []string{"my pages/a.yaml"}, "drafter read --sync --resume r1 'my pages/a.yaml'"},
+		{"path with a quote", "drafter read", "sync", []string{"it's.yaml"}, `drafter read --sync --resume r1 'it'\''s.yaml'`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ResumeCommand(tt.command, tt.sync, "r1", tt.args); got != tt.want {
+			if got := ResumeCommand(tt.command, tt.mode, "r1", tt.args); got != tt.want {
 				t.Errorf("ResumeCommand = %q, want %q", got, tt.want)
 			}
 		})

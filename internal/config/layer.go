@@ -129,6 +129,9 @@ func (l *layer) from(key string) string {
 		if key == "output" {
 			return "flag --json"
 		}
+		if l.f.Mode != nil && *l.f.Mode == "batch" {
+			return "flag --batch"
+		}
 		return "flag --sync"
 	}
 	return l.label

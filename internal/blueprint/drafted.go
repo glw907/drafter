@@ -10,9 +10,10 @@ import (
 
 // DraftedEntry is the lock entry for a page drafter just wrote: the page as it stands in the
 // working tree, uncommitted, by blob id and section hash, and the blueprint as committed at start.
-// accepted is the blueprint blob the entry records as read-accepted, which the caller chooses. The
-// entry comes out of the same constructor conversion and seeding use.
-func DraftedEntry(root, start, bp, pagePath, accepted string) (LockEntry, error) {
+// accepted is the blueprint blob the entry records as read-accepted, and facts the fact hashes
+// recorded with it, which the caller chooses. The entry comes out of the same constructor
+// conversion and seeding use.
+func DraftedEntry(root, start, bp, pagePath, accepted string, facts map[string]string) (LockEntry, error) {
 	bpBytes, err := gitRaw(root, "show", start+":"+bp)
 	if err != nil {
 		return LockEntry{}, err
@@ -34,7 +35,7 @@ func DraftedEntry(root, start, bp, pagePath, accepted string) (LockEntry, error)
 		return LockEntry{}, fmt.Errorf("read the drafted page: %w", err)
 	}
 	e := newLockEntry(b, pageBlob, pageBytes, bpBlob)
-	e.Accepted = accepted
+	e.Accepted, e.Facts = accepted, facts
 	return e, nil
 }
 

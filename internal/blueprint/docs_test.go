@@ -34,7 +34,7 @@ func TestReferenceNamesEverySchemaField(t *testing.T) {
 	for _, schema := range []string{"blueprint.schema.json", "outline.schema.json"} {
 		propertyNames(map[string]any(loadSchema(t, schema)), names)
 	}
-	for _, lock := range []string{"page", "blueprint", "accepted", "sections"} {
+	for _, lock := range []string{"page", "blueprint", "accepted", "facts", "sections"} {
 		names[lock] = true
 	}
 	if len(names) < 50 {

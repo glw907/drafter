@@ -1,6 +1,7 @@
 package blueprint
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -133,7 +134,8 @@ func TestDraftedEntry(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(convertPage)), []byte(written), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	e, err := DraftedEntry(root, start, seedBP, convertPage, "acc")
+	facts := map[string]string{"f:a": "0123456789ab"}
+	e, err := DraftedEntry(root, start, seedBP, convertPage, "acc", facts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,6 +147,9 @@ func TestDraftedEntry(t *testing.T) {
 	}
 	if e.Accepted != "acc" {
 		t.Errorf("accepted = %q", e.Accepted)
+	}
+	if !maps.Equal(e.Facts, facts) {
+		t.Errorf("facts = %v, want %v", e.Facts, facts)
 	}
 	b, _ := Decode(seedBP, conv.Data)
 	if want := SectionHashes(b, []byte(written)); len(e.Sections) != len(want) || e.Sections[IntroKey] != want[IntroKey] {
