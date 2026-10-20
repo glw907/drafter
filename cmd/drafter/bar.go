@@ -121,7 +121,10 @@ func scopedRefusal(e blueprint.LockEntry, base string) string {
 	if e.Blocked != nil {
 		return "it holds a bar the scoped read did not judge"
 	}
-	if e.Accepted == "" || e.Accepted != base {
+	if e.Accepted == "" {
+		return "it has no accepted blueprint yet"
+	}
+	if e.Accepted != base {
 		return "the blueprint it accepted is not the one at the scoped read's base"
 	}
 	return ""

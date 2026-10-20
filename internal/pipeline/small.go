@@ -33,6 +33,8 @@ func allSmall(fs []edits.Finding) bool {
 	return true
 }
 
+// blockingOnly returns the findings of fs that block, in order, so the small exchange is scoped to
+// them and not to the non-blocking ones.
 func blockingOnly(fs []edits.Finding) []edits.Finding {
 	var out []edits.Finding
 	for _, f := range fs {

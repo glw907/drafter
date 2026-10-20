@@ -666,3 +666,25 @@ func TestPageScopeWithABar(t *testing.T) {
 		}
 	})
 }
+
+func TestScopedRefusal(t *testing.T) {
+	bar := &blueprint.Blocked{Commit: "c", Findings: []blueprint.BlockedFinding{{Location: "steps", Text: "x"}}}
+	tests := []struct {
+		name  string
+		entry blueprint.LockEntry
+		base  string
+		want  string
+	}{
+		{"a bar the read did not judge", blueprint.LockEntry{Accepted: "b0", Blocked: bar}, "b0", "it holds a bar the scoped read did not judge"},
+		{"no accepted blueprint yet", blueprint.LockEntry{}, "b0", "it has no accepted blueprint yet"},
+		{"an accept that is not the base", blueprint.LockEntry{Accepted: "b1"}, "b0", "the blueprint it accepted is not the one at the scoped read's base"},
+		{"an accept at the base", blueprint.LockEntry{Accepted: "b0"}, "b0", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := scopedRefusal(tt.entry, tt.base); got != tt.want {
+				t.Errorf("scopedRefusal = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

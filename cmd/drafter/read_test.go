@@ -619,7 +619,7 @@ func TestReadSince(t *testing.T) {
 		if !strings.Contains(out, "docs/a.md: accepted") || !strings.Contains(out, "[scoped: two]") {
 			t.Errorf("stdout %q lacks the accepted page and its scope", out)
 		}
-		if !strings.Contains(errOut, "docs/a.md: accepted on a scoped read; drafted.lock keeps its earlier entry, since the blueprint it accepted is not the one at the scoped read's base") {
+		if !strings.Contains(errOut, "docs/a.md: accepted on a scoped read; drafted.lock keeps its earlier entry, since it has no accepted blueprint yet") {
 			t.Errorf("stderr %q lacks the kept-entry line", errOut)
 		}
 		if reqs := p.stub.requests(); len(reqs) != 1 || !strings.Contains(reqs[0], `Scope: two`) {
