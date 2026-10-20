@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -94,7 +95,7 @@ func TestRecordAccepted(t *testing.T) {
 		"a dry run":     {two, true},
 	} {
 		t.Run(name+" writes no lock", func(t *testing.T) {
-			if err := recordAccepted(c, root, "start", tc.s, tc.dry); err != nil {
+			if _, err := recordAccepted(c, root, "start", tc.s, nil, tc.dry); err != nil {
 				t.Fatal(err)
 			}
 			if got := lockBytes(t, root); got != "" {
@@ -104,7 +105,7 @@ func TestRecordAccepted(t *testing.T) {
 	}
 
 	t.Run("one accepted and one set aside leaves exactly one new accepted id", func(t *testing.T) {
-		if err := recordAccepted(c, root, "start", two, false); err != nil {
+		if _, err := recordAccepted(c, root, "start", two, nil, false); err != nil {
 			t.Fatal(err)
 		}
 		l, err := blueprint.ReadLock(filepath.Join(root, "blueprints/drafted.lock"))
@@ -118,7 +119,7 @@ func TestRecordAccepted(t *testing.T) {
 
 	t.Run("an accepted id already recorded leaves the file as it was", func(t *testing.T) {
 		before := lockBytes(t, root)
-		if err := recordAccepted(c, root, "start", two, false); err != nil {
+		if _, err := recordAccepted(c, root, "start", two, nil, false); err != nil {
 			t.Fatal(err)
 		}
 		if got := lockBytes(t, root); got != before {
@@ -136,7 +137,7 @@ func TestRecordAccepted(t *testing.T) {
 			{Path: "docs/a.md", Status: pipeline.StatusAccepted, Accepted: "aaa2"},
 			{Path: "docs/b.md", Status: pipeline.StatusEscalated, Rule: "plan"},
 		}}
-		if err := recordAccepted(c, root, "start", s, false); err != nil {
+		if _, err := recordAccepted(c, root, "start", s, nil, false); err != nil {
 			t.Fatal(err)
 		}
 		got, _ := blueprint.ReadLock(filepath.Join(root, "blueprints/drafted.lock"))
@@ -574,7 +575,41 @@ func TestReadSince(t *testing.T) {
 		}
 	})
 
-	t.Run("a scoped accept names its sections, sends them, and writes no lock", func(t *testing.T) {
+	t.Run("a scoped accept advances accepted when the entry accepted the blueprint at --since", func(t *testing.T) {
+		p := newSinceProject(t)
+		p.writeLock(&blueprint.Lock{Version: blueprint.Version, Pages: map[string]blueprint.LockEntry{"docs/a.md": {Accepted: p.rev("HEAD:blueprints/docs/a.blueprint.yaml")}}})
+		p.commit(editItem)
+		code, out, errOut := p.read("--since", "HEAD~1", p.bp("a"))
+		if code != 0 {
+			t.Fatalf("exit %d\nstdout %s\nstderr %s", code, out, errOut)
+		}
+		if strings.Contains(errOut, "keeps its earlier entry") {
+			t.Errorf("stderr %q reports a kept entry", errOut)
+		}
+		if e := p.lock().Pages["docs/a.md"]; e.Accepted != p.rev("HEAD:blueprints/docs/a.blueprint.yaml") || e.Blocked != nil {
+			t.Errorf("entry = %+v, want accepted at HEAD", e)
+		}
+	})
+
+	t.Run("a scoped accept with a bar on the entry keeps the entry and says why", func(t *testing.T) {
+		p := newSinceProject(t)
+		bar := &blueprint.Blocked{Commit: p.rev("HEAD"), Findings: []blueprint.BlockedFinding{{Location: "two", Text: "Say why."}}}
+		prior := blueprint.LockEntry{Accepted: p.rev("HEAD:blueprints/docs/a.blueprint.yaml"), Blocked: bar}
+		p.writeLock(&blueprint.Lock{Version: blueprint.Version, Pages: map[string]blueprint.LockEntry{"docs/a.md": prior}})
+		p.commit(editItem)
+		code, out, errOut := p.read("--since", "HEAD~1", p.bp("a"))
+		if code != 0 {
+			t.Fatalf("exit %d\nstdout %s\nstderr %s", code, out, errOut)
+		}
+		if !strings.Contains(errOut, "docs/a.md: accepted on a scoped read; drafted.lock keeps its earlier entry, since it holds a bar the scoped read did not judge") {
+			t.Errorf("stderr %q lacks the kept-entry line naming the bar", errOut)
+		}
+		if e := p.lock().Pages["docs/a.md"]; !reflect.DeepEqual(e, prior) {
+			t.Errorf("entry = %+v, want it kept as %+v", e, prior)
+		}
+	})
+
+	t.Run("a scoped accept names its sections, sends them, and keeps a page with no entry out of the lock", func(t *testing.T) {
 		p := newSinceProject(t)
 		p.commit(editItem)
 		code, out, errOut := p.read("--since", "HEAD~1", p.bp("a"))
@@ -584,8 +619,8 @@ func TestReadSince(t *testing.T) {
 		if !strings.Contains(out, "docs/a.md: accepted") || !strings.Contains(out, "[scoped: two]") {
 			t.Errorf("stdout %q lacks the accepted page and its scope", out)
 		}
-		if !strings.Contains(errOut, "docs/a.md: accepted on a scoped read; drafted.lock keeps its earlier entry") {
-			t.Errorf("stderr %q lacks the no-lock line", errOut)
+		if !strings.Contains(errOut, "docs/a.md: accepted on a scoped read; drafted.lock keeps its earlier entry, since it has no accepted blueprint yet") {
+			t.Errorf("stderr %q lacks the kept-entry line", errOut)
 		}
 		if reqs := p.stub.requests(); len(reqs) != 1 || !strings.Contains(reqs[0], `Scope: two`) {
 			t.Errorf("requests = %d, want one carrying the scope line", len(reqs))
@@ -715,6 +750,54 @@ func TestReadSince(t *testing.T) {
 		reqs := p.stub.requests()
 		if len(reqs) != 1 || !strings.Contains(reqs[0], "Scope: page") || strings.Contains(requestText(reqs[0]), "=== blueprint diff ===") || !strings.Contains(requestText(reqs[0]), "=== outline entry change ===") {
 			t.Errorf("requests = %d, want one with scope page, the entry change, and no blueprint diff", len(reqs))
+		}
+	})
+
+	// resumeScoped stops a scoped read of pages a and b after the first request, resumes it, and
+	// returns the resume's output.
+	resumeScoped := func(t *testing.T, p *sinceProject) (string, string) {
+		t.Helper()
+		p.stub.failFrom = 1
+		code, out, errOut := p.read("--since", "HEAD~1", p.bp("a"), p.bp("b"))
+		if code != 3 {
+			t.Fatalf("exit %d, want 3 for a stopped run\nstdout %s\nstderr %s", code, out, errOut)
+		}
+		fields := strings.Fields(strings.TrimSpace(out[strings.Index(out, "resume with:"):]))
+		id := fields[slices.Index(fields, "--resume")+1]
+		p.stub.mu.Lock()
+		p.stub.failFrom, p.stub.bodies = 0, nil
+		p.stub.mu.Unlock()
+		code, out, errOut = p.read("--resume", id, p.bp("a"), p.bp("b"))
+		if code != 0 {
+			t.Fatalf("resume exit %d\nstdout %s\nstderr %s", code, out, errOut)
+		}
+		return out, errOut
+	}
+
+	t.Run("a stopped run resumes with its scope and advances accepted when the entry accepted the blueprint at its base", func(t *testing.T) {
+		p := newSinceProject(t)
+		p.writeLock(&blueprint.Lock{Version: blueprint.Version, Pages: map[string]blueprint.LockEntry{"docs/a.md": {Accepted: p.rev("HEAD:blueprints/docs/a.blueprint.yaml")}}})
+		p.commit(editItem)
+		_, errOut := resumeScoped(t, p)
+		if strings.Contains(errOut, "keeps its earlier entry") {
+			t.Errorf("stderr %q reports a kept entry", errOut)
+		}
+		if e := p.lock().Pages["docs/a.md"]; e.Accepted != p.rev("HEAD:blueprints/docs/a.blueprint.yaml") {
+			t.Errorf("entry = %+v, want accepted at HEAD after the resume", e)
+		}
+	})
+
+	t.Run("a resumed scoped accept keeps an entry whose accept is not the blueprint at its base", func(t *testing.T) {
+		p := newSinceProject(t)
+		prior := blueprint.LockEntry{Accepted: "0123456789abcdef0123456789abcdef01234567"}
+		p.writeLock(&blueprint.Lock{Version: blueprint.Version, Pages: map[string]blueprint.LockEntry{"docs/a.md": prior}})
+		p.commit(editItem)
+		_, errOut := resumeScoped(t, p)
+		if !strings.Contains(errOut, "docs/a.md: accepted on a scoped read; drafted.lock keeps its earlier entry, since the blueprint it accepted") {
+			t.Errorf("stderr %q lacks the kept-entry line", errOut)
+		}
+		if e := p.lock().Pages["docs/a.md"]; !reflect.DeepEqual(e, prior) {
+			t.Errorf("entry = %+v, want it kept as %+v", e, prior)
 		}
 	})
 

@@ -4,7 +4,9 @@
 package edits
 
 // Finding is one numbered item a seat or the gate raised against a page.
-// N is unique within a page's exchange.
+// N is unique within a page's exchange. Kind is the review answer's label for
+// what the finding is about, empty for a gate finding and for a finding saved
+// before kinds existed.
 type Finding struct {
 	N        int
 	Seat     string
@@ -12,6 +14,7 @@ type Finding struct {
 	Text     string
 	Rewrite  string
 	Blocking bool
+	Kind     string
 }
 
 // Edit replaces one span of a file. File is "page" or "brief".

@@ -46,7 +46,7 @@ var seatAnswers = []struct {
 	{"reader", assemble.AnswerReader1, "low"},
 	{"coverage", assemble.AnswerCoverage, "low"},
 	{"consistency", assemble.AnswerConsistency, "low"},
-	{"blueprint", assemble.AnswerRead, "medium"},
+	{"blueprint", assemble.AnswerBlueprint, "medium"},
 	{"coherence", assemble.AnswerRead, "medium"},
 }
 

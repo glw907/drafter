@@ -37,29 +37,41 @@ func TestRecordReads(t *testing.T) {
 		result  pipeline.PageResult
 		changed bool
 		want    *blueprint.LockEntry // nil: the page still has no entry
+		base    string               // the blueprint's blob at a scoped read's base
+		kept    bool                 // a scoped accept left the entry and gave a reason
 	}{
 		{"a whole read that blocks gives a page with no entry a bar-only entry, its blocking findings in order",
-			nil, pipeline.PageResult{Status: pipeline.StatusEscalated, WholeBlocked: true, Findings: findings}, true, &blueprint.LockEntry{Blocked: wantBar}},
+			nil, pipeline.PageResult{Status: pipeline.StatusEscalated, WholeBlocked: true, Findings: findings}, true, &blueprint.LockEntry{Blocked: wantBar}, "", false},
 		{"a whole read that blocks keeps a drafted entry's other fields",
-			&drafted, pipeline.PageResult{Status: pipeline.StatusEscalated, WholeBlocked: true, Findings: findings}, true, new(withBar(drafted, wantBar))},
+			&drafted, pipeline.PageResult{Status: pipeline.StatusEscalated, WholeBlocked: true, Findings: findings}, true, new(withBar(drafted, wantBar)), "", false},
 		{"a whole read that blocks replaces an older bar",
-			new(withBar(drafted, oldBar)), pipeline.PageResult{Status: pipeline.StatusEscalated, WholeBlocked: true, Findings: findings}, true, new(withBar(drafted, wantBar))},
+			new(withBar(drafted, oldBar)), pipeline.PageResult{Status: pipeline.StatusEscalated, WholeBlocked: true, Findings: findings}, true, new(withBar(drafted, wantBar)), "", false},
 		{"a fix with no blocking finding records no bar",
-			nil, pipeline.PageResult{Status: pipeline.StatusEscalated, WholeBlocked: true, Findings: findings[1:2]}, false, nil},
+			nil, pipeline.PageResult{Status: pipeline.StatusEscalated, WholeBlocked: true, Findings: findings[1:2]}, false, nil, "", false},
 		{"a change read that blocks records no bar",
-			nil, pipeline.PageResult{Status: pipeline.StatusEscalated, Scope: scopeOf(blueprint.ScopeScoped), Findings: findings}, false, nil},
+			nil, pipeline.PageResult{Status: pipeline.StatusEscalated, Scope: scopeOf(blueprint.ScopeScoped), Findings: findings}, false, nil, "", false},
 		{"a bar read that blocks leaves the bar as it was",
-			new(withBar(drafted, oldBar)), pipeline.PageResult{Status: pipeline.StatusEscalated, BarFrom: oldBar.Commit, Scope: scopeOf(blueprint.ScopeScoped), Findings: findings}, false, new(withBar(drafted, oldBar))},
+			new(withBar(drafted, oldBar)), pipeline.PageResult{Status: pipeline.StatusEscalated, BarFrom: oldBar.Commit, Scope: scopeOf(blueprint.ScopeScoped), Findings: findings}, false, new(withBar(drafted, oldBar)), "", false},
 		{"an unscoped accept writes accepted and clears the bar",
-			new(withBar(drafted, oldBar)), pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2"}, true, &blueprint.LockEntry{Page: "p1", Blueprint: "b1", Accepted: "b2", Sections: drafted.Sections}},
+			new(withBar(drafted, oldBar)), pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2"}, true, &blueprint.LockEntry{Page: "p1", Blueprint: "b1", Accepted: "b2", Sections: drafted.Sections}, "", false},
 		{"an accept on a bar read writes accepted and clears the bar",
-			new(withBar(drafted, oldBar)), pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2", BarFrom: oldBar.Commit, Scope: scopeOf(blueprint.ScopeScoped)}, true, &blueprint.LockEntry{Page: "p1", Blueprint: "b1", Accepted: "b2", Sections: drafted.Sections}},
+			new(withBar(drafted, oldBar)), pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2", BarFrom: oldBar.Commit, Scope: scopeOf(blueprint.ScopeScoped)}, true, &blueprint.LockEntry{Page: "p1", Blueprint: "b1", Accepted: "b2", Sections: drafted.Sections}, "", false},
 		{"a later accept of a bar-only entry leaves only accepted",
-			&blueprint.LockEntry{Blocked: oldBar}, pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2", BarFrom: oldBar.Commit, Scope: scopeOf(blueprint.ScopeScoped)}, true, &blueprint.LockEntry{Accepted: "b2"}},
-		{"a scoped accept with no bar keeps the old accepted",
-			&drafted, pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2", Scope: scopeOf(blueprint.ScopeScoped)}, false, &drafted},
+			&blueprint.LockEntry{Blocked: oldBar}, pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2", BarFrom: oldBar.Commit, Scope: scopeOf(blueprint.ScopeScoped)}, true, &blueprint.LockEntry{Accepted: "b2"}, "", false},
+		{"a scoped accept advances accepted and drops blocked when the entry accepted the blueprint at the scope's base",
+			&drafted, pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2", Scope: scopeOf(blueprint.ScopeScoped)}, true, &blueprint.LockEntry{Page: "p1", Blueprint: "b1", Accepted: "b2", Sections: drafted.Sections}, "b0", false},
+		{"a scoped accept keeps the entry when its accepted is not the blueprint at the scope's base",
+			&drafted, pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2", Scope: scopeOf(blueprint.ScopeScoped)}, false, &drafted, "b1", true},
+		{"a scoped accept keeps the entry when the base is unknown",
+			&drafted, pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2", Scope: scopeOf(blueprint.ScopeScoped)}, false, &drafted, "", true},
+		{"a scoped accept keeps a page with no entry without one",
+			nil, pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2", Scope: scopeOf(blueprint.ScopeScoped)}, false, nil, "", true},
+		{"a scoped accept against an entry with a bar keeps its bar",
+			new(withBar(drafted, oldBar)), pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2", Scope: scopeOf(blueprint.ScopeScoped)}, false, new(withBar(drafted, oldBar)), "b0", true},
+		{"a scoped read beside a whole draft advances accepted under the same condition",
+			&drafted, pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2", Scope: scopeOf(blueprint.ScopeWhole), ReadScope: scopeOf(blueprint.ScopeScoped)}, true, &blueprint.LockEntry{Page: "p1", Blueprint: "b1", Accepted: "b2", Sections: drafted.Sections}, "b0", false},
 		{"a read that fell back to whole beside a scoped draft writes accepted",
-			&drafted, pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2", Scope: scopeOf(blueprint.ScopeScoped), ReadScope: scopeOf(blueprint.ScopeWhole)}, true, &blueprint.LockEntry{Page: "p1", Blueprint: "b1", Accepted: "b2", Sections: drafted.Sections}},
+			&drafted, pipeline.PageResult{Status: pipeline.StatusAccepted, Accepted: "b2", Scope: scopeOf(blueprint.ScopeScoped), ReadScope: scopeOf(blueprint.ScopeWhole)}, true, &blueprint.LockEntry{Page: "p1", Blueprint: "b1", Accepted: "b2", Sections: drafted.Sections}, "", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -68,9 +80,12 @@ func TestRecordReads(t *testing.T) {
 				lock.Pages = map[string]blueprint.LockEntry{"docs/a.md": *tt.prior}
 			}
 			tt.result.Path = "docs/a.md"
-			changed := recordReads(lock, barStart, pipeline.Summary{Pages: []pipeline.PageResult{tt.result}})
+			changed, kept := recordReads(lock, barStart, pipeline.Summary{Pages: []pipeline.PageResult{tt.result}}, map[string]string{"docs/a.md": tt.base})
 			if changed != tt.changed {
 				t.Errorf("changed = %v, want %v", changed, tt.changed)
+			}
+			if _, ok := kept["docs/a.md"]; ok != tt.kept {
+				t.Errorf("kept = %v, want a reason %v", kept, tt.kept)
 			}
 			got, ok := lock.Pages["docs/a.md"]
 			if tt.want == nil {
@@ -102,7 +117,7 @@ func TestRecordAcceptedWritesNoBarOnADryOrStoppedRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			root, c := readProject(t)
-			if err := recordAccepted(c, root, barStart, tt.s, tt.dry); err != nil {
+			if _, err := recordAccepted(c, root, barStart, tt.s, nil, tt.dry); err != nil {
 				t.Fatal(err)
 			}
 			got := strings.Contains(lockBytes(t, root), "commit: "+barStart)
@@ -650,4 +665,26 @@ func TestPageScopeWithABar(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestScopedRefusal(t *testing.T) {
+	bar := &blueprint.Blocked{Commit: "c", Findings: []blueprint.BlockedFinding{{Location: "steps", Text: "x"}}}
+	tests := []struct {
+		name  string
+		entry blueprint.LockEntry
+		base  string
+		want  string
+	}{
+		{"a bar the read did not judge", blueprint.LockEntry{Accepted: "b0", Blocked: bar}, "b0", "it holds a bar the scoped read did not judge"},
+		{"no accepted blueprint yet", blueprint.LockEntry{}, "b0", "it has no accepted blueprint yet"},
+		{"an accept that is not the base", blueprint.LockEntry{Accepted: "b1"}, "b0", "the blueprint it accepted is not the one at the scoped read's base"},
+		{"an accept at the base", blueprint.LockEntry{Accepted: "b0"}, "b0", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := scopedRefusal(tt.entry, tt.base); got != tt.want {
+				t.Errorf("scopedRefusal = %q, want %q", got, tt.want)
+			}
+		})
+	}
 }

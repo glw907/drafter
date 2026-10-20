@@ -22,9 +22,12 @@ var commandWaitDelay = 2 * time.Second
 
 // commandBlocks runs each command in the seat's inputs from the project root and returns its
 // output as a block under the command text, whatever its exit status. A command naming
-// {baseline} runs only when the input has a baseline. Only draft and read requests run commands.
+// {baseline} runs only when the input has a baseline. Only draft and read requests, the blueprint
+// read's included, run commands.
 func commandBlocks(ctx context.Context, in Input, seat config.Seat) ([]string, error) {
-	if in.Answer != AnswerDraft && in.Answer != AnswerRead {
+	switch in.Answer {
+	case AnswerDraft, AnswerRead, AnswerBlueprint:
+	default:
 		return nil, nil
 	}
 	var blocks []string

@@ -71,12 +71,28 @@ func updateLock(c *config.Config, root string, edit func(*blueprint.Lock) (bool,
 // the page's bar, with start, the run's start commit, replacing any bar the entry held. A change
 // read that blocked, a bar read among them, leaves the entry alone, so a bar stays at the first
 // blocked whole read and each later read judges every change since it.
-func recordReads(lock *blueprint.Lock, start string, s pipeline.Summary) bool {
-	changed := false
+//
+// A scoped accept judged only the change since its base, so it records the accepted id only when
+// that change is all that is new: the entry holds no bar, which the read never saw, and its
+// accepted id is bases[path], the blueprint's blob at the commit the read diffed from. Otherwise
+// the entry stays, and kept maps the page to the reason.
+func recordReads(lock *blueprint.Lock, start string, s pipeline.Summary, bases map[string]string) (changed bool, kept map[string]string) {
 	for _, r := range s.Pages {
 		e := lock.Pages[r.Path]
 		switch {
-		case r.Status == pipeline.StatusAccepted && r.Accepted != "" && !scopedAccept(r):
+		case scopedAccept(r):
+			if why := scopedRefusal(e, bases[r.Path]); why != "" {
+				if kept == nil {
+					kept = map[string]string{}
+				}
+				kept[r.Path] = why
+				continue
+			}
+			if e.Accepted == r.Accepted {
+				continue
+			}
+			e.Accepted = r.Accepted
+		case r.Status == pipeline.StatusAccepted && r.Accepted != "":
 			if e.Accepted == r.Accepted && e.Blocked == nil {
 				continue
 			}
@@ -96,7 +112,32 @@ func recordReads(lock *blueprint.Lock, start string, s pipeline.Summary) bool {
 		lock.Pages[r.Path] = e
 		changed = true
 	}
-	return changed
+	return changed, kept
+}
+
+// scopedRefusal is why a scoped accept cannot advance the entry e, whose read diffed from the
+// blueprint blob base, or empty when it can.
+func scopedRefusal(e blueprint.LockEntry, base string) string {
+	if e.Blocked != nil {
+		return "it holds a bar the scoped read did not judge"
+	}
+	if e.Accepted == "" {
+		return "it has no accepted blueprint yet"
+	}
+	if e.Accepted != base {
+		return "the blueprint it accepted is not the one at the scoped read's base"
+	}
+	return ""
+}
+
+// scopedKept prints the line for each page whose scoped accept left its entry as it was, in the
+// order the run lists the pages.
+func scopedKept(w io.Writer, s pipeline.Summary, kept map[string]string) {
+	for _, r := range s.Pages {
+		if why, ok := kept[r.Path]; ok {
+			_, _ = fmt.Fprintf(w, "%s: accepted on a scoped read; drafted.lock keeps its earlier entry, since %s\n", r.Path, why)
+		}
+	}
 }
 
 // barOf is the bar a blocked whole read leaves: its blocking findings, in order. It is nil when

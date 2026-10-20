@@ -314,15 +314,36 @@ func TestRecordDrafted(t *testing.T) {
 		}
 	})
 
-	t.Run("a scoped accept keeps accepted", func(t *testing.T) {
+	t.Run("a scoped accept keeps accepted when the entry's accept is not its blueprint", func(t *testing.T) {
 		f, c, hs, head := setup(t)
-		writeEntry(t, f, blueprint.LockEntry{Accepted: "earlier"})
+		writeEntry(t, f, blueprint.LockEntry{Blueprint: "drafted-from", Accepted: "earlier"})
 		scoped := &blueprint.Scope{Kind: blueprint.ScopeScoped}
-		if err := recordDrafted(c, f.root, head, hs, acceptedSummary(f.rev("HEAD:"+tallyBP), scoped), false, &bytes.Buffer{}); err != nil {
+		var warn bytes.Buffer
+		if err := recordDrafted(c, f.root, head, hs, acceptedSummary(f.rev("HEAD:"+tallyBP), scoped), false, &warn); err != nil {
 			t.Fatal(err)
 		}
 		if e := readLock(t, f); e.Accepted != "earlier" || e.Page == "" {
 			t.Errorf("entry = %+v, want accepted kept and the page recorded", e)
+		}
+		if !strings.Contains(warn.String(), tallyPage+": accepted on a scoped read; drafted.lock keeps its earlier entry, since the blueprint it accepted") {
+			t.Errorf("warning %q lacks the kept-entry line", warn.String())
+		}
+	})
+
+	t.Run("a scoped accept at s1 records the blueprint at the run's start commit", func(t *testing.T) {
+		f, c, hs, head := setup(t)
+		writeEntry(t, f, blueprint.LockEntry{Blueprint: "drafted-from", Accepted: "drafted-from"})
+		blob := f.rev(head + ":" + tallyBP)
+		scoped := &blueprint.Scope{Kind: blueprint.ScopeScoped}
+		var warn bytes.Buffer
+		if err := recordDrafted(c, f.root, head, hs, acceptedSummary(blob, scoped), false, &warn); err != nil {
+			t.Fatal(err)
+		}
+		if e := readLock(t, f); e.Accepted != blob || e.Blueprint != blob || e.Page == "" {
+			t.Errorf("entry = %+v, want accepted and blueprint %s and the page recorded", e, blob)
+		}
+		if strings.Contains(warn.String(), "keeps its earlier entry") {
+			t.Errorf("warning %q reports a kept entry", warn.String())
 		}
 	})
 

@@ -213,6 +213,71 @@ func TestPageBarReadBesideASectionRedraft(t *testing.T) {
 	}
 }
 
+// TestScopedAcceptAdvancesTheLockOffline runs a scoped accept through the built binary in both
+// commands: it advances accepted when the entry accepted the blueprint at the read's base, and
+// keeps the entry, saying why, when it did not.
+func TestScopedAcceptAdvancesTheLockOffline(t *testing.T) {
+	t.Run("drafter page records the blueprint at the run's start after a scoped accept", func(t *testing.T) {
+		e := newDraftEnv(t)
+		e.firstDraft()
+		e.write(draftBP, strings.Replace(e.read(draftBP), draftOld, draftNew, 1))
+		e.commit("edit one sentence item", draftBP)
+		start := e.git("rev-parse", "HEAD")
+		e.stub.reset(0)
+		e.stub.setAnswer("coverage", strings.Replace(mustRead(t, filepath.Join("testdata", "cli-answers", "coverage.json")), draftOld, draftNew, 1))
+		r := e.page(draftPage)
+		if r.code != 0 {
+			t.Fatalf("exit %d sent %v\n%s%s", r.code, e.stub.sent(), r.stdout, r.stderr)
+		}
+		if ps := e.barSummary(r).Pages[0]; ps.BarFrom != "" || ps.Scope == nil || ps.Scope.Kind != blueprint.ScopeScoped {
+			t.Fatalf("page %+v, want a scoped read and draft with no bar", ps)
+		}
+		if !slices.Contains(e.stub.sent(), "read") {
+			t.Fatalf("requests %v, want the blueprint read sent", e.stub.sent())
+		}
+		if got, want := e.lockEntry().Accepted, e.git("rev-parse", start+":"+draftBP); got != want {
+			t.Errorf("accepted = %s, want the blueprint at the start commit %s", got, want)
+		}
+		if strings.Contains(r.stderr, "keeps its earlier entry") {
+			t.Errorf("stderr reports a kept entry: %s", r.stderr)
+		}
+	})
+
+	t.Run("drafter read --since advances accepted, then keeps an entry whose accept is not at the base", func(t *testing.T) {
+		e := newDraftEnv(t)
+		e.stub.setAnswer("read", okRead)
+		if r := e.readBP(); r.code != 0 {
+			t.Fatalf("whole read: exit %d\n%s", r.code, r.stderr)
+		}
+		e.commit("the accepted read", draftLock)
+		base := e.git("rev-parse", "HEAD")
+		e.write(draftBP, strings.Replace(e.read(draftBP), draftOld, draftNew, 1))
+		e.commit("edit one sentence item", draftBP)
+		e.stub.reset(0)
+		e.stub.setAnswer("read", okRead)
+		r := e.drafter("read", "--sync", "--json", "--since", base, draftBP)
+		if ps := e.barSummary(r).Pages[0]; r.code != 0 || ps.Status != "accepted" || ps.Scope == nil || ps.Scope.Kind != blueprint.ScopeScoped {
+			t.Fatalf("exit %d, page %+v, want accepted on a scoped read\n%s", r.code, ps, r.stderr)
+		}
+		advanced := e.git("rev-parse", "HEAD:"+draftBP)
+		if got := e.lockEntry().Accepted; got != advanced {
+			t.Fatalf("accepted = %s, want %s", got, advanced)
+		}
+		e.commit("the scoped accept", draftLock)
+
+		e.fixWhy()
+		e.stub.reset(0)
+		e.stub.setAnswer("read", okRead)
+		r = e.drafter("read", "--sync", "--json", "--since", base, draftBP)
+		if r.code != 0 || !strings.Contains(r.stderr, "drafted.lock keeps its earlier entry, since the blueprint it accepted is not the one at the scoped read's base") {
+			t.Fatalf("exit %d, stderr %q, want 0 and the kept-entry line", r.code, r.stderr)
+		}
+		if got := e.lockEntry().Accepted; got != advanced {
+			t.Errorf("accepted = %s, want it kept at %s", got, advanced)
+		}
+	})
+}
+
 // requestTextOf is the text of every string in a request body, which is how the model reads it.
 func requestTextOf(body string) string {
 	var v any

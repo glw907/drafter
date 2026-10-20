@@ -354,9 +354,11 @@ the page and the fix. The entry it writes keeps `accepted`.
 
 `drafter page` writes a page's entry when it accepts the page. The entry holds the page as written,
 the blueprint as committed at the run's start, and the section hashes of the written page. The
-entry's `accepted` id changes only when the page's blueprint read covered the whole blueprint:
-then `accepted` becomes that blueprint's id. A scoped or skipped read leaves it alone. See
-[What `drafter page` does with a blueprint](#what-drafter-page-does-with-a-blueprint).
+entry's `accepted` id becomes the blueprint's id at the run's start in two cases: the page's
+blueprint read covered the whole blueprint, or a scoped read accepted when nothing else was new.
+[What `drafter read` does](#what-drafter-read-does-with-a-blueprint) and
+[What `drafter page` does](#what-drafter-page-does-with-a-blueprint) give that condition for each
+command. Any other scoped read, and a skipped read, leaves `accepted` alone.
 
 ## What `drafter check` checks
 
@@ -554,7 +556,16 @@ adds, alters, or causes. Every other defect is reported as non-blocking, with a 
 starts "Already present:". The consistency read blocks only on a conflict that touches a fact the
 change touched, and reports any other conflict as already present. In a change read, a conflict that names no fact
 and no page is recorded as a warning starting "Unplaced:" and never blocks. A blueprint with no earlier
-version at `<rev>` is read whole. A change read writes no `drafted.lock` entry when it accepts.
+version at `<rev>` is read whole.
+
+A change read judged only the change since `<rev>`, so its accept is recorded only when that
+change is all that's new since the last accept. When the page's entry holds no bar and its
+`accepted` id is the blueprint as committed at `<rev>`, the accept writes the blueprint's id at
+the run's start into `accepted`. Otherwise the entry stays as it was, and the command prints a line on stderr:
+`<page>: accepted on a scoped read; drafted.lock keeps its earlier entry, since <reason>`. The
+reason is one of three: the entry holds a bar the read didn't judge, the page has no accepted
+blueprint yet, or the blueprint it accepted isn't the one at `<rev>`. To keep a page's entry moving, pass `--since` the commit whose blueprint its
+`accepted` id records. A resumed run compares against the revision it started with.
 
 Within the defects a change adds, the change read blocks on a defect that makes the page wrong, or
 leaves a reader stuck or without a state a later step needs: a claim past its fact, invented
@@ -636,6 +647,12 @@ as `read_scope` beside the draft's `scope`. A page whose blueprint hasn't change
 commit is `held`, isn't run, and makes the command exit 1. A read that blocks inside `drafter page`
 writes the bar as `drafter read` does.
 
+A page with a scoped change and no bar gets a change read of the blueprint since the entry's
+`blueprint` id. Its accept follows the rule for a change read in `drafter read`: when the
+entry's `accepted` id equals its `blueprint` id, the page's new entry records
+the blueprint at the run's start as `accepted`. Otherwise the entry keeps its `accepted` id, and
+the command prints the same line with the reason.
+
 `--whole` drafts each page whole, whatever its entry says: no page is up to date, and none is a
 section redraft. Use `--whole` for the first draft of a page converted to a blueprint. Conversion seeds an
 entry from the page as it stands, so without `--whole` the page is up to date until its blueprint
@@ -651,6 +668,50 @@ can't decode.
 
 On the stock prompts module, a page whose outline declares tracks must match exactly one, and the
 track must name the `google` standard. A project module is not checked.
+
+### What the draft seat receives
+
+Each `code` item's `source` reaches the draft seat with the file's contents. drafter resolves
+`source` as `drafter check` does: from the page's directory, or from the repository root when it
+starts with `/`. It drops a `#Symbol` suffix, so the seat gets the whole file. A tracked file up
+to 256 KiB is inlined. An untracked file, a larger one, or a path outside the repository is named
+and marked as not inlined, and its contents are never sent. A directory, an `http` or `https`
+URL, and a repeat of an earlier source add nothing. Only the draft seat gets these files. It gets
+them on the first turn of each of its conversations, the redraft included.
+
+### Small findings
+
+Each review finding carries a kind. `link`, `handoff`, `heading`, and `citation` are small.
+`fact`, `claim`, `code`, `voice`, `step`, `placement`, and `other` aren't, and neither is a
+finding with no kind or an unknown one. A coverage miss takes a kind from what it missed: a
+link item gives `link`, a handoff `handoff`, and a brief sentence or fact citation `citation`.
+A miss in a section whose heading isn't found is `placement`, whatever the item. A verbatim miss
+is `code`, and a reason or claim miss is `claim`. Only `link`, `handoff`, and `citation` are
+small.
+
+Two points end a page with rule `second fix verdict`: a round-2 seat that answers fix, and a
+coverage miss after the redraft. At either point, when every blocking finding is small, drafter
+spends one fix exchange scoped to those findings instead. At round 2 that means every blocking
+finding of every seat that answered fix. Non-blocking findings, the ones that start "Nit:" or
+"Already present:", don't count, and a seat that answers fix with no blocking finding escalates
+with rule `second fix verdict`. A blocking finding of any other kind escalates the same way, and
+a page gets at most one small exchange per run.
+
+After the exchange, the gate and the coverage check run again, with no review seat. When both
+pass, the page is accepted, or, in a section redraft, goes on to the coherence read. A coverage
+miss after that exchange escalates with rule `second fix verdict`, whatever its kind. Outside a
+section redraft, no seat reads the page after the small exchange. The gate and the coverage check
+are the only checks on what it wrote.
+
+### A red gate that names another page
+
+Pages in one run share the worktree, and a red gate can fail on another page's line. When
+`gate.failure_pattern` picks out the failing lines and none names the page or its brief, drafter
+holds the page instead of spending a fix round on it. Once no other page is running, the held
+page's gate runs again: a green gate moves it on, and a failure of its own starts a fix round.
+When every held page's gate still fails only on other pages, the run stops. The pattern must
+match each check's failing lines: drafter counts a red log the pattern doesn't parse as the
+page's own. See [the gate settings](configuration.md#the-gate).
 
 ### What the run writes
 

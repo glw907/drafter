@@ -72,6 +72,7 @@ type findingRecord struct {
 	Location string `json:"location"`
 	Text     string `json:"text"`
 	Blocking bool   `json:"blocking"`
+	Kind     string `json:"kind,omitempty"`
 }
 
 // resolutionEntry is a resolution with the stage that produced it.
@@ -144,7 +145,7 @@ func (r *record) verdict(stage, seat, v string) {
 func (r *record) findings(stage string, fs []edits.Finding) {
 	for _, f := range fs {
 		r.Findings = append(r.Findings, findingRecord{
-			Stage: stage, Seat: f.Seat, N: f.N, Location: f.Location, Text: f.Text, Blocking: f.Blocking,
+			Stage: stage, Seat: f.Seat, N: f.N, Location: f.Location, Text: f.Text, Blocking: f.Blocking, Kind: f.Kind,
 		})
 	}
 }
