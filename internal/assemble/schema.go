@@ -29,7 +29,7 @@ func answerSchema(a Answer) (json.RawMessage, string, error) {
 	case AnswerConsistency:
 		return marshal(consistencySchema()), "Answer with each conflict you find, or an empty list.", nil
 	case AnswerFactTruth:
-		return marshal(factTruthSchema()), "Answer with one entry for each listed fact: its id, its verdict, the excerpt lines a verdict other than holds rests on, and the claim the code supports in fix. Leave excerpt and fix empty for holds.", nil
+		return marshal(factTruthSchema()), "Answer with one entry for each listed fact: its id, its verdict, the excerpt lines a verdict other than holds rests on, and the claim the code supports in fix. Leave fix empty for holds, and excerpt too unless the claim names a set.", nil
 	}
 	return nil, "", fmt.Errorf("assemble: unknown answer %q", a)
 }

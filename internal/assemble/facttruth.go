@@ -34,7 +34,8 @@ func FactTruthPrompt(path string, facts []plan.Fact) string {
 	b.WriteString("- contradicts: an excerpt line shows a part of the claim is false. A general claim, such as what a command exits with or what every write does, is contradicts when an excerpt shows a path that departs from it. ")
 	b.WriteString("A bullet that names a set, such as the entries of a list, the bindings, the stages, or the cases that refuse or throw, presents it as complete unless it says otherwise (\"for example\", \"among them\"); it is contradicts when an excerpt shows a member it leaves out.\n")
 	b.WriteString("- no-excerpt: no excerpt bears on the claim.\n\n")
-	b.WriteString("Give holds only for a claim whose every part you can point to. ")
+	b.WriteString("Give holds only for a claim whose every part you can point to. The bullet's own words, its notes on its sources included, are the claim and never evidence for it. ")
+	b.WriteString("For a claim that names a set, list in excerpt the members the excerpts show, whatever the verdict, and compare the two lists before you give one. ")
 	b.WriteString("When a code line and a comment disagree, the code line outranks the comment. A prose excerpt shows what a document says, never what the code does, and so does a string in the code, such as a message or a description: it shows what the program says, not what it does. ")
 	b.WriteString("For every verdict but holds, quote the excerpt lines the verdict rests on, and state the fix as the claim the code supports. Never ask for an edit to the bullet or the code.\n\n")
 	fmt.Fprintf(&b, "There are %d facts. The answer has %d entries, one for each id below, in the order listed, each id copied exactly.\n\nFacts:\n", len(facts), len(facts))
@@ -73,7 +74,7 @@ func factTruthSchema() map[string]any {
 	item := obj(map[string]any{
 		"id":      str("The fact's id, as listed."),
 		"verdict": map[string]any{"type": "string", "enum": FactVerdicts, "description": "The fact's verdict."},
-		"excerpt": str("The excerpt lines a verdict other than holds rests on; empty for holds."),
+		"excerpt": str("The excerpt lines a verdict other than holds rests on, or for a claim that names a set the members the excerpts show; otherwise empty for holds."),
 		"fix":     str("The claim the code supports; empty for holds."),
 	})
 	return obj(map[string]any{

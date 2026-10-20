@@ -34,6 +34,8 @@ func TestFactTruthPrompt(t *testing.T) {
 		"the code line outranks the comment",
 		"never what the code does",
 		"a string in the code",
+		"are the claim and never evidence for it",
+		"list in excerpt the members the excerpts show",
 		"There are 2 facts. The answer has 2 entries",
 		"quote the excerpt lines",
 		"Never ask for an edit",
