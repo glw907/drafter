@@ -145,7 +145,7 @@ func TestEditPassOfASectionRedraftIsBoundedAndSkipsTheCoherenceRead(t *testing.T
 func TestEditPassOfASectionRedraftRefusesAnEditOutsideTheSection(t *testing.T) {
 	h := newSectionHarness(t)
 	h.api.script(s2, "draft", okText(answer(inOld, inNew, 1)))
-	h.api.script(s2e, "edit", okText(answer("## Before you begin", "## Before you start", 1)), okText(declined(1, "no change")))
+	h.api.script(s2e, "edit", okText(answer("## Before you begin", "## Before you start", 1)))
 	s := h.mustDraft(sectionScope("rotate").narrowed())
 	mustAccept(t, h, s)
 	if n := len(requestsFor(h, s2e, "edit")); n != 2 {
