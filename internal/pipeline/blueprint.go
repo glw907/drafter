@@ -21,7 +21,7 @@ import (
 // run reads one version of the blueprint and its outline entry.
 type bpInputs struct {
 	raw       []byte
-	bp        *blueprint.Blueprint
+	bp        blueprint.Source
 	entryJSON []byte
 	view      *plan.Plan
 	findings  []plan.Finding
@@ -87,7 +87,7 @@ func (p *page) blueprintInputs() (*bpInputs, error) {
 	}
 	in := &bpInputs{raw: raw, bp: bp, findings: findings}
 	if bp != nil {
-		in.view = blueprint.View(bp, entry, p.r.facts)
+		in.view = bp.View(entry, p.r.facts)
 		if in.entryJSON, err = EntryJSON(entry); err != nil {
 			return nil, err
 		}
@@ -326,7 +326,7 @@ func (p *page) toDraft() error {
 // stands, the start commit's page since the run has not written it yet, has every one of their
 // headings, cut by the headings of the start commit's blueprint. An added section or a renamed
 // heading drafts whole.
-func (p *page) changedSections() ([]blueprint.Section, error) {
+func (p *page) changedSections() ([]blueprint.SectionHead, error) {
 	sc := p.w.Scope
 	if sc == nil || sc.Kind != blueprint.ScopeScoped || len(sc.IDs) == 0 {
 		return nil, nil
@@ -340,20 +340,22 @@ func (p *page) changedSections() ([]blueprint.Section, error) {
 		return nil, err
 	}
 	_, _, found := coverage.Regions(sectionHeadings(in.bp), []byte(text))
-	var out []blueprint.Section
+	heads := in.bp.SectionHeads()
+	var out []blueprint.SectionHead
 	for _, id := range sc.IDs {
-		i := slices.IndexFunc(in.bp.Sections, func(s blueprint.Section) bool { return s.ID == id })
+		i := slices.IndexFunc(heads, func(s blueprint.SectionHead) bool { return s.ID == id })
 		if i < 0 || !found[i] {
 			return nil, nil
 		}
-		out = append(out, in.bp.Sections[i])
+		out = append(out, heads[i])
 	}
 	return out, nil
 }
 
-func sectionHeadings(bp *blueprint.Blueprint) []string {
-	out := make([]string, len(bp.Sections))
-	for i, s := range bp.Sections {
+func sectionHeadings(bp blueprint.Source) []string {
+	heads := bp.SectionHeads()
+	out := make([]string, len(heads))
+	for i, s := range heads {
 		out[i] = s.Heading
 	}
 	return out
@@ -386,7 +388,7 @@ func (p *page) bound(ex *exchange) (*edits.Bound, error) {
 		return nil, err
 	}
 	b := &edits.Bound{Headings: sectionHeadings(in.bp)}
-	for _, s := range in.bp.Sections {
+	for _, s := range in.bp.SectionHeads() {
 		if slices.Contains(p.w.Scope.IDs, s.ID) {
 			b.Allowed = append(b.Allowed, s.Heading)
 		}
@@ -421,7 +423,7 @@ func (p *page) draftingBlocks(ctx context.Context, seat string) (cached []string
 		}
 	}
 	if seat == "draft" {
-		snippets, err := assemble.SnippetBlocks(ctx, p.r.cfg, p.h.Page.Path, codeSources(in.bp))
+		snippets, err := assemble.SnippetBlocks(ctx, p.r.cfg, p.h.Page.Path, in.bp.CodeSources())
 		if err != nil {
 			return nil, "", err
 		}
@@ -430,17 +432,4 @@ func (p *page) draftingBlocks(ctx context.Context, seat string) (cached []string
 		}
 	}
 	return []string{assemble.DraftingFactsBlock(in.view, p.r.facts)}, extra, nil
-}
-
-// codeSources lists the source of each code item in the blueprint, in order.
-func codeSources(bp *blueprint.Blueprint) []string {
-	var out []string
-	for _, s := range bp.Sections {
-		for _, it := range s.Items {
-			if it.Kind == "code" && it.Source != "" {
-				out = append(out, it.Source)
-			}
-		}
-	}
-	return out
 }

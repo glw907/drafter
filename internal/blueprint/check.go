@@ -101,7 +101,7 @@ func (c *projectCheck) blueprint(rel string) {
 // them, nil and a zero Page otherwise, and every finding. The error means the outline, the lock,
 // or the facts directory could not be read. Pairing, the lock's entries, and the convention are
 // the project walk's, not this check's.
-func (p Project) CheckSource(rel string, blueprint, outline []byte) (*Blueprint, Page, []plan.Finding, error) {
+func (p Project) CheckSource(rel string, blueprint, outline []byte) (Source, Page, []plan.Finding, error) {
 	l, err := p.loadOutline(outline)
 	if err != nil {
 		return nil, Page{}, nil, err
@@ -109,6 +109,9 @@ func (p Project) CheckSource(rel string, blueprint, outline []byte) (*Blueprint,
 	c := &projectCheck{Project: p, l: l, usedTypes: map[string]bool{}}
 	c.findings = append(c.findings, l.findings...)
 	b, entry := c.blueprintData(rel, blueprint)
+	if b == nil {
+		return nil, entry, c.findings, nil
+	}
 	return b, entry, c.findings, nil
 }
 

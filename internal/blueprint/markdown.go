@@ -196,6 +196,8 @@ type Source interface {
 	ExemplarSources() []string
 	// SectionHeads lists each section's id and heading in page order.
 	SectionHeads() []SectionHead
+	// CodeSources lists the source file of each code item, in order.
+	CodeSources() []string
 }
 
 // SectionHead is a section's id and heading.
@@ -240,6 +242,23 @@ func (b *Blueprint) SectionHeads() []SectionHead {
 	}
 	return out
 }
+
+// CodeSources lists the source of each code item.
+func (b *Blueprint) CodeSources() []string {
+	var out []string
+	for _, s := range b.Sections {
+		for _, it := range s.Items {
+			if it.Kind == "code" && it.Source != "" {
+				out = append(out, it.Source)
+			}
+		}
+	}
+	return out
+}
+
+// CodeSources is empty: a markdown blueprint has no code items, and its facts' excerpts carry
+// the code a draft reads.
+func (m *Markdown) CodeSources() []string { return nil }
 
 // View projects m onto a plan so the code that reads a YAML blueprint's view reads a markdown one.
 // The page's path, title, and type come from entry. The reader block is the introduction's
