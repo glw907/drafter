@@ -150,12 +150,16 @@ func (c *Config) apply(l *layer) {
 	if d := f.Facts; d != nil {
 		putPath(c, l, "facts.dir", &c.Facts.Dir, d.Dir)
 		put(c, l, "facts.bullet_format", &c.Facts.BulletFormat, d.BulletFormat)
+		put(c, l, "facts.prose_sources", &c.Facts.ProseSources, d.ProseSources)
 	}
 	if b := f.Blueprints; b != nil {
 		put(c, l, "blueprints.root", &c.Blueprints.Root, b.Root)
 		put(c, l, "blueprints.required", &c.Blueprints.Required, b.Required)
 		put(c, l, "blueprints.outline", &c.Blueprints.Outline, b.Outline)
 		put(c, l, "blueprints.brief_path", &c.Blueprints.BriefPath, b.BriefPath)
+	}
+	if e := f.Editing; e != nil {
+		put(c, l, "editing.preferences", &c.Editing.Preferences, e.Preferences)
 	}
 	for track, sections := range f.Register {
 		c.Register[track] = sections

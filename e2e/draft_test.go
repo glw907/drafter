@@ -60,6 +60,7 @@ func newDraftStub(t *testing.T) *draftStub {
 	s.answers["consistency"] = `{"conflicts":[]}`
 	s.answers["coverage"] = answer("coverage.json")
 	s.answers["edits"] = answer("edits-sentence.json")
+	s.answers["edit"] = `{"edits":[],"resolutions":[{"finding":1,"status":"declined","edits":[],"reason":"The page needs no edit."}]}`
 	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/models":
@@ -111,6 +112,11 @@ func newDraftStub(t *testing.T) *draftStub {
 // schemaKind names the answer a request asks for by the properties of its output schema.
 func schemaKind(body []byte) string {
 	var req struct {
+		Messages []struct {
+			Content []struct {
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"messages"`
 		OutputConfig struct {
 			Format struct {
 				Schema struct {
@@ -127,6 +133,15 @@ func schemaKind(body []byte) string {
 	case p["page"] != nil && p["brief"] != nil:
 		return "draft"
 	case p["edits"] != nil && p["resolutions"] != nil:
+		// The edit pass's first turn is the one whose own message holds the pass's finding; its
+		// gate-fix turns follow it and are ordinary edits requests.
+		if n := len(req.Messages); n > 0 {
+			for _, c := range req.Messages[n-1].Content {
+				if strings.Contains(c.Text, "The edit pass:") {
+					return "edit"
+				}
+			}
+		}
 		return "edits"
 	case p["verdict"] != nil:
 		return "read"
@@ -206,7 +221,14 @@ func (e *draftEnv) drafter(args ...string) result {
 	return runEnv(e.t, e.dir, e.env, args...)
 }
 
+// page runs drafter page with --judge, the full pipeline the rows of the drafting plan exercise.
 func (e *draftEnv) page(args ...string) result {
+	e.t.Helper()
+	return e.drafter(append([]string{"page", "--sync", "--json", "--judge"}, args...)...)
+}
+
+// pageDefault runs drafter page as a user does with no --judge.
+func (e *draftEnv) pageDefault(args ...string) result {
 	e.t.Helper()
 	return e.drafter(append([]string{"page", "--sync", "--json"}, args...)...)
 }

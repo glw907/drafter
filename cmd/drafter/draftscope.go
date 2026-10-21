@@ -30,10 +30,8 @@ func draftInputs(c *config.Config, root, head, rel string, outline []byte, entry
 	if err != nil {
 		return in, nil
 	}
-	if b, _ := blueprint.Decode(rel, bp); b != nil {
-		for _, ex := range b.Exemplars {
-			in.ExemplarSources = append(in.ExemplarSources, ex.Source)
-		}
+	if b, _ := blueprint.Load(rel, bp); b != nil {
+		in.ExemplarSources = append(in.ExemplarSources, b.ExemplarSources()...)
 	}
 	p := blueprint.Project{Root: root, BlueprintRoot: path.Clean(c.Blueprints.Root), Outline: path.Clean(c.Blueprints.Outline), FactsDir: c.Facts.Dir, Required: c.Blueprints.Required}
 	ids, err := p.CitedIn(rel, bp, outline)
@@ -69,9 +67,10 @@ const wholeOnRequest = "drafted whole on request (--whole)"
 // scopeFromLock compares each blueprint page with the lock entry committed at head and decides how
 // the run treats it. With whole set, every page drafts whole and none is up to date. A page whose
 // read is not skipped and whose entry holds a bar reads the change since the bar's commit, while
-// its draft keeps the scope decided here; a page its bar holds is not run. A lock that does not
-// decode is an error, since every entry, bar, and skipped read would be lost with it.
-func scopeFromLock(c *config.Config, root, head string, handoffs []handoff.Handoff, whole bool, warn io.Writer) (draftPlan, error) {
+// its draft keeps the scope decided here; a page its bar holds is not run. Without judge no page
+// reads its blueprint, so every page's read is skipped and no bar holds a page. A lock that does
+// not decode is an error, since every entry, bar, and skipped read would be lost with it.
+func scopeFromLock(c *config.Config, root, head string, handoffs []handoff.Handoff, whole, judge bool, warn io.Writer) (draftPlan, error) {
 	d := draftPlan{
 		scopes: map[string]blueprint.Scope{}, changes: map[string]string{}, skipRead: map[string]bool{},
 		read: barMaps{scopes: map[string]blueprint.Scope{}, changes: map[string]string{}, bars: map[string]string{}, barFrom: map[string]string{}},
@@ -90,9 +89,11 @@ func scopeFromLock(c *config.Config, root, head string, handoffs []handoff.Hando
 			d.skipped = append(d.skipped, unchangedPage(h.Page.Path, upToDate))
 			continue
 		}
-		if blob, err := blueprint.CommitBlobID(root, head, h.Plan); err == nil && skipRead(e, blob) {
+		blob, err := blueprint.CommitBlobID(root, head, h.Plan)
+		switch {
+		case !judge || (err == nil && skipRead(e, blob)):
 			d.skipRead[h.Page.Path] = true
-		} else if e.Blocked != nil {
+		case e.Blocked != nil:
 			if r := applyBar(c, root, head, h, e.Blocked, d.read, warn); r != nil {
 				d.skipped = append(d.skipped, *r)
 				continue
@@ -148,7 +149,7 @@ func pageScopeFor(c *config.Config, root, head, lockRel string, e blueprint.Lock
 			return wholeBecause("the page has no brief at the start commit, so a section redraft cannot cover its sentences")
 		}
 		pageBytes, _ := gitShow(root, head, h.Page.Path)
-		b, _ := blueprint.Decode(h.Plan, cur.Blueprint)
+		b, _ := blueprint.Load(h.Plan, cur.Blueprint)
 		if b == nil {
 			return wholeBecause("the blueprint does not decode")
 		}
@@ -174,13 +175,14 @@ func pageScopeFor(c *config.Config, root, head, lockRel string, e blueprint.Lock
 // blueprint order. When a changed bullet is cited by a sentence of the preamble, it returns the
 // fact instead, and the page drafts whole. A brief sentence found in no section is ignored here;
 // the run's coverage check reports it.
-func widenIDs(sc blueprint.Scope, b *blueprint.Blueprint, page, brief []byte) (ids []string, preambleFact string) {
+func widenIDs(sc blueprint.Scope, b blueprint.Source, page, brief []byte) (ids []string, preambleFact string) {
 	var br coverage.Brief
 	if json.Unmarshal(brief, &br) != nil {
 		return sc.IDs, ""
 	}
-	headings := make([]string, len(b.Sections))
-	for i, s := range b.Sections {
+	sections := b.SectionHeads()
+	headings := make([]string, len(sections))
+	for i, s := range sections {
 		headings[i] = s.Heading
 	}
 	preamble, text, found := coverage.Regions(headings, page)
@@ -200,11 +202,11 @@ func widenIDs(sc blueprint.Scope, b *blueprint.Blueprint, page, brief []byte) (i
 		}
 		for i := range text {
 			if found[i] && strings.Contains(coverage.Normalize(text[i]), norm) {
-				want[b.Sections[i].ID] = true
+				want[sections[i].ID] = true
 			}
 		}
 	}
-	for _, s := range b.Sections {
+	for _, s := range sections {
 		if want[s.ID] {
 			ids = append(ids, s.ID)
 		}

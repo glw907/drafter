@@ -24,9 +24,11 @@ top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || exit 0
 rel=$prefix$rest
 
 [ -d "$top/blueprints" ] || exit 0
-blueprint=blueprints/${rel%.md}.blueprint.yaml
+# A markdown blueprint wins over a YAML one for the same page, as drafter's path rule says.
+blueprint=blueprints/${rel%.md}.blueprint.md
+[ -f "$top/$blueprint" ] || blueprint=blueprints/${rel%.md}.blueprint.yaml
 [ -f "$top/$blueprint" ] || exit 0
 
-msg="This page is generated from a blueprint: $blueprint. Change the blueprint, not the page. Use the blueprint skill, and run drafter check on the blueprint after each edit. Edit the page only when the project's gate fails a code change whose pages still name something it renamed or removed: make just the page edits the gate demands, and change the blueprint to match."
+msg="This page is generated from a blueprint: $blueprint. Change the blueprint, not the page, and follow the blueprint skill's order. Edit the page by hand only to settle a draft's fact-check findings, or when the project's gate fails a code change whose pages still name something it renamed or removed; in both cases change the blueprint to match."
 jq -n --arg msg "$msg" '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: $msg}}' 2>/dev/null
 exit 0

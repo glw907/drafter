@@ -4,15 +4,15 @@ Every page opens with an introduction and ends with the closing section its type
 page gives the questions you answer before you write an introduction, and where the background a
 reader lacks goes. It doesn't give wording to fill in. Write each introduction for the page's own readers.
 
-A blueprint plans its introduction in `framing.introPlan`, which `drafter check` requires. The
-blueprint read grades that plan against what the page's sections deliver and against the
-introduction its anatomy requires. [Stock anatomies](anatomies.md) lists those parts. Each rule
+A blueprint plans its introduction in its `:::reader` block (in an older YAML blueprint,
+`framing.introPlan`, which `drafter check` requires). The plan answers to what the page's
+sections deliver and to the introduction its anatomy requires. [Stock anatomies](anatomies.md) lists those parts. Each rule
 below names its source.
 
 ## Start from the reader
 
 Before you plan the introduction, answer three questions about the page's readers. Record the
-answers in `framing.readers`.
+answers in the `:::reader` block (`framing.readers` in an older YAML blueprint).
 
 - **Who arrives at the page?** Name each role that reads it. Google's technical writing course
   starts here: "Begin by identifying your audience's role(s)."
@@ -87,12 +87,13 @@ who lacks it, and in one of two forms:
 
 - A link to the concept page that explains it, when the background is a whole idea the doc set
   covers elsewhere.
-- A `sentence` or `reason` item in the section that needs it, citing the facts it rests on, when a
-  sentence or two is enough.
+- A line in the section that needs it (a `sentence` or `reason` item in an older YAML blueprint),
+  citing the facts it rests on, when a sentence or two is enough.
 
 Don't explain what the page's readers already know.
 Source: [Google Technical Writing One, Audience](https://developers.google.com/tech-writing/one/audience).
 
-`framing.background` stays your planning note about what the page rests on. It is never drafted as
-content; the items above are. The item kinds are in drafter's
+The `**Background.**` paragraph of the `:::reader` block (`framing.background` in an older YAML
+blueprint) is a planning note about what the page rests on. The draft reads it as part of the
+brief, but only the section lines are drafted as content. The format is in drafter's
 [blueprint format](https://github.com/glw907/drafter/blob/main/docs/blueprint-format.md).

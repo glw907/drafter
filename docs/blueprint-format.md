@@ -4,6 +4,9 @@ A blueprint is the durable plan for one documentation page. It holds everything 
 and why, as one YAML file, `<page>.blueprint.yaml`, kept apart from the page. Agents change the
 blueprint, never the page prose, and drafter turns the change into prose.
 
+Two formats exist. Markdown, `<page>.blueprint.md`, is the current one; YAML is the older one, and the
+sections below the markdown section describe it.
+
 A blueprint starts from the [plan format](plan-format.md) and changes it for a file that lives for
 years and is edited in small steps. This page is the format's one home. The JSON Schemas are
 [`schema/blueprint.schema.json`](../schema/blueprint.schema.json) and
@@ -41,6 +44,119 @@ pages cite one fact.
 The settings `blueprints.root`, `blueprints.outline`, and `facts.dir` move these paths for a
 project that is mid-migration, and `drafter check` warns while a project departs from the
 convention. [Configuration](configuration.md) lists them.
+
+## Markdown blueprints
+
+A page may keep its blueprint as `<page>.blueprint.md` instead. Markdown is the current format; the
+YAML format described in the sections after this one is the older one, still read and checked, and
+`drafter convert markdown` moves a page from one to the other. A page has one blueprint. When both
+files exist, `drafter check` reports the `.blueprint.yaml` as an error and every command reads the
+`.blueprint.md`.
+
+A markdown blueprint is a short front matter block, a title, one reader block, and the page's
+sections as headings. This example is for a made-up widget product:
+
+```markdown
+---
+page: Rotate the widget key
+type: task guide
+track: operate
+exemplar: guides/rotate-a-secret
+---
+
+# Rotate the widget key
+
+:::reader
+**Who reads it.** An operator who rotates keys on a schedule and has the admin role.
+
+**Why they arrive:**
+- A key is due for rotation. :fact[aaaaaa]
+
+**What it leaves to other pages.** Creating the first key.
+:::
+
+## Before you begin
+
+*Gets the reader ready, so no step fails for a missing role.*
+
+- Rotating a key needs the admin role. :fact[bbbbbb]
+
+## Rotate the key
+
+*Walks the reader through the rotation.*
+
+1. Generate a new key in the service settings.
+2. Add the new key to the service.
+
+:::row
+**Symptom.** The settings page refuses to generate a key.
+**Cause.** The account lacks the admin role.
+**Fix.** Ask an admin to grant the role, then try again. :fact[bbbbbb]
+:::
+
+- See [the key reference](https://example.com/docs/keys).
+```
+
+### Front matter
+
+The front matter is YAML between two `---` lines. It takes four keys, and only these four.
+
+| Key | Meaning |
+| --- | --- |
+| `page` | The page's title. It must equal the title of the page's outline entry. |
+| `type` | The outline's type name for the page, such as `task guide`. It must equal the entry's type. |
+| `track` | The track that holds the page. When the outline declares tracks, the named track's `paths` must hold the page. |
+| `exemplar` | The source of one published page to imitate. Optional. |
+
+### The reader block
+
+A `:::reader` block, closed by a line holding only `:::`, says who reads the page and why. A page has
+exactly one. Write it as short labeled paragraphs and lists; drafter reads it as the page's
+introduction brief. A `:fact[id]` tag in it cites a fact.
+
+### Sections
+
+A heading of level 2 to 6 opens a section, and its slug is the section's id, as in the lock. Two
+headings may not share a slug. Under each heading, the first line is the section's job, written as
+one italic span: what the section does for the reader. A section without one is an error.
+
+A bullet or numbered step states one thing the section must say. End it with a `:fact[id]` tag for
+each fact it places or cites. Leave off the `f:` prefix the facts store uses, so `:fact[bbbbbb]`
+cites `f:bbbbbb`. A bullet of the form `See [text](target).` is a link, and `drafter check` checks
+its target as it does a link item in YAML. A tag belongs on a bullet's or step's first line, a row
+line, or a reader line; `drafter check` reports a tag anywhere else as an error, since drafter
+reads no other line for tags.
+
+A `:::row` block is one row of a symptom page. It holds three lines, each opening with a bold label:
+`**Symptom.**` for what the reader sees, `**Cause.**` for why, and `**Fix.**` for what to do. A row
+missing any of the three is an error. A line may wrap onto the lines after it. Place `:fact[id]`
+tags on whichever of the three lines state the fact.
+
+Code fences are skipped, so a fence may hold any of the markup above as an example.
+
+### What the lock does with a markdown blueprint
+
+The lock keys a section by its heading's slug, and `_intro` holds the text above the first section.
+`drafter seed` and a draft write the same entry as for YAML. When it compares a markdown blueprint
+with the one the lock recorded, drafter calls a section changed when its slug is new, its text in
+the blueprint differs, or a fact it cites changed. A change to the front matter or the reader block
+scopes the page without naming a section.
+
+### Convert a YAML blueprint
+
+`drafter convert markdown <blueprint.yaml>...` writes the markdown file beside each YAML file,
+deletes the YAML, and rewrites the page's lock entry so a page whose file has not changed stays up
+to date. The lock entry's `accepted` id and read bar are dropped, because no read has judged the
+new file. The command refuses a drafted page whose lock entry is stale, and a page that already has
+a markdown blueprint, and writes nothing in either case. On standard error it lists what the
+mapping dropped or could not decide: a section without a `why`, a failure without a `cause`, the
+`argument` and `orderReason` fields, dispositions, and exemplars after the first.
+
+### Find where a fact is used in a markdown blueprint
+
+`drafter refs f:bbbbbb` lists each line of a markdown blueprint that carries a tag for the fact, as
+`file:line: item (kind)`. A bullet's item id is `<section id>.p<n>`, a row's is
+`<section id>.row<n>`, and the reader block's is `reader`.
 
 ## Write prose fields as blocks
 
@@ -398,6 +514,7 @@ as an example item.
 | `lock` | An entry with a `page` id names a page on disk, and an entry with only an `accepted` id names a page the outline lists. | error |
 | `convention` | `blueprints.root` is `blueprints`, and `facts.dir` is `<root>/facts`. | warning |
 | `handler` | A `failure`'s handler gives the reader a next action. A `handledBy` that names only a `fact` item, a `sentence` with `mode: verbatim`, or a `link` or `handoff` that sends the reader back to the section holding the failure's `from` step warns. The message carries the fix: hand off to the step or section that gives the reader a next action. | warning |
+| `no-excerpt` | A `verified` fact that a checked blueprint cites has a pointer that yields an excerpt, so a read can check the claim against source lines. Each fact is reported once, at its bullet, and the fix names `drafter excerpt`. | warning |
 | `store` | Every fact bullet in the facts store has an id no other bullet has, a `Source:`, and one valid tag, and each source pointer names something that exists. See [The facts store](#the-facts-store). | error, or warning for a bare path that doesn't exist |
 
 A prose field that carries a `[[id]]` is `argument`, `orderReason`, the `introduction` parts, the
@@ -424,6 +541,38 @@ The exit status is 0 when the command lists at least one place and 1 when it lis
 message for none says whether the facts store holds the id, which tells a mistyped id from a fact
 no page uses yet. The status is 2 when the command can't run, for the same reasons as `drafter
 check`.
+
+### See what a read sees
+
+`drafter excerpt [--root dir] [--json] <fact-id | pointer>` prints the source lines a read gets
+for a fact. For a fact id it prints the fact's bullet, then each excerpt block exactly as a
+read's request carries it. For a pointer, such as `src/panel.ts#Panel.open`, it prints that
+pointer's block, so you can try an anchor before you write the bullet. The exit status is 0 when
+at least one block shows source lines, 1 when none does, and 2 when the command can't run.
+
+A block that reads `no excerpt:` gives the reason a read sees nothing there: `missing`,
+`untracked`, `directory`, `prose`, `not a regular file`, `declaration not found`, or `range beyond
+the end of the file`. A verified fact whose pointers all give one of these draws the `no-excerpt`
+warning from `drafter check`.
+
+What a pointer yields depends on its form.
+
+| Pointer | The excerpt |
+|---|---|
+| `path:N` | 10 lines on each side of line N. |
+| `path:A-B` | Lines A through B, with 5 lines on each side. |
+| `path#name` | The declaration of `name`, from its leading doc comment through its last line. An excerpt over 200 lines stops at 200 and ends with `… (N more lines)`. |
+| `path#outer.inner` | The declaration of `inner` inside the declaration of `outer`: a member, property, method, or a `const`, `let`, `var`, or `function` declared inside it. A longer chain, such as `a.b.c`, resolves link by link. In Go, `Type.Method` finds the method of that receiver type. |
+| `path` | The whole file. |
+
+A pointer into a tracked code file of 150 lines or fewer shows the whole file, once per fact,
+whatever its form. A pointer that doesn't resolve keeps its `no excerpt:` reason instead.
+
+Prose files give no excerpt, because a document shows what the project says and not what the code
+does. The exception is a file that `facts.prose_sources` lists in `drafter.toml`: a `path:N` or
+`path:A-B` pointer into it yields its lines, for a claim whose source is an owner's statement.
+Every other pointer into a prose file, a bare path to a listed one, and every page of the docs
+stays `no excerpt: prose`. See [Configuration](configuration.md#facts-and-registers).
 
 ## The facts store
 

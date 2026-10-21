@@ -69,7 +69,7 @@ func runGate(cmd *cobra.Command, f *gateFlags) error {
 	out := cmd.OutOrStdout()
 	var findings []plan.Finding
 	var notes []string
-	bp := blueprint.BlueprintPath(p.BlueprintRoot, page)
+	bp := p.Locate(page)
 	switch _, err := os.Stat(filepath.Join(p.Root, filepath.FromSlash(bp))); {
 	case err == nil:
 		bpFindings, err := gateBlueprint(p, bp)

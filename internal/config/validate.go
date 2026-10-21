@@ -3,6 +3,8 @@ package config
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 )
 
 // Scope names the settings a command needs.
@@ -42,6 +44,11 @@ func (c *Config) Validate(s Scope) error {
 		}
 		if c.Prompts == "" && c.RequirePrompts {
 			problems = append(problems, errors.New(RefusedStock))
+		}
+		if p := c.Editing.Preferences; p != "" && c.Root != "" {
+			if _, err := os.Stat(filepath.Join(c.Root, filepath.FromSlash(p))); err != nil {
+				problems = append(problems, fmt.Errorf("editing.preferences names a file that cannot be read: %w", err))
+			}
 		}
 		for _, name := range c.Seats {
 			if name == "consistency" && c.Facts.Dir == "" {

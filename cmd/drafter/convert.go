@@ -20,14 +20,15 @@ func newConvertCmd() *cobra.Command {
 		Short: "Convert the chain's outline and plans to the blueprint format",
 		Long: `Convert files from the chain's formats to the blueprint format. The outline subcommand
 writes outline.yaml from JSON outlines; the plan subcommand writes a page's blueprint from its v1
-plan and framing record. Neither overwrites a file.`,
+plan and framing record; the markdown subcommand rewrites YAML blueprints in the markdown format.
+Outline and plan never overwrite a file.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return usageError(cmd, "convert needs a subcommand: outline or plan")
+			return usageError(cmd, "convert needs a subcommand: outline, plan, or markdown")
 		},
 	}
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error { return usageError(cmd, err.Error()) })
-	cmd.AddCommand(newConvertOutlineCmd(), newConvertPlanCmd())
+	cmd.AddCommand(newConvertOutlineCmd(), newConvertPlanCmd(), newConvertMarkdownCmd())
 	return cmd
 }
 
@@ -189,6 +190,61 @@ func runConvertPlan(cmd *cobra.Command, planFile string, f *convertPlanFlags) er
 	}
 	_, err = io.WriteString(cmd.ErrOrStderr(), report(conv, res, pagePath))
 	return err
+}
+
+func newConvertMarkdownCmd() *cobra.Command {
+	var f checkFlags
+	cmd := &cobra.Command{
+		Use:   "markdown [flags] <blueprint.yaml>...",
+		Short: "Rewrite YAML blueprints in the markdown format",
+		Long: `Write a .blueprint.md beside each named YAML blueprint, delete the YAML, and rewrite the page's
+drafted.lock entry so a page whose file has not changed stays up to date. Standard output gets
+each new blueprint's path; standard error gets what the mapping dropped or could not decide.
+
+Convert refuses the whole call, writing nothing, when a blueprint does not decode, a page already
+has a markdown blueprint, or a drafted page's lock entry is stale. Run drafter page first to bring
+a stale page up to date.`,
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return usageError(cmd, "convert markdown needs at least one blueprint")
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error { return runConvertMarkdown(cmd, args, &f) },
+	}
+	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error { return usageError(cmd, err.Error()) })
+	cmd.Flags().StringVar(&f.root, "root", "", "project root (default: the git top level of the working directory)")
+	return cmd
+}
+
+func runConvertMarkdown(cmd *cobra.Command, args []string, f *checkFlags) error {
+	p, err := projectFor(f.root)
+	if err != nil {
+		return err
+	}
+	named := make([]string, 0, len(args))
+	for _, a := range args {
+		rel, err := repoRelative(p.Root, a)
+		if err != nil {
+			return exitError{code: exitCannotRun, msg: err.Error()}
+		}
+		named = append(named, rel)
+	}
+	done, err := p.ConvertToMarkdown(named)
+	if err != nil {
+		return exitError{code: exitCannotRun, msg: err.Error()}
+	}
+	for _, c := range done {
+		if _, err := fmt.Fprintln(cmd.OutOrStdout(), c.To); err != nil {
+			return err
+		}
+		for _, j := range c.Judgment {
+			if _, err := fmt.Fprintf(cmd.ErrOrStderr(), "%s: %s\n", c.Page, j); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // report returns what the conversion left to a person. It is status text, so the caller sends it

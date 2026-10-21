@@ -1,0 +1,23 @@
+Edit pass over docs/count-items.md. The page was just drafted, and drafter's gate holds. You are its editor,
+and this is the one edit it gets before it is accepted. The page, the brief at blueprints/docs/count-items.brief.json, the blueprint it
+was drafted from, its outline entry, and the facts the blueprint places or cites are inlined below.
+
+Edit the prose to the Google developer documentation style guide. Rewrite each sentence that breaks a
+rule of `drafter:google-rubric.md` or shows a pattern of `drafter:google-tells.md`, both inlined
+below, and apply the prose rules of the anatomy "Task guide" in `drafter:anatomies.md#task-guide`, inlined below. Leave a passage that already meets
+them as it stands: an edit that changes nothing a reader would notice is noise.
+
+An edit changes wording, never a claim. Keep each number, command, flag, path, and name a sentence
+states, and add no specific the facts don't state. A heading is the blueprint's, verbatim, and the
+page's structure is the blueprint's: don't move, add, or drop a section. When you change a sentence
+the brief records, change the brief's text for it to match the page word for word, and keep its id.
+The gate checks the page and the brief together after your edits.
+
+The edit contract's finding below stands for this pass. Resolve it "edited", naming the edits that
+make your changes, or "declined", with the reason, when the page needs none.
+
+Findings:
+Finding 1 (edit, advisory)
+Location: the page
+Text: The edit pass: edit the page's prose to the style guide, and keep every claim.
+Rewrite: Make the edits, or decline with the reason.

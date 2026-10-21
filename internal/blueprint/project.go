@@ -37,11 +37,22 @@ type loaded struct {
 	facts    *plan.Facts
 	files    []string // repo-relative blueprint paths in walk order
 	strays   []string // blueprint-like files that no page path maps to
+	shadowed []string // .blueprint.yaml files whose page also has a .blueprint.md, which wins
 	outRel   string
 	findings []plan.Finding // outline decode warnings
 }
 
 func (p Project) abs(rel string) string { return filepath.Join(p.Root, filepath.FromSlash(rel)) }
+
+// Locate returns the repo-relative path of the blueprint for the page at pagePath: the
+// .blueprint.md when that file exists, else the .blueprint.yaml path, whether or not it exists.
+func (p Project) Locate(pagePath string) string {
+	md := MarkdownPath(p.BlueprintRoot, pagePath)
+	if _, err := os.Stat(p.abs(md)); err == nil {
+		return md
+	}
+	return BlueprintPath(p.BlueprintRoot, pagePath)
+}
 
 // load reads the shared inputs. Every error it returns means the command could not run: the
 // blueprint root or the outline is missing or malformed, the lock does not parse, or the facts
@@ -113,8 +124,10 @@ func (p Project) loadOutline(data []byte) (*loaded, error) {
 }
 
 // discover lists the blueprint files under the blueprint root. A file that ends in
-// .blueprint.yaml but maps to no page path, such as one named only that, goes to strays, as does
-// a .blueprint.yml file, since the suffix is the path rule's and the extension is not negotiable.
+// .blueprint.yaml or .blueprint.md but maps to no page path, such as one named only that, goes to
+// strays, as does a .blueprint.yml file, since the suffix is the path rule's and the extension is
+// not negotiable. A .blueprint.yaml whose page also has a .blueprint.md goes to shadowed, not
+// files, so every command reads the markdown one.
 func (p Project) discover(l *loaded) error {
 	err := filepath.WalkDir(p.abs(p.BlueprintRoot), func(file string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -129,11 +142,15 @@ func (p Project) discover(l *loaded) error {
 		}
 		rel = filepath.ToSlash(rel)
 		switch {
-		case strings.HasSuffix(rel, blueprintSuffix):
-			if _, ok := PagePath(p.BlueprintRoot, rel); ok {
-				l.files = append(l.files, rel)
-			} else {
+		case strings.HasSuffix(rel, blueprintSuffix), strings.HasSuffix(rel, markdownSuffix):
+			page, ok := PagePath(p.BlueprintRoot, rel)
+			switch {
+			case !ok:
 				l.strays = append(l.strays, rel)
+			case strings.HasSuffix(rel, blueprintSuffix) && p.Locate(page) != rel:
+				l.shadowed = append(l.shadowed, rel)
+			default:
+				l.files = append(l.files, rel)
 			}
 		case strings.HasSuffix(rel, ".blueprint.yml"):
 			l.strays = append(l.strays, rel)

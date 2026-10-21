@@ -97,7 +97,7 @@ check("parity: Node and goja render the blueprint matrix byte for byte", async (
 check("check-prompts: the blueprint matrix exits 0, containment included", () => {
   const r = checkPrompts(BLUEPRINT_MATRIX, null);
   assert.equal(r.status, 0, r.output);
-  assert.match(r.output, /24 cases, 0 failed/);
+  assert.match(r.output, /28 cases, 0 failed/);
 });
 
 check("handoff mode: every case equals the B3c.0 golden", async () => {
@@ -267,12 +267,53 @@ check("blueprint seat: a bar read holds the bar paragraph, every finding, and th
 
 const SEVEN = ["blueprint", "coherence", "draft", "editor", "fact", "reader", "structure"];
 
-check("DRAFTER_SEATS: defines exactly the seven seats in each mode", async () => {
-  for (const matrix of [BLUEPRINT, HANDOFF]) {
-    const seats = await seatsOf(matrix);
-    assert.deepEqual(Object.keys(seats).sort(), SEVEN);
-    for (const f of Object.values(seats)) assert.equal(typeof f, "function");
+check("DRAFTER_SEATS: defines the seven seats in handoff mode and the edit seat besides in blueprint mode", async () => {
+  const handoff = await seatsOf(HANDOFF);
+  assert.deepEqual(Object.keys(handoff).sort(), SEVEN);
+  const blueprint = await seatsOf(BLUEPRINT);
+  assert.deepEqual(Object.keys(blueprint).sort(), [...SEVEN, "edit"].sort());
+  for (const f of [...Object.values(handoff), ...Object.values(blueprint)]) assert.equal(typeof f, "function");
+});
+
+// -------------------------------------------------------------------------------------------
+// The edit seat, the Markdown blueprint, and the editing preferences.
+// -------------------------------------------------------------------------------------------
+
+check("edit seat: names the register, the finding, and the claim rule", () => {
+  const text = flat(RENDERS["edit/whole"]);
+  assert.ok(text.includes("Edit pass over docs/extend/rotate-the-widget-key.md."));
+  assert.ok(text.includes("## Drafting brief: developer docs"));
+  assert.ok(text.includes("An edit changes wording, never a claim."));
+  assert.ok(text.includes("Finding 1 (edit, advisory)"));
+  assert.ok(!text.includes("Editing preferences."), "no preferences without a file");
+  assert.ok(!text.includes("This pass follows a section redraft."), "a whole-page pass is unbounded");
+});
+
+check("edit seat: a section redraft's pass is bounded to the changed sections", () => {
+  const text = flat(RENDERS["edit/section"]);
+  assert.ok(text.includes("This pass follows a section redraft. Change only the sections in scope: `verify`, `rotate`."));
+});
+
+check("preferences: the draft and edit prompts carry the file's text verbatim", () => {
+  const prefs = caseOf("edit/markdown").context.preferences;
+  assert.equal(prefs, caseOf("draft/markdown").context.preferences);
+  for (const name of ["edit/markdown", "draft/markdown"]) {
+    assert.ok(RENDERS[name].includes(prefs), `${name} holds the preferences whole`);
+    assert.ok(RENDERS[name].includes("Editing preferences."), name);
   }
+  assert.ok(!RENDERS["draft/whole"].includes("Editing preferences."), "no preferences without a file");
+});
+
+check("markdown blueprint: the draft and edit prompts read it as Markdown, not as YAML fields", () => {
+  for (const name of ["edit/markdown", "draft/markdown"]) {
+    const text = flat(RENDERS[name]);
+    assert.ok(text.includes("The blueprint is a Markdown file, not YAML."), name);
+    assert.ok(text.includes("`:fact[id]` tag"), name);
+  }
+  const draft = flat(RENDERS["draft/markdown"]);
+  assert.ok(draft.includes("`:::reader` block is the source of the introduction"));
+  assert.ok(!draft.includes("framing.introPlan"), "the YAML framing fields stay out of a Markdown draft");
+  assert.ok(!flat(RENDERS["draft/whole"]).includes("Markdown file, not YAML"), "a YAML blueprint reads as before");
 });
 
 for (const { name, fn } of pending) {

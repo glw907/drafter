@@ -27,14 +27,23 @@ func BlueprintPath(root, pagePath string) string {
 	return path.Join(root, strings.TrimSuffix(pagePath, ".md")+blueprintSuffix)
 }
 
-// PagePath is BlueprintPath's inverse. It reports false when blueprintPath is not a
-// .blueprint.yaml file under root.
+// MarkdownPath is BlueprintPath for the markdown format: the page path with .md replaced by
+// .blueprint.md.
+func MarkdownPath(root, pagePath string) string {
+	return path.Join(root, strings.TrimSuffix(pagePath, ".md")+markdownSuffix)
+}
+
+// PagePath is the inverse of BlueprintPath and MarkdownPath. It reports false when blueprintPath
+// is not a .blueprint.yaml or .blueprint.md file under root.
 func PagePath(root, blueprintPath string) (string, bool) {
 	rel, ok := strings.CutPrefix(path.Clean(blueprintPath), path.Clean(root)+"/")
 	if !ok {
 		return "", false
 	}
 	page, ok := strings.CutSuffix(rel, blueprintSuffix)
+	if !ok {
+		page, ok = strings.CutSuffix(rel, markdownSuffix)
+	}
 	if !ok || page == "" || strings.HasSuffix(page, "/") {
 		return "", false
 	}

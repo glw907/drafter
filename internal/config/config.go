@@ -26,6 +26,7 @@ type Config struct {
 	Seat           map[string]Seat
 	Facts          Facts
 	Blueprints     Blueprints
+	Editing        Editing
 	Register       map[string][]string
 	InlineFiles    []string
 	Root           string // the project root, empty outside a project
@@ -94,6 +95,7 @@ type Tier struct {
 type Facts struct {
 	Dir          string
 	BulletFormat string
+	ProseSources []string // project-relative prose files a line pointer may excerpt
 }
 
 // Blueprints holds the blueprint-tree settings. Root and Outline are slash paths relative to the
@@ -106,6 +108,12 @@ type Blueprints struct {
 	Required  bool
 	Outline   string
 	BriefPath string
+}
+
+// Editing holds the editing settings. Preferences is a slash path relative to the project root,
+// not absolute, to a file whose text the draft and edit prompts carry verbatim; empty means none.
+type Editing struct {
+	Preferences string
 }
 
 // Flags holds the only two settings that have command-line flags.

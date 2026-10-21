@@ -24,6 +24,7 @@ type repo struct {
 	root    string
 	real    string
 	tracked map[string]bool
+	prose   map[string]bool // facts.prose_sources, the prose files a line pointer may excerpt
 	allowed []string
 }
 
@@ -43,7 +44,10 @@ func openRepo(ctx context.Context, c *config.Config) (*repo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("assemble: list tracked files: %w", err)
 	}
-	r := &repo{root: root, real: real, tracked: map[string]bool{}}
+	r := &repo{root: root, real: real, tracked: map[string]bool{}, prose: map[string]bool{}}
+	for _, p := range c.Facts.ProseSources {
+		r.prose[filepath.ToSlash(filepath.Clean(p))] = true
+	}
 	for name := range strings.SplitSeq(string(out), "\x00") {
 		if name != "" {
 			r.tracked[name] = true

@@ -119,24 +119,37 @@ func TestPageAllUpToDateNeedsNothing(t *testing.T) {
 }
 
 func TestPageDryRunDraftsFromTheBlueprint(t *testing.T) {
-	f := newCLIFixture(t)
-	valePath, err := exec.LookPath("vale")
-	if err != nil {
-		t.Fatalf("vale is required to run this test: %v", err)
+	tests := []struct {
+		name  string
+		flags []string
+		count int
+		why   string
+	}{
+		{"with --judge", []string{"--judge"}, 2, "the consistency read and the blueprint read"},
+		{"without --judge", nil, 1, "the draft alone, since the reads are skipped"},
 	}
-	toolsOnPath(t, true, "git", filepath.Base(valePath))
-	code, out, errOut := f.page("--dry-run", tallyPage)
-	if code != 0 {
-		t.Fatalf("exit %d\n%s%s", code, out, errOut)
-	}
-	if !strings.Contains(out, "prompts: drafter:prompts.js") || !strings.Contains(out, tallyPage+": running [whole: ") {
-		t.Errorf("stdout lacks the stock prompts line and the whole-scope page:\n%s", out)
-	}
-	if n := len(f.stub.counts); n != 2 {
-		t.Errorf("%d token counts, want the consistency read and the blueprint read", n)
-	}
-	if _, err := os.Stat(filepath.Join(f.root, tallyLock)); err == nil {
-		t.Error("a dry run wrote drafted.lock")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newCLIFixture(t)
+			valePath, err := exec.LookPath("vale")
+			if err != nil {
+				t.Fatalf("vale is required to run this test: %v", err)
+			}
+			toolsOnPath(t, true, "git", filepath.Base(valePath))
+			code, out, errOut := f.page(append(append([]string{"--dry-run"}, tt.flags...), tallyPage)...)
+			if code != 0 {
+				t.Fatalf("exit %d\n%s%s", code, out, errOut)
+			}
+			if !strings.Contains(out, "prompts: drafter:prompts.js") || !strings.Contains(out, tallyPage+": running [whole: ") {
+				t.Errorf("stdout lacks the stock prompts line and the whole-scope page:\n%s", out)
+			}
+			if n := len(f.stub.counts); n != tt.count {
+				t.Errorf("%d token counts, want %d: %s", n, tt.count, tt.why)
+			}
+			if _, err := os.Stat(filepath.Join(f.root, tallyLock)); err == nil {
+				t.Error("a dry run wrote drafted.lock")
+			}
+		})
 	}
 }
 

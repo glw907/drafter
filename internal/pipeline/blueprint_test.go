@@ -27,6 +27,7 @@ func newBlueprintHarness(t *testing.T, opts ...harnessOption) *harness {
 	h.cfg.Blueprints = config.Blueprints{Root: "blueprints", Outline: "blueprints/outline.yaml"}
 	seat := h.cfg.Seat["structure"]
 	h.cfg.Seat["blueprint"] = seat
+	h.cfg.Seat["edit"] = seat
 	h.handoffs = []handoff.Handoff{h.blueprintHandoff(pageA, briefA, bpA, "Rotate a key"), h.blueprintHandoff(pageB, briefB, bpB, "Revoke a key")}
 	for _, o := range opts {
 		o(h)

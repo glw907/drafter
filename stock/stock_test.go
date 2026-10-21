@@ -61,7 +61,7 @@ func loadMatrix(t *testing.T, path string) (stockMatrix, *prompts.Module) {
 
 func TestStockModuleSeats(t *testing.T) {
 	_, mod := loadStockMatrix(t)
-	want := []string{"blueprint", "coherence", "draft", "editor", "fact", "reader", "structure"}
+	want := []string{"blueprint", "coherence", "draft", "edit", "editor", "fact", "reader", "structure"}
 	if got := mod.Seats(); !slices.Equal(got, want) {
 		t.Errorf("seats = %v, want %v", got, want)
 	}
@@ -303,7 +303,7 @@ func TestFixtureMatrixRenders(t *testing.T) {
 			}
 		})
 	}
-	want := []string{"coherence", "draft", "editor", "fact", "reader", "structure"}
+	want := []string{"coherence", "draft", "edit", "editor", "fact", "reader", "structure"}
 	if got := slices.Sorted(maps.Keys(golden)); !slices.Equal(got, want) {
 		t.Errorf("seats with a golden = %v, want %v", got, want)
 	}

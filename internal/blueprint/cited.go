@@ -33,13 +33,13 @@ func (p Project) CitedIn(rel string, data, outline []byte) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	b, _ := Decode(rel, data)
+	b, _ := Load(rel, data)
 	pagePath, _ := PagePath(p.BlueprintRoot, rel)
 	entry, listed := l.pages[path.Clean(pagePath)]
 	if b == nil || !listed || !entry.Managed {
 		return nil, nil
 	}
-	v := View(b, entry, l.facts)
+	v := b.View(entry, l.facts)
 	ids := slices.Clone(v.Introduction.Facts)
 	for _, s := range v.Sections {
 		for _, it := range s.Items {

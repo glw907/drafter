@@ -67,6 +67,10 @@ type Options struct {
 	// Draft makes the run draft its blueprint pages after the blueprint read accepts them. Without
 	// it a blueprint page ends at the read, as under drafter read.
 	Draft bool
+	// Judge runs a drafting blueprint page's configured seats: the blueprint and consistency
+	// reads, the review rounds, the final reader, coverage, and coherence. Without it the page
+	// takes only the draft, the gate, and the edit pass, and is accepted on the gate.
+	Judge bool
 	// SkipRead holds the blueprint pages, keyed by page path, whose blueprint read is skipped
 	// because the lock's accepted id already matches the blueprint. Both Draft and SkipRead are
 	// recorded in the pages' state, so a resume needs neither.
@@ -214,10 +218,13 @@ type runner struct {
 	// suffix is the random part of the run ID, which starts every custom_id.
 	suffix string
 	facts  *plan.Facts
-	pages  []*page
-	mods   map[string]*prompts.Module
-	stop   string
-	locks  []*run.Lock
+	// prefs is the text of the editing preferences file, read at the start of the run and again at a
+	// resume.
+	prefs string
+	pages []*page
+	mods  map[string]*prompts.Module
+	stop  string
+	locks []*run.Lock
 	// inflight holds the batches submitted and not yet read, in submission order.
 	inflight []*flight
 }

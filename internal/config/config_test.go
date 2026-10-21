@@ -511,9 +511,9 @@ func TestValueChecks(t *testing.T) {
 		{"discount one", "user", "[prices]\nbatch_discount = 1\n", "2", "prices.batch_discount must be from 0 up to but not including 1, not 1"},
 		{"discount negative", "user", "[prices]\nbatch_discount = -0.1\n", "2", "prices.batch_discount must be from 0 up to but not including 1, not -0.1"},
 		{"max tokens", "project", "[seat.draft]\nmax_tokens = 0\n", "2", "seat.draft.max_tokens must be at least 1, not 0"},
-		{"seat name", "project", "[seat.writer]\nmodel = \"m\"\n", "1", "seat.writer is not a seat; the seats are draft, structure, editor, fact, reader, coverage, consistency, blueprint, coherence"},
+		{"seat name", "project", "[seat.writer]\nmodel = \"m\"\n", "1", "seat.writer is not a seat; the seats are draft, structure, editor, fact, reader, coverage, consistency, blueprint, coherence, edit"},
 		{"seats without draft", "project", "seats = [\"editor\"]\n", "1", "seats must include draft, which always runs"},
-		{"seats unknown", "project", "seats = [\"draft\", \"proofread\"]\n", "1", "seats names \"proofread\", which is not a seat; the seats are draft, structure, editor, fact, reader, coverage, consistency, blueprint, coherence"},
+		{"seats unknown", "project", "seats = [\"draft\", \"proofread\"]\n", "1", "seats names \"proofread\", which is not a seat; the seats are draft, structure, editor, fact, reader, coverage, consistency, blueprint, coherence, edit"},
 		{"section pattern syntax", "project", "[gate]\nsection_pattern = \"(\"\n", "2", "gate.section_pattern is not a regular expression: error parsing regexp: missing closing ): `(`"},
 		{"section pattern group", "project", "[gate]\nsection_pattern = \"^## .+$\"\n", "2", "gate.section_pattern needs a capture group for the section name"},
 		{"failure pattern syntax", "project", "[gate]\nfailure_pattern = \"[\"\n", "2", "gate.failure_pattern is not a regular expression: error parsing regexp: missing closing ]: `[`"},
@@ -669,5 +669,39 @@ docs = ["voice"]
 		if got := row(t, c, key).From; got != want {
 			t.Errorf("%s from %q, want %q", key, got, want)
 		}
+	}
+}
+
+func TestFactsProseSources(t *testing.T) {
+	tests := []struct {
+		name    string
+		project string
+		local   string
+		want    []string
+		printed string
+	}{
+		{"unset", "mode = \"batch\"\n", "", nil, ""},
+		{"project layer", "[facts]\nprose_sources = [\"notes.md\", \"docs/owner.md\"]\n", "", []string{"notes.md", "docs/owner.md"}, "notes.md, docs/owner.md"},
+		{"local layer replaces", "[facts]\nprose_sources = [\"notes.md\"]\n", "[facts]\nprose_sources = [\"mine.md\"]\n", []string{"mine.md"}, "mine.md"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sb := newSandbox(t)
+			sb.ignoreLocal(t)
+			writeFile(t, sb.project(), tt.project)
+			if tt.local != "" {
+				writeFile(t, sb.local(), tt.local)
+			}
+			c, err := Load(sb.root, Flags{})
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if !slices.Equal(c.Facts.ProseSources, tt.want) {
+				t.Errorf("facts.prose_sources = %q, want %q", c.Facts.ProseSources, tt.want)
+			}
+			if got := row(t, c, "facts.prose_sources").Value; got != tt.printed {
+				t.Errorf("Sources row value = %q, want %q", got, tt.printed)
+			}
+		})
 	}
 }

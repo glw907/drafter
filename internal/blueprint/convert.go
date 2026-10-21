@@ -2,9 +2,13 @@ package blueprint
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strconv"
@@ -14,6 +18,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/glw907/drafter/internal/plan"
+	"github.com/glw907/drafter/internal/run"
 )
 
 // NamedData is a file's name, for messages, and its bytes.
@@ -379,6 +384,370 @@ func headingHints(b *Blueprint) []string {
 		}
 	}
 	return out
+}
+
+// MarkdownConverted reports one page ConvertToMarkdown converted.
+type MarkdownConverted struct {
+	// Page is the page's path, From the YAML blueprint that was deleted, and To the markdown
+	// blueprint that replaced it, both relative to the repository root.
+	Page, From, To string
+	// Judgment lists what the mapping could not carry over or decide, one line each.
+	Judgment []string
+}
+
+// ConvertToMarkdown converts each YAML blueprint named, a repo-relative slash path, to a markdown
+// blueprint beside it, deletes the YAML, and rewrites the page's drafted.lock entry so a page
+// whose file has not changed stays up to date: the entry's blueprint becomes the new file's blob
+// and its sections are hashed again under the markdown headings' slugs. The entry's accepted id
+// and read bar are dropped, since no read has judged the new file.
+//
+// Every blueprint is checked before anything is written, and the first refusal names the page and
+// the fix. A blueprint is refused when it does not decode, its page is not a managed one the
+// outline lists, the page already has a markdown blueprint, or the page's lock entry records a
+// draft and no longer matches it: the scope code would call the page changed, because the
+// blueprint, the outline entry, or a fact it cites differs from what drafter last drafted from.
+// Convert such a page after drafter page has brought it up to date.
+func (p Project) ConvertToMarkdown(blueprints []string) ([]MarkdownConverted, error) {
+	gitDir, err := gitRaw(p.Root, "rev-parse", "--absolute-git-dir")
+	if err != nil {
+		return nil, err
+	}
+	// The worktree lock keeps a running drafter from reading a lock this call is about to change.
+	wl, err := run.TryLock(filepath.Join(strings.TrimSpace(string(gitDir)), "drafter.lock"))
+	if err != nil {
+		return nil, fmt.Errorf("another drafter run holds this worktree: %w", err)
+	}
+	defer func() { _ = wl.Release() }()
+
+	l, err := p.load()
+	if err != nil {
+		return nil, err
+	}
+	type job struct {
+		MarkdownConverted
+		data []byte
+	}
+	var jobs []job
+	for _, rel := range blueprints {
+		page, ok := PagePath(p.BlueprintRoot, rel)
+		if !ok || !strings.HasSuffix(rel, blueprintSuffix) {
+			return nil, fmt.Errorf("%s is not a blueprint to convert; name a %s file under %s", rel, blueprintSuffix, p.BlueprintRoot)
+		}
+		data, err := os.ReadFile(p.abs(rel))
+		if err != nil {
+			return nil, fmt.Errorf("read blueprint: %w", err)
+		}
+		b, findings := Decode(rel, data)
+		if b == nil || plan.HasError(findings) {
+			return nil, fmt.Errorf("%s does not decode; run drafter check", rel)
+		}
+		entry, listed := l.pages[page]
+		if !listed || !entry.Managed {
+			return nil, fmt.Errorf("%s is not a managed page the outline lists; fix %s first", page, p.Outline)
+		}
+		to := MarkdownPath(p.BlueprintRoot, page)
+		if _, err := os.Lstat(p.abs(to)); err == nil {
+			return nil, fmt.Errorf("%s already exists; convert never overwrites a blueprint", to)
+		}
+		if e, ok := l.lock.Pages[page]; ok && e.Page != "" {
+			if why, err := p.stale(l, rel, entry, e, data); err != nil {
+				return nil, err
+			} else if why != "" {
+				return nil, fmt.Errorf("%s is stale: %s; run drafter page to bring it up to date, then convert", page, why)
+			}
+		}
+		track := ""
+		if t, ok := l.outline.TrackFor(page); ok {
+			track = t.Name
+		}
+		md, judgment := RenderMarkdown(b, entry, track, l.facts)
+		if track == "" {
+			judgment = append(judgment, "the outline gives the page no single track, so the front matter's track is empty")
+		}
+		jobs = append(jobs, job{MarkdownConverted{Page: page, From: rel, To: to, Judgment: judgment}, md})
+	}
+
+	lock := l.lock
+	for _, j := range jobs {
+		if err := writeExclusive(p.abs(j.To), j.data); err != nil {
+			return nil, err
+		}
+		if err := os.Remove(p.abs(j.From)); err != nil {
+			return nil, fmt.Errorf("delete the converted blueprint: %w", err)
+		}
+		e, ok := lock.Pages[j.Page]
+		if !ok {
+			continue
+		}
+		e.Accepted, e.Blocked = "", nil
+		if e.Page != "" {
+			md, _ := DecodeMarkdown(j.To, j.data)
+			pageBytes := BlobBytes(p.Root, e.Page)
+			if pageBytes == nil {
+				return nil, fmt.Errorf("the page recorded for %s is not in the object store, so its sections cannot be hashed; the blueprint %s is converted and the lock is not", j.Page, j.To)
+			}
+			blob, err := FileBlobID(p.Root, j.To)
+			if err != nil {
+				return nil, err
+			}
+			e.Blueprint, e.Sections = blob, SectionHashes(md, pageBytes)
+		}
+		if e.Page == "" && e.Blueprint == "" && e.Accepted == "" {
+			delete(lock.Pages, j.Page)
+			continue
+		}
+		lock.Pages[j.Page] = e
+	}
+	if err := WriteLock(p.abs(l.lockRel), lock); err != nil {
+		return nil, err
+	}
+	out := make([]MarkdownConverted, len(jobs))
+	for i, j := range jobs {
+		out[i] = j.MarkdownConverted
+	}
+	return out, nil
+}
+
+// stale says why the lock entry e of a drafted page no longer matches its YAML blueprint, or ""
+// when it does. It asks Compare what the scope code asks: the blueprint the entry recorded, with
+// the outline entry and facts as they stood just before the commit that introduced the entry,
+// against the blueprint on disk with the outline entry and facts as they are now.
+func (p Project) stale(l *loaded, rel string, entry Page, e LockEntry, current []byte) (string, error) {
+	recorded := BlobBytes(p.Root, e.Blueprint)
+	if recorded == nil {
+		return "the blueprint the lock recorded is not in the object store", nil
+	}
+	introduced, err := LockIntroducedAt(p.Root, l.lockRel, entry.Path, e)
+	if err != nil {
+		return "", err
+	}
+	if introduced == "" {
+		return "no commit introduced its entry in " + LockFile, nil
+	}
+	old := p.revisionAt(ParentCommit(p.Root, introduced), entry.Path)
+	old.Blueprint = recorded
+	cur := Revision{Blueprint: current, Entry: &entry, Facts: l.facts}
+	if sc := Compare(rel, old, cur); sc.Kind != ScopeUnchanged {
+		if sc.Why != "" {
+			return sc.Why, nil
+		}
+		return "its blueprint, outline entry, or a fact it cites changed since the page was drafted", nil
+	}
+	return "", nil
+}
+
+// revisionAt gathers a page's outline entry and facts store as committed at rev. What rev lacks
+// or cannot decode comes back empty, which Compare reads as a reason to treat the page whole.
+func (p Project) revisionAt(rev, pagePath string) Revision {
+	var r Revision
+	if out, err := gitRaw(p.Root, "show", rev+":"+p.Outline); err == nil {
+		if o, fs := DecodeOutline(p.Outline, out); o != nil && !plan.HasError(fs) {
+			for i := range o.Pages {
+				if path.Clean(o.Pages[i].Path) == pagePath {
+					r.Entry = &o.Pages[i]
+				}
+			}
+		}
+	}
+	if p.FactsDir == "" {
+		return r
+	}
+	dir, err := filepath.Rel(p.Root, p.FactsDir)
+	if err != nil {
+		return r
+	}
+	dir = filepath.ToSlash(dir)
+	names, err := gitRaw(p.Root, "ls-tree", "--name-only", rev+":"+dir)
+	if err != nil {
+		return Revision{}
+	}
+	files := map[string]string{}
+	for name := range strings.FieldsSeq(string(names)) {
+		if !strings.HasSuffix(name, ".md") || name == "README.md" {
+			continue
+		}
+		if out, err := gitRaw(p.Root, "show", rev+":"+dir+"/"+name); err == nil {
+			files[name] = string(out)
+		}
+	}
+	r.Facts = plan.ParseFacts(files, p.Root)
+	return r
+}
+
+// RenderMarkdown writes b, the blueprint of the page entry describes, as a markdown blueprint.
+// track names the track that holds the page. facts is the project's facts store, or nil, and
+// supplies the claim a fact item places. The second result lists what the mapping dropped or could
+// not decide.
+//
+// The reader block carries the framing record and the introduction. A section keeps its heading
+// level, its why as the job line, its opens text as the first bullet, and each item as a bullet,
+// numbered for a step, with its facts as :fact tags that omit the store's "f:" prefix. A link is a
+// "See [text](target)." bullet. A failure is a :::row block whose Fix is its handler's text, and
+// a handler that is not a step is not repeated as a bullet. A [[section-id]] reference becomes
+// the section's heading.
+func RenderMarkdown(b *Blueprint, entry Page, track string, facts *plan.Facts) ([]byte, []string) {
+	var judgment []string
+	note := func(format string, args ...any) { judgment = append(judgment, fmt.Sprintf(format, args...)) }
+	heads := map[string]string{}
+	items := map[string]Item{}
+	for _, s := range b.Sections {
+		heads[s.ID] = s.Heading
+		for _, it := range s.Items {
+			items[it.ID] = it
+		}
+	}
+	text := func(s string) string {
+		return sectionRef.ReplaceAllStringFunc(strings.TrimSpace(s), func(m string) string {
+			if h, ok := heads[m[2:len(m)-2]]; ok {
+				return h
+			}
+			return m
+		})
+	}
+	line := func(s string) string { return strings.Join(strings.Fields(text(s)), " ") }
+	tags := func(ids ...string) string {
+		var sb strings.Builder
+		var seen []string
+		for _, id := range ids {
+			if id != "" && !slices.Contains(seen, id) {
+				seen = append(seen, id)
+				sb.WriteString(" :fact[" + strings.TrimPrefix(id, "f:") + "]")
+			}
+		}
+		return sb.String()
+	}
+	link := func(it Item) string {
+		label := cmp.Or(line(it.Text), it.Target)
+		return "See [" + label + "](" + it.Target + ")."
+	}
+	claim := func(it Item) string {
+		if facts != nil {
+			if f, ok := facts.Get(it.Fact); ok && f.Text != "" {
+				return line(f.Text)
+			}
+		}
+		note("fact item %s: the facts store gave no claim to place, so the bullet holds the item's use text", it.ID)
+		return cmp.Or(line(it.Use), strings.TrimPrefix(it.Fact, "f:"))
+	}
+
+	handlers := map[string]bool{}
+	for _, s := range b.Sections {
+		for _, it := range s.Items {
+			if h, ok := items[it.HandledBy]; ok && it.Kind == "failure" && h.Kind != "step" && h.Kind != "code" && h.Kind != "figure" {
+				handlers[h.ID] = true
+			}
+		}
+	}
+
+	front := Front{Page: entry.Title, Type: entry.Type, Track: track}
+	if len(b.Exemplars) > 0 {
+		front.Exemplar = strings.TrimSuffix(b.Exemplars[0].Source, "/")
+	}
+	if len(b.Exemplars) > 1 {
+		note("exemplars after the first, with their take, are dropped; the front matter names one")
+	}
+	fm, _ := yaml.Marshal(front) // a struct of strings always marshals
+
+	var out strings.Builder
+	out.WriteString("---\n" + string(fm) + "---\n\n# " + entry.Title + "\n\n:::reader\n")
+	in, fr := b.Introduction, b.Framing
+	for _, part := range []struct{ label, body, facts string }{
+		{"Who reads it.", fr.Readers, ""},
+		{"Background.", fr.Background, ""},
+		{"Place in the doc set.", fr.PlaceInDocSet, ""},
+		{"What the page does for them.", in.Covers, tags(in.Facts...)},
+		{"What they already know.", in.PriorKnowledge, ""},
+		{"What it leaves to other pages.", in.NotCovered, ""},
+		{"How the introduction runs.", fr.IntroPlan, ""},
+	} {
+		if strings.TrimSpace(part.body) != "" {
+			out.WriteString("**" + part.label + "** " + text(part.body) + part.facts + "\n\n")
+		}
+	}
+	out.WriteString(":::\n\n")
+
+	for _, s := range b.Sections {
+		level := cmp.Or(s.Level, 2)
+		out.WriteString(strings.Repeat("#", level) + " " + s.Heading + "\n\n")
+		if why := line(s.Why); why != "" {
+			out.WriteString("*" + why + "*\n\n")
+		} else {
+			note("section %s has no why, so it has no job line", s.ID)
+		}
+		var bullets []string
+		flush := func() {
+			if len(bullets) > 0 {
+				out.WriteString(strings.Join(bullets, "\n") + "\n\n")
+				bullets = nil
+			}
+		}
+		if opens := line(s.Opens); opens != "" {
+			bullets = append(bullets, "- "+opens)
+		}
+		step := 0
+		for _, it := range s.Items {
+			if handlers[it.ID] {
+				continue
+			}
+			if it.Kind == "step" {
+				step++
+			} else {
+				step = 0
+			}
+			var body string
+			switch it.Kind {
+			case "fact":
+				body = claim(it) + tags(it.Fact)
+			case "sentence", "example", "reason", "code", "figure":
+				body = line(it.Text) + tags(it.Facts...)
+			case "handoff", "step":
+				body = line(it.Text)
+			case "link":
+				body = link(it)
+			case "failure":
+				flush()
+				cause := line(it.Cause)
+				if cause == "" {
+					note("failure %s has no cause; the row's Cause part is empty", it.ID)
+				}
+				fix, ids := "", append([]string(nil), it.Facts...)
+				if h, ok := items[it.HandledBy]; ok {
+					switch h.Kind {
+					case "fact":
+						fix, ids = claim(h), append(ids, h.Fact)
+					case "link":
+						fix = link(h)
+					default:
+						fix, ids = line(h.Text), append(ids, h.Facts...)
+					}
+				}
+				out.WriteString(":::row\n**Symptom.** " + line(it.Symptom) + "\n**Cause.** " + cause + "\n**Fix.** " + fix + tags(ids...) + "\n:::\n\n")
+				continue
+			}
+			if it.Kind == "code" || it.Kind == "figure" {
+				note("%s item %s becomes a bullet of its text; its source is not carried", it.Kind, it.ID)
+			}
+			if it.Kind == "step" {
+				bullets = append(bullets, fmt.Sprintf("%d. %s", step, body))
+			} else {
+				bullets = append(bullets, "- "+body)
+			}
+		}
+		flush()
+	}
+
+	for _, f := range []struct{ name, set string }{
+		{"argument", b.Argument}, {"orderReason", b.OrderReason},
+		{"preconditions", strings.Join(b.Preconditions, "")}, {"constraints", strings.Join(b.Constraints, "")},
+	} {
+		if strings.TrimSpace(f.set) != "" {
+			note("%s is dropped; the markdown format has no field for it", f.name)
+		}
+	}
+	if len(b.Dispositions) > 0 {
+		note("dispositions are dropped; the markdown format records no fact a page leaves out")
+	}
+	return []byte(strings.TrimRight(out.String(), "\n") + "\n"), judgment
 }
 
 func firstError(findings []plan.Finding) string {

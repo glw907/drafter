@@ -34,6 +34,7 @@ type file struct {
 	Facts           *factsFile           `toml:"facts"`
 	Register        map[string][]string  `toml:"register"`
 	Blueprints      *blueprintsFile      `toml:"blueprints"`
+	Editing         *editingFile         `toml:"editing"`
 	InlineFiles     *[]string            `toml:"inline_files"`
 }
 
@@ -91,9 +92,14 @@ type blueprintsFile struct {
 	BriefPath *string `toml:"brief_path"`
 }
 
+type editingFile struct {
+	Preferences *string `toml:"preferences"`
+}
+
 type factsFile struct {
-	Dir          *string `toml:"dir"`
-	BulletFormat *string `toml:"bullet_format"`
+	Dir          *string   `toml:"dir"`
+	BulletFormat *string   `toml:"bullet_format"`
+	ProseSources *[]string `toml:"prose_sources"`
 }
 
 // decode parses data strictly: an unknown key, a malformed document, and a value of the wrong
