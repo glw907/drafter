@@ -315,7 +315,8 @@
 // script returns `DRAFTER_SEATS` just before the slot pool, so no page runs.
 //
 // `DRAFTER_SEATS` maps `draft`, `structure`, `editor`, `fact`, `reader`, `blueprint`, and
-// `coherence` to functions of one seat context object, each adapting it to the builder the chain
+// `coherence` (and, in blueprint mode only, `edit`, the edit pass drafter runs once on a drafted
+// blueprint page) to functions of one seat context object, each adapting it to the builder the chain
 // itself calls (`blueprint` and `coherence` have no chain counterpart; `blueprint` reads only
 // `scope`, which drafter sets to the comma-separated ids of the sections a blueprint read may block
 // on, or leaves empty for a whole read, and `findings`, the bar below; drafter loads the module for
@@ -332,6 +333,9 @@
 //                   `bothReviewers`), and null only when the seat did not read in round 1
 //   turn            the final reader only: 1 for steps 1 and 2, 2 for step 3 with the job
 //   facts           whether the project has a facts store (the builders do not read it)
+//   markdown        true when the page's blueprint is a Markdown file (blueprint mode only)
+//   preferences     the text of the project's editing preferences file, verbatim, or ""
+//                   (blueprint mode's `draft` and `edit` seats only)
 //
 // The adapters pass `where || undefined`, `scope || undefined`, and `narrow || undefined`, so an
 // empty string never reaches a builder as a value the chain itself never passes. `draft` calls
@@ -2581,6 +2585,61 @@ supply structure and detail per step, never voice or wording.`;
 }
 
 /**
+ * The paragraph that says how a seat reads a blueprint written as a Markdown file.
+ * @returns {string}
+ */
+function bpMarkdownReading() {
+  return `The blueprint is a Markdown file, not YAML. Its front matter names the page, its type, its
+track, and the exemplar to imitate. The \`:::reader\` block states who reads the page and why. Each
+heading is a section of the page, in the blueprint's order, drafted under that heading verbatim and
+at its level. The italic line under a heading says what the section does for the reader, and the
+section serves it. Each bullet or numbered step is content its section carries, in order, and a
+numbered step stays a numbered step. A \`:fact[id]\` tag on a line places that fact there: the fact in
+the facts block, not the line's wording, says what the line may claim. A \`:::row\` block is a
+symptom row: what the reader sees, the cause, and the fix. A line with no tag states its point in
+your words and adds no detail a fact doesn't state. A fenced code block is code the page carries as
+written.`;
+}
+
+/**
+ * The project's editing preferences, carried verbatim, or the empty string when it keeps none.
+ * @param {string} [text]
+ * @returns {string}
+ */
+function bpPreferences(text) {
+  if (!text) return "";
+  return `Editing preferences. The project's own, verbatim. Apply them with the register. A preference
+narrows how the page reads and never licenses a claim the facts don't state.
+
+${text}`;
+}
+
+/**
+ * The paragraph that says how a drafting seat reads a Markdown blueprint as the page plan.
+ * @returns {string}
+ */
+function bpMarkdownAsPlan() {
+  return `The blueprint, inlined after the facts block, is the page plan: the source of the page's
+order, each section's claim, and each fact's placement. Read it whole before you draft. ${bpMarkdownReading()}
+
+The register's drafting brief is the source of voice. Voice comes only from the register's drafting
+brief and its primary exemplar, docs/extend/choose-an-ai-posture.md; the page's exemplars below
+supply structure and detail per step, never voice or wording.`;
+}
+
+/**
+ * The Markdown blueprint's reader block as the drafter's source of the introduction.
+ * @returns {string}
+ */
+function bpMarkdownFramingLine() {
+  return `The blueprint's \`:::reader\` block is the source of the introduction: read it whole before you
+draft. Write the introduction for the reader it names, with the fact ids each part cites. The
+introduction opens on a statement, never an imperative and never a sentence about the page; it may
+run two or three paragraphs, and it says what the page covers, the prior knowledge it expects, and
+what it leaves out. The body stays fact-driven, drafted from the blueprint's sections.`;
+}
+
+/**
  * The blueprint's framing block as the drafter's source of the introduction.
  * @returns {string}
  */
@@ -2685,8 +2744,9 @@ ${sources || "(none named; follow the register's anatomy)"}`;
     bound,
     bpDraftOverride(p),
     registerLine({ track: registerTrackOf(p) }, "drafter"),
-    bpBlueprintAsPlan(),
-    bpFramingDraftLine(),
+    c.markdown ? bpMarkdownAsPlan() : bpBlueprintAsPlan(),
+    c.markdown ? bpMarkdownFramingLine() : bpFramingDraftLine(),
+    bpPreferences(c.preferences),
     p.title ? `The page's H1, verbatim: # ${p.title}` : "",
     `The page's job: ${job}\nPage type: ${pageType}`,
     scopeLines(p).trim(),
@@ -2791,6 +2851,46 @@ its "doesn't cover" list.`,
     `A checklist item the page fails is a blocking finding: its location (the section heading, and the
 sentence when it applies), the item it fails and how, and in rewrite a suggestion for how to address
 it. Verdict "fix" if any blocking finding exists; otherwise "ok".`
+  ].filter(Boolean).join("\n\n");
+}
+
+/**
+ * The edit pass in blueprint mode: one edit of a drafted page, after the gate holds and before any
+ * read, answered through the edit contract with the single finding drafter numbers for the pass.
+ * @param {Record<string, any>} c - the seat context object
+ * @returns {string}
+ */
+function bpEditPrompt(c) {
+  const p = c.page || {};
+  const scope = c.scope || "";
+  const bound = scope
+    ? `This pass follows a section redraft. Change only the sections in scope: ${idList(scope)}. The
+blueprint names each section's id beside its heading. Leave the text before the first heading, every
+heading line, and every other section as they stand, line for line, and leave the brief's sentences
+for those parts unchanged.`
+    : "";
+  return [
+    `Edit pass over ${p.path}. The page was just drafted, and drafter's gate holds. You are its editor,
+and this is the one edit it gets before it is accepted. The page is inlined below with ${briefOf(p)},
+${BP_INLINED}.`,
+    `No command runs in this pass. drafter sends this prompt to the API, and you hold no tools, so this
+prompt overrides your agent definition where the two differ. Where the definition says to run
+\`tellgrader\` or any other command, run nothing and judge the tells it names by reading the page.`,
+    registerLine({ track: registerTrackOf(p) }, "editor"),
+    c.markdown ? bpMarkdownReading() : "",
+    bound,
+    bpPreferences(c.preferences),
+    `Edit the prose to the register: rewrite each sentence that breaks a rule of the sections above or
+shows a tell, and leave a passage that already meets them as it stands. ${CAP_SCOPE}
+${BP_HANDOFF_OWNER}`,
+    `An edit changes wording, never a claim. Keep each number, command, flag, path, and name a sentence
+states, and add no specific the facts don't state. A heading is the blueprint's, verbatim, and the
+page's structure is the blueprint's: don't move, add, or drop a section. When you change a sentence
+the brief records, change the brief's text for it to match the page word for word, and keep its id.
+The gate checks the page and the brief together after your edits.`,
+    `The edit contract's finding below stands for this pass. Resolve it "edited", naming the edits that
+make your changes, or "declined", with the reason, when the page needs none.`,
+    `Findings:\n${c.findings || ""}`
   ].filter(Boolean).join("\n\n");
 }
 
@@ -2970,7 +3070,8 @@ const DRAFTER_SEATS = BLUEPRINT_MODE ? {
   editor: bpEditorPrompt,
   fact: bpFactPrompt,
   reader: bpReaderPrompt,
-  coherence: coherencePrompt
+  coherence: coherencePrompt,
+  edit: bpEditPrompt
 } : {
   blueprint: (c) => blueprintPrompt(c.scope || undefined, c.findings || undefined),
   draft: (c) => draftPrompt(c.page, c.inputs, c.round === 1 ? 1 : 2, c.findings, c.afterFinalRead === true),

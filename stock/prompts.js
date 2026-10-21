@@ -239,7 +239,7 @@ function anatomyRead(a) {
  * @param {string} lead - the sentence that opens the rules
  * @returns {string}
  */
-function briefRules(lead) {
+function briefRules(lead, markdown) {
   return `${lead} The brief is a JSON object with one key, "sentences": an array holding one
 entry per sentence of the page's prose, in page order, each {"text": "the sentence as the page has
 it", "id": the facts it rests on}. drafter's gate checks the page and the brief together, and any
@@ -257,7 +257,9 @@ defect fails the page:
 - A "no-claim" sentence states none of those: an introduction, a lead-in, or a transition that
   carries no checkable specific. A sentence that names a command or a number cites the fact that
   states it.
-- Every \`fact\` item of the blueprint is cited by at least one sentence in that item's section.`;
+- ${markdown
+    ? "Every fact a `:fact[id]` tag of the blueprint places is cited by at least one sentence in that tag's section."
+    : "Every `fact` item of the blueprint is cited by at least one sentence in that item's section."}`;
 }
 
 /**
@@ -280,6 +282,38 @@ only as the link its \`reference\` names.`;
 }
 
 /**
+ * The paragraph that says how a seat reads a blueprint written as a Markdown file.
+ * @returns {string}
+ */
+function markdownReading() {
+  return `How the blueprint is read. It is a Markdown file, not YAML. Its front matter names the page,
+its type, its track, and the exemplar to imitate. The \`:::reader\` block states who reads the page
+and why. Each heading is a section of the page, in the blueprint's order, drafted under that
+heading verbatim and at its level. The italic line under a heading says what the section does for
+the reader, and the section serves it. Each bullet or numbered step is content its section
+carries, in order, and a numbered step stays a numbered step. A \`:fact[id]\` tag on a line places
+that fact there: the fact in the facts block, not the line's wording, says what the line may claim.
+A \`:::row\` block is a symptom row: what the reader sees, the cause, and the fix. A line with no
+tag states its point in your words and adds no detail a fact doesn't state. A fenced code block is
+code the page carries as written.`;
+}
+
+/**
+ * The project's editing preferences, carried verbatim, or the empty string when it keeps none.
+ * @param {string} [text]
+ * @returns {string}
+ */
+function preferencesBlock(text) {
+  if (!text) return "";
+  return `
+
+Editing preferences. The project's own, verbatim. Apply them with the standard. A preference
+narrows how the page reads and never licenses a claim the facts don't state.
+
+${text}`;
+}
+
+/**
  * The paragraph that keeps a drafting seat to the facts.
  * @returns {string}
  */
@@ -293,10 +327,11 @@ is there to read the fact correctly, never to add to it.`;
 
 /**
  * The whole draft: the page from its blueprint, with its brief, at round 1 with no findings.
+ * @param {Record<string, any>} c - the context object
  * @param {Record<string, any>} p - the page's resolved entry
  * @returns {string}
  */
-function wholeDraft(p) {
+function wholeDraft(c, p) {
   const a = anatomyFor(p);
   const title = p.title ? `\nThe page's H1, verbatim: # ${p.title}\n` : "";
   const reader = p.reader ? `\nThe page's reader, from its track: ${String(p.reader).trim()}\n` : "";
@@ -305,11 +340,11 @@ outline entry, and the facts the blueprint places or cites are inlined below. Th
 this prompt names are everything you draft from. The outline entry holds the page's job, its type,
 what it covers, and what it leaves out.
 ${title}${reader}
-${blueprintReading()}
+${c.markdown ? markdownReading() : blueprintReading()}
 
-The introduction and the close. Plan the introduction from \`framing.introPlan\` and the
-blueprint's \`introduction\`: what the page covers, the prior knowledge it expects, and what it
-leaves out. Write it for the readers \`framing.readers\` names. Read \`drafter:introductions.md\`,
+The introduction and the close. ${c.markdown
+    ? "Plan the introduction from the `:::reader` block: what the page covers, the prior knowledge it\nexpects, and what it leaves out. Write it for the readers the block names."
+    : "Plan the introduction from `framing.introPlan` and the\nblueprint's `introduction`: what the page covers, the prior knowledge it expects, and what it\nleaves out. Write it for the readers `framing.readers` names."} Read \`drafter:introductions.md\`,
 inlined below, for how an introduction starts from the reader. Follow ${anatomyRead(a)}, for the
 parts the introduction has and the closing section this page's type requires. The anatomy gives
 the parts, never the words.
@@ -318,11 +353,11 @@ The standard. Write to the Google developer documentation style guide.
 \`drafter:google-description.md\` describes the standard and its reader,
 \`drafter:google-tells.md\` lists the patterns it rules out, each with a before-and-after pair, and
 \`drafter:google-corpus.md\` holds short passages in its voice, all inlined below. Imitate the
-corpus for voice only, and never take its facts, terms, product names, or wording.
+corpus for voice only, and never take its facts, terms, product names, or wording.${preferencesBlock(c.preferences)}
 
 ${factsDiscipline()}
 
-${briefRules("The brief.")}
+${briefRules("The brief.", c.markdown)}
 
 Answer with the whole page as Markdown, its brief, and any friction you met.`;
 }
@@ -360,14 +395,14 @@ those parts unchanged. A finding from the coherence read is the exception: fix i
 
 The page, its brief, the blueprint, its outline entry, and the facts the blueprint places or cites
 are inlined below. Draft as the first draft did: from the blueprint and its facts, to the Google
-developer documentation style guide, and in the shape of the page's anatomy.
+developer documentation style guide, and in the shape of the page's anatomy.${preferencesBlock(c.preferences)}
 
 ${factsDiscipline()}
 
 Findings:
 ${c.findings}
 
-${briefRules("The brief's rules still hold, and the gate checks them after your edits.")}`;
+${briefRules("The brief's rules still hold, and the gate checks them after your edits.", c.markdown)}`;
 }
 
 /**
@@ -377,8 +412,47 @@ ${briefRules("The brief's rules still hold, and the gate checks them after your 
  */
 function draftPrompt(c) {
   const p = c.page || {};
-  if (c.round === 1 && !c.findings) return wholeDraft(p);
+  if (c.round === 1 && !c.findings) return wholeDraft(c, p);
   return editDraft(c, p);
+}
+
+/**
+ * The edit pass: one edit of a drafted page, after the gate holds and before any read. It answers
+ * through the edit contract, with the single finding drafter numbers for the pass.
+ * @param {Record<string, any>} c
+ * @returns {string}
+ */
+function editPrompt(c) {
+  const p = c.page || {};
+  const scope = c.scope || "";
+  const bound = scope
+    ? `
+
+This pass follows a section redraft. Change only the sections in scope: ${idList(scope)}. The
+blueprint names each section's id beside its heading. Leave the text before the first heading, every
+heading line, and every other section as they stand, line for line, and leave the brief's sentences
+for those parts unchanged.`
+    : "";
+  return `Edit pass over ${p.path}. The page was just drafted, and drafter's gate holds. You are its editor,
+and this is the one edit it gets before it is accepted. The page, ${briefName(p)}, the blueprint it
+was drafted from, its outline entry, and the facts the blueprint places or cites are inlined below.
+
+Edit the prose to the Google developer documentation style guide. Rewrite each sentence that breaks a
+rule of \`drafter:google-rubric.md\` or shows a pattern of \`drafter:google-tells.md\`, both inlined
+below, and apply the prose rules of ${anatomyRead(anatomyFor(p))}. Leave a passage that already meets
+them as it stands: an edit that changes nothing a reader would notice is noise.${bound}${preferencesBlock(c.preferences)}
+
+An edit changes wording, never a claim. Keep each number, command, flag, path, and name a sentence
+states, and add no specific the facts don't state. A heading is the blueprint's, verbatim, and the
+page's structure is the blueprint's: don't move, add, or drop a section. When you change a sentence
+the brief records, change the brief's text for it to match the page word for word, and keep its id.
+The gate checks the page and the brief together after your edits.
+
+${c.markdown ? markdownReading() + "\n\n" : ""}The edit contract's finding below stands for this pass. Resolve it "edited", naming the edits that
+make your changes, or "declined", with the reason, when the page needs none.
+
+Findings:
+${c.findings}`;
 }
 
 /**
@@ -446,6 +520,7 @@ ${fs}` : ""}`;
  */
 function structurePrompt(c) {
   const p = c.page || {};
+  const md = c.markdown ? `\n\n${markdownReading()} Where this prompt names a YAML field, read its Markdown counterpart: the \`:::reader\` block for \`framing\`, the italic line under a heading for \`why\`, and the order of the headings for \`orderReason\`.` : "";
   return `Structural edit of ${p.path}. The page is inlined below with ${briefName(p)}, the blueprint
 it was drafted from, the blueprint's outline entry, and the facts the blueprint places or cites.
 Your stance is an editor's: the Editorial Freelancers Association says "Developmental editors (also
@@ -480,7 +555,7 @@ have. What the document doesn't cover." Compare the page's introduction with the
 \`job\`, \`covers\`, and \`outOfScope\`, and with the blueprint's \`framing.introPlan\`. The same
 course asks: "Does your introduction provide an accurate overview of the topics you cover?"
 
-A checklist item the page fails is a blocking finding. ${findingRule()}`;
+A checklist item the page fails is a blocking finding. ${findingRule()}${md}`;
 }
 
 /**
@@ -661,4 +736,5 @@ return {
   fact: factPrompt,
   reader: readerPrompt,
   coherence: coherencePrompt,
+  edit: editPrompt,
 };

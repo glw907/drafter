@@ -1142,6 +1142,26 @@
         "turn": 0,
         "facts": true
       }
+    },
+    {
+      "name": "edit/whole",
+      "seat": "edit",
+      "context": {"page": {"path": "docs/extend/rotate-the-widget-key.md", "slug": "rotate-the-widget-key", "title": "Rotate the widget key", "pageType": "task guide", "job": "Rotate the widget's signing key without downtime.\n", "covers": ["The rotation steps.", "How to confirm the new key signs."], "outOfScope": ["Creating the first key (install-widget)."], "figure": false, "anatomy": "Task guide", "brief": "notes/briefs/extend/rotate-the-widget-key.json", "standard": "google"}, "inputs": {"job": "Rotate the widget's signing key without downtime.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": ["operators/widget-create-token/", "docs/extend/how-widgets-work.md"], "claimInventory": [], "factIds": ["f:aaa111", "f:bbb222"]}, "round": 1, "findings": "Finding 1 (edit, advisory)\nLocation: the page\nText: The edit pass: edit the page's prose to the register, and keep every claim.\nRewrite: Make the edits, or decline with the reason.\n", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 0, "facts": true}
+    },
+    {
+      "name": "edit/section",
+      "seat": "edit",
+      "context": {"page": {"path": "docs/extend/rotate-the-widget-key.md", "slug": "rotate-the-widget-key", "title": "Rotate the widget key", "pageType": "task guide", "job": "Rotate the widget's signing key without downtime.\n", "covers": ["The rotation steps.", "How to confirm the new key signs."], "outOfScope": ["Creating the first key (install-widget)."], "figure": false, "anatomy": "Task guide", "brief": "notes/briefs/extend/rotate-the-widget-key.json", "standard": "google"}, "inputs": {"job": "Rotate the widget's signing key without downtime.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": ["operators/widget-create-token/", "docs/extend/how-widgets-work.md"], "claimInventory": [], "factIds": ["f:aaa111", "f:bbb222"]}, "round": 1, "findings": "Finding 1 (edit, advisory)\nLocation: the page\nText: The edit pass: edit the page's prose to the register, and keep every claim.\nRewrite: Make the edits, or decline with the reason.\n", "afterFinalRead": false, "scope": "verify,rotate", "where": "", "narrow": null, "turn": 0, "facts": true}
+    },
+    {
+      "name": "edit/markdown",
+      "seat": "edit",
+      "context": {"page": {"path": "docs/extend/rotate-the-widget-key.md", "slug": "rotate-the-widget-key", "title": "Rotate the widget key", "pageType": "task guide", "job": "Rotate the widget's signing key without downtime.\n", "covers": ["The rotation steps.", "How to confirm the new key signs."], "outOfScope": ["Creating the first key (install-widget)."], "figure": false, "anatomy": "Task guide", "brief": "notes/briefs/extend/rotate-the-widget-key.json", "standard": "google"}, "inputs": {"job": "Rotate the widget's signing key without downtime.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": ["operators/widget-create-token/", "docs/extend/how-widgets-work.md"], "claimInventory": [], "factIds": ["f:aaa111", "f:bbb222"]}, "round": 1, "findings": "Finding 1 (edit, advisory)\nLocation: the page\nText: The edit pass: edit the page's prose to the register, and keep every claim.\nRewrite: Make the edits, or decline with the reason.\n", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 0, "facts": true, "markdown": true, "preferences": "Spell out a command's flag the first time it appears.\nPrefer \"run\" to \"execute\"."}
+    },
+    {
+      "name": "draft/markdown",
+      "seat": "draft",
+      "context": {"page": {"path": "docs/extend/rotate-the-widget-key.md", "slug": "rotate-the-widget-key", "title": "Rotate the widget key", "pageType": "task guide", "job": "Rotate the widget's signing key without downtime.\n", "covers": ["The rotation steps.", "How to confirm the new key signs."], "outOfScope": ["Creating the first key (install-widget)."], "figure": false, "anatomy": "Task guide", "brief": "notes/briefs/extend/rotate-the-widget-key.json", "standard": "google"}, "inputs": {"job": "Rotate the widget's signing key without downtime.\n", "pageType": "task guide", "registerSections": [], "exemplarSources": ["operators/widget-create-token/", "docs/extend/how-widgets-work.md"], "claimInventory": [], "factIds": ["f:aaa111", "f:bbb222"]}, "round": 1, "findings": "", "afterFinalRead": false, "scope": "", "where": "", "narrow": null, "turn": 0, "facts": true, "markdown": true, "preferences": "Spell out a command's flag the first time it appears.\nPrefer \"run\" to \"execute\"."}
     }
   ]
 }
