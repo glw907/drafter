@@ -33,7 +33,11 @@ func runPageBlueprints(cmd *cobra.Command, args []string, f *pageFlags) error {
 	if err := c.Validate(config.ScopeRun); err != nil {
 		return cannot(err)
 	}
-	for _, seat := range []string{"blueprint", "coherence"} {
+	seats := []string{"edit"}
+	if f.judge {
+		seats = append(seats, "blueprint", "coherence")
+	}
+	for _, seat := range seats {
 		if err := c.ValidateSeat(seat); err != nil {
 			return cannot(fmt.Errorf("drafter page on a blueprint needs the %s seat: %w", seat, err))
 		}
@@ -53,7 +57,7 @@ func runPageBlueprints(cmd *cobra.Command, args []string, f *pageFlags) error {
 	var d draftPlan
 	if st != nil {
 		d.handoffs, d.skipped = inRun(handoffs, st)
-	} else if d, err = scopeFromLock(c, root, head, handoffs, f.whole, cmd.ErrOrStderr()); err != nil {
+	} else if d, err = scopeFromLock(c, root, head, handoffs, f.whole, f.judge, cmd.ErrOrStderr()); err != nil {
 		return cannot(err)
 	}
 	if len(d.handoffs) == 0 {
@@ -81,7 +85,7 @@ func runPageBlueprints(cmd *cobra.Command, args []string, f *pageFlags) error {
 	client := batch.New(batch.Options{Key: k, BaseURL: c.APIBaseURL, WorkspaceID: c.WorkspaceID})
 	s, err := pipeline.Run(cmd.Context(), pipeline.Options{
 		Config: c, Handoffs: d.handoffs, API: client, Resume: f.resume, DryRun: f.dryRun,
-		Scopes: d.scopes, Changes: d.changes, Draft: true, SkipRead: d.skipRead,
+		Scopes: d.scopes, Changes: d.changes, Draft: true, Judge: f.judge, SkipRead: d.skipRead,
 		ReadScopes: d.read.scopes, ReadChanges: d.read.changes, Bars: d.read.bars, BarFrom: d.read.barFrom,
 		Version: version(), Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr(), ResumeArgs: args,
 	})
@@ -129,11 +133,13 @@ func projectRoot(arg string) (string, error) {
 }
 
 // blueprintArgs turns each argument into the path of its blueprint: a blueprint stays as given,
-// and a page maps to the blueprint at the page's path under the blueprint root.
+// and a page maps to its blueprint under the blueprint root, the .blueprint.md when that file
+// exists and the .blueprint.yaml otherwise.
 func blueprintArgs(c *config.Config, root string, args []string) ([]string, error) {
+	proj := blueprint.Project{Root: root, BlueprintRoot: c.Blueprints.Root}
 	out := make([]string, 0, len(args))
 	for _, a := range args {
-		if !strings.HasSuffix(a, ".md") {
+		if strings.HasSuffix(a, ".blueprint.md") || !strings.HasSuffix(a, ".md") {
 			out = append(out, a)
 			continue
 		}
@@ -141,7 +147,7 @@ func blueprintArgs(c *config.Config, root string, args []string) ([]string, erro
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, filepath.Join(root, filepath.FromSlash(blueprint.BlueprintPath(c.Blueprints.Root, rel))))
+		out = append(out, filepath.Join(root, filepath.FromSlash(proj.Locate(rel))))
 	}
 	return out, nil
 }

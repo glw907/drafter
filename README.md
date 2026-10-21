@@ -41,7 +41,7 @@ Every command prints for a person by default and takes `--json` for scripts. Run
 ### page
 
 ```sh
-drafter page [--workflow-run <run-file>] [--resume <run-id>] [--whole] [--dry-run] [--sync] [--json] [<handoff-file>...]
+drafter page [--workflow-run <run-file>] [--resume <run-id>] [--whole] [--judge] [--dry-run] [--sync] [--json] [<handoff-file>|<blueprint>|<page>...]
 ```
 
 The command runs each handoff's page through the pipeline. A handoff tells drafter everything
@@ -53,9 +53,19 @@ reads the pages from a planner's run file instead.
 | `--workflow-run <run-file>` | Reads the handoff from a planner's Workflow run file. |
 | `--resume <run-id>` | Continues a stopped run. |
 | `--whole` | Drafts each blueprint page whole, whatever its `drafted.lock` entry says. |
+| `--judge` | Also runs the configured review seats, the blueprint and consistency reads, and the coherence read. |
 | `--dry-run` | Assembles the first stage's requests, prints their sizes and estimated cost, and submits nothing. |
 | `--sync` | Sends streamed Messages calls for this run instead of Message Batches. |
 | `--json` | Prints the result as JSON. |
+
+A blueprint is a `.blueprint.yaml` or a `.blueprint.md` file, and a page argument maps to its
+blueprint: the `.blueprint.md` when that file exists, else the `.blueprint.yaml`. Without
+`--judge`, a blueprint page runs the draft seat and the edit seat only: the draft, the gate, one
+edit request, and an accept when the gate holds. A section redraft runs its section exchange, the
+gate, and the edit pass. With `--judge`, the page also takes the configured `seats`, the blueprint
+and consistency reads, and, after a section redraft, the coherence read. [Configuration](docs/configuration.md)
+lists which seats run when, and `[editing] preferences` names a file of editing preferences that
+the draft and edit prompts carry.
 
 The exit status is 0 when every page is accepted, 1 when any page is escalated, 2 when the command
 couldn't start, and 3 when the run stopped and you can resume it. Status 3 outranks 1: a run that

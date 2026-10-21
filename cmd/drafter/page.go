@@ -22,6 +22,7 @@ import (
 type pageFlags struct {
 	workflowRun, resume       string
 	dryRun, sync, json, whole bool
+	judge                     bool
 }
 
 func newPageCmd() *cobra.Command {
@@ -34,13 +35,24 @@ review reads, redraft, and the final reader. The handoffs come from files, or fr
 Workflow run file with --workflow-run. The command spends on the API key the configuration names
 and never commits.
 
-An argument that ends in .blueprint.yaml is a blueprint, and one that ends in .md is a page,
-mapped to its blueprint. The command reads each blueprint, drafts the page from it, and records
-the page in drafted.lock when it is accepted. A page whose blueprint, facts, and outline entry
-match its lock entry is not run, and the command says it is up to date. After a blueprint change,
-only the sections the change touched are redrafted, and a read of the whole page for coherence
-follows. --whole drafts each page whole, whatever its lock entry says, which is how a page
-converted to a blueprint is first drafted. Give handoff files or blueprints and pages, not both.
+An argument that ends in .blueprint.yaml or .blueprint.md is a blueprint, and one that ends in .md
+is a page, mapped to its blueprint: the page's .blueprint.md when that file exists, else its
+.blueprint.yaml. The command drafts the page from its blueprint and records the page in
+drafted.lock when it is accepted. A page whose blueprint, facts, and outline entry match its lock
+entry is not run, and the command says it is up to date. After a blueprint change, only the
+sections the change touched are redrafted. --whole drafts each page whole, whatever its lock entry
+says, which is how a page converted to a blueprint is first drafted. Give handoff files or
+blueprints and pages, not both.
+
+Without --judge, a blueprint page runs the draft seat and the edit seat only. The draft goes
+through the gate, the edit pass runs once as one request, and the page is accepted when the gate
+holds. A section redraft runs its section exchange, the gate, and the edit pass. The command skips
+the blueprint read and the consistency read whatever the lock says, and sends no review round,
+final reader, coverage read, or coherence read. A gate that is red after the edit goes to the
+gate-fix exchange a red draft does. --judge also runs the seats named by seats in drafter.toml,
+and the blueprint and coherence seats: the blueprint and consistency reads, the review rounds, the
+final reader, the coverage read, and, after a section redraft, a read of the whole page for
+coherence. The edit pass runs in both.
 
 --dry-run assembles the first stage's requests, counts their tokens, prints each request's size
 and the stage's worst-case cost, and submits nothing. --resume continues a stopped run; give the
@@ -57,6 +69,7 @@ not start or hit an error, and 3 when the run stopped and can be resumed, which 
 	cmd.Flags().BoolVar(&f.sync, "sync", false, "send ordinary Messages calls instead of a batch")
 	cmd.Flags().BoolVar(&f.json, "json", false, "print the result as one JSON object")
 	cmd.Flags().BoolVar(&f.whole, "whole", false, "draft each page whole, whatever its lock entry says")
+	cmd.Flags().BoolVar(&f.judge, "judge", false, "also run the configured review seats, the blueprint read, and the coherence read")
 	return cmd
 }
 
@@ -88,7 +101,7 @@ func dryExitCode(s pipeline.Summary) int {
 // isBlueprintArg reports whether a page argument names a blueprint or a page, as opposed to a
 // handoff file.
 func isBlueprintArg(a string) bool {
-	return strings.HasSuffix(a, ".blueprint.yaml") || strings.HasSuffix(a, ".md")
+	return strings.HasSuffix(a, ".blueprint.yaml") || strings.HasSuffix(a, ".blueprint.md") || strings.HasSuffix(a, ".md")
 }
 
 func runPage(cmd *cobra.Command, args []string, f *pageFlags) error {
@@ -109,6 +122,8 @@ func runPage(cmd *cobra.Command, args []string, f *pageFlags) error {
 		return usageError(cmd, "--whole drafts blueprints and pages, not a --workflow-run")
 	case f.whole && bp == 0:
 		return usageError(cmd, "--whole drafts blueprints and pages, not handoff files")
+	case f.judge && bp == 0:
+		return usageError(cmd, "--judge runs on blueprints and pages, not handoff files")
 	case bp > 0:
 		return runPageBlueprints(cmd, args, f)
 	}
