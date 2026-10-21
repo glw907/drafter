@@ -12,6 +12,9 @@
 
 ## Medium
 
+- [ ] **#35** Read a code fence inside an open `:::row` or `:::reader` block as block text `#bug` `#drafter` `#initiative:docs-system` *(2026-10-21)*
+  `DecodeMarkdown` checks for a fence before it checks for an open block, so a fence line inside a row or the reader block starts a fence, and the block's closing `:::` inside that fence is swallowed. The block can then be misread or never close. Found by the reviewed-pages CT1 recheck. `internal/blueprint/markdown.go:161-170`
+
 - [ ] **#29** Refuse a resume on a binary other than the run's `drafter_version` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-20)*
   A run started under one build resumes under another, so a stock change like the 64000-to-128000 draft ceiling can split one run across two configurations. `internal/pipeline/resume.go`
 
@@ -40,6 +43,9 @@
   The edit-quality pass (2026-10-18) sent a caution with no fact-supplied handler to the "Add a caveat" row and made the smaller edit on a conflicting request. Prompt 4 then made the caveat in 3 of 3 runs and 2 of 3 were accepted; prompt 5 passed 1 of 3. The prompt 5 misses were consistency escalations (#12), so the shape that remains is a new section placed between the push and the checks, which the read now returns as a Nit. Left open for prompt 5.
 
 ## Low
+
+- [ ] **#34** Refuse a `:fact` tag in front matter and a malformed tag `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-21)*
+  `page: Rotate keys :fact[bbbbbb]` decodes with the tag left in the title, and `:fact[]` or `:fact[a b]` does not match `factTag`, so each is ignored with no finding, although the format doc says a tag anywhere else is an error. The reviewed-pages tests also lack a case for a tag on a `:::reader` opener. Found by the reviewed-pages CT1 recheck. `internal/blueprint/markdown.go:93,129-147`
 
 - [ ] **#18** Retry a reader read that stops at `max_tokens` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19)*
   The reader's schema lets the model run a string on past its end: in the B3 live runs about one reader call in four filled its 32000-token ceiling with repeated blank lines, quotes, or tags, and the page escalated as an unreadable reader at about $1.2. `noRetry` gives `stReader1` and `stReader2` no second try by design. The reader prompt now asks for plain text and the stock reader runs at low effort, which cut the rate in a replay but not to zero. A single retry of a `max_tokens` stop, or a lower `max_tokens` for the reader, needs Geoff's ruling because it changes the failures table. `internal/pipeline/handle.go`
