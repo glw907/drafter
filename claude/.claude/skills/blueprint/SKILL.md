@@ -19,7 +19,7 @@ A change that adds or removes a section, or changes the reader's path through th
 
 ## Edit
 
-Read the blueprint whole before you edit it. Each section is a heading with an italic job line under it, then the lines the page carries: bullets and numbered steps, each ending in the `:fact[id]` tags of the facts it rests on, and `:::row` blocks on a symptom page. [The markdown format](format.md) gives every rule. Edit fact bullets with the Edit tool, never a shell append. Never edit `drafted.lock`.
+Read the blueprint whole before you edit it. Each section is a heading with an italic job line under it, then the lines the page carries: bullets and numbered steps, each ending in the `:fact[id]` tags of the facts it rests on, and `:::row` blocks on a symptom page. [Markdown blueprints](format.md#markdown-blueprints) gives every rule. Edit fact bullets with the Edit tool, never a shell append. Never edit `drafted.lock`.
 
 ## Check
 

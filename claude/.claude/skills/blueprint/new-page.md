@@ -21,7 +21,7 @@ Never file a fact tagged `candidate` or `docs-drift`. Edit fact bullets with the
 
 ## 3. Write the blueprint
 
-Write `<page>.blueprint.md` in [the markdown format](format.md): the front matter (`page`, `type`, `track`, `exemplar`), the `:::reader` block that says who reads the page, why they arrive, what the page does for them, and what it leaves to other pages, then the sections. Argue their order from the reader: Google's outline guidance is the source, so the page introduces information when it is most relevant to the reader, and the order of `covers` is only an inventory.
+Write `<page>.blueprint.md` in [the markdown format](format.md#markdown-blueprints): the front matter (`page`, `type`, `track`, `exemplar`), the `:::reader` block that says who reads the page, why they arrive, what the page does for them, and what it leaves to other pages, then the sections. Argue their order from the reader: Google's outline guidance is the source, so the page introduces information when it is most relevant to the reader, and the order of `covers` is only an inventory.
 
 Under each heading, write the italic job line that says what the section does for the reader, then the lines the page will carry, each a bullet or numbered step ending in its `:fact[id]` tags. A symptom page gives each symptom a `:::row` with its Symptom, Cause, and Fix. Write each line as the page should say it to its reader: the blueprint is what Geoff reads and approves, so it reads as the page's plan in plain sentences, not as notes.
 
