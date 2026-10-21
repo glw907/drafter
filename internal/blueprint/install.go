@@ -123,7 +123,7 @@ func headPage(root, pagePath string) (blob string, data []byte, err error) {
 
 // newLockEntry is the entry that records a page as drafted from a blueprint: the page and the
 // blueprint by blob id, and the page's sections by hash. Conversion and Seed both write it.
-func newLockEntry(b *Blueprint, pageBlob string, pageBytes []byte, bpBlob string) LockEntry {
+func newLockEntry(b Source, pageBlob string, pageBytes []byte, bpBlob string) LockEntry {
 	return LockEntry{Page: pageBlob, Blueprint: bpBlob, Sections: SectionHashes(b, pageBytes)}
 }
 

@@ -4,6 +4,9 @@ A blueprint is the durable plan for one documentation page. It holds everything 
 and why, as one YAML file, `<page>.blueprint.yaml`, kept apart from the page. Agents change the
 blueprint, never the page prose, and drafter turns the change into prose.
 
+Two formats exist. Markdown, `<page>.blueprint.md`, is the current one; YAML is the older one, and the
+sections below the markdown section describe it.
+
 A blueprint starts from the [plan format](plan-format.md) and changes it for a file that lives for
 years and is edited in small steps. This page is the format's one home. The JSON Schemas are
 [`schema/blueprint.schema.json`](../schema/blueprint.schema.json) and
@@ -41,6 +44,117 @@ pages cite one fact.
 The settings `blueprints.root`, `blueprints.outline`, and `facts.dir` move these paths for a
 project that is mid-migration, and `drafter check` warns while a project departs from the
 convention. [Configuration](configuration.md) lists them.
+
+## Markdown blueprints
+
+A page may keep its blueprint as `<page>.blueprint.md` instead. Markdown is the current format; the
+YAML format described in the sections after this one is the older one, still read and checked, and
+`drafter convert markdown` moves a page from one to the other. A page has one blueprint. When both
+files exist, `drafter check` reports the `.blueprint.yaml` as an error and every command reads the
+`.blueprint.md`.
+
+A markdown blueprint is a short front matter block, a title, one reader block, and the page's
+sections as headings. This example is for a made-up widget product:
+
+```markdown
+---
+page: Rotate the widget key
+type: task guide
+track: operate
+exemplar: guides/rotate-a-secret
+---
+
+# Rotate the widget key
+
+:::reader
+**Who reads it.** An operator who rotates keys on a schedule and has the admin role.
+
+**Why they arrive:**
+- A key is due for rotation. :fact[aaaaaa]
+
+**What it leaves to other pages.** Creating the first key.
+:::
+
+## Before you begin
+
+*Gets the reader ready, so no step fails for a missing role.*
+
+- Rotating a key needs the admin role. :fact[bbbbbb]
+
+## Rotate the key
+
+*Walks the reader through the rotation.*
+
+1. Generate a new key in the service settings.
+2. Add the new key to the service.
+
+:::row
+**Symptom.** The settings page refuses to generate a key.
+**Cause.** The account lacks the admin role.
+**Fix.** Ask an admin to grant the role, then try again. :fact[bbbbbb]
+:::
+
+- See [the key reference](https://example.com/docs/keys).
+```
+
+### Front matter
+
+The front matter is YAML between two `---` lines. It takes four keys, and only these four.
+
+| Key | Meaning |
+| --- | --- |
+| `page` | The page's title. It must equal the title of the page's outline entry. |
+| `type` | The outline's type name for the page, such as `task guide`. It must equal the entry's type. |
+| `track` | The track that holds the page. When the outline declares tracks, the named track's `paths` must hold the page. |
+| `exemplar` | The source of one published page to imitate. Optional. |
+
+### The reader block
+
+A `:::reader` block, closed by a line holding only `:::`, says who reads the page and why. A page has
+exactly one. Write it as short labeled paragraphs and lists; drafter reads it as the page's
+introduction brief. A `:fact[id]` tag in it cites a fact.
+
+### Sections
+
+A heading of level 2 to 6 opens a section, and its slug is the section's id, as in the lock. Two
+headings may not share a slug. Under each heading, the first line is the section's job, written as
+one italic span: what the section does for the reader. A section without one is an error.
+
+A bullet or numbered step states one thing the section must say. End it with a `:fact[id]` tag for
+each fact it places or cites. Leave off the `f:` prefix the facts store uses, so `:fact[bbbbbb]`
+cites `f:bbbbbb`. A bullet of the form `See [text](target).` is a link, and `drafter check` checks
+its target as it does a link item in YAML.
+
+A `:::row` block is one row of a symptom page. It holds three lines, each opening with a bold label:
+`**Symptom.**` for what the reader sees, `**Cause.**` for why, and `**Fix.**` for what to do. A row
+missing any of the three is an error. A line may wrap onto the lines after it. Place `:fact[id]`
+tags on whichever of the three lines state the fact.
+
+Code fences are skipped, so a fence may hold any of the markup above as an example.
+
+### What the lock does with a markdown blueprint
+
+The lock keys a section by its heading's slug, and `_intro` holds the text above the first section.
+`drafter seed` and a draft write the same entry as for YAML. When it compares a markdown blueprint
+with the one the lock recorded, drafter calls a section changed when its slug is new, its text in
+the blueprint differs, or a fact it cites changed. A change to the front matter or the reader block
+scopes the page without naming a section.
+
+### Convert a YAML blueprint
+
+`drafter convert markdown <blueprint.yaml>...` writes the markdown file beside each YAML file,
+deletes the YAML, and rewrites the page's lock entry so a page whose file has not changed stays up
+to date. The lock entry's `accepted` id and read bar are dropped, because no read has judged the
+new file. The command refuses a drafted page whose lock entry is stale, and a page that already has
+a markdown blueprint, and writes nothing in either case. On standard error it lists what the
+mapping dropped or could not decide: a section without a `why`, a failure without a `cause`, the
+`argument` and `orderReason` fields, dispositions, and exemplars after the first.
+
+### Find where a fact is used in a markdown blueprint
+
+`drafter refs f:bbbbbb` lists each line of a markdown blueprint that carries a tag for the fact, as
+`file:line: item (kind)`. A bullet's item id is `<section id>.p<n>`, a row's is
+`<section id>.row<n>`, and the reader block's is `reader`.
 
 ## Write prose fields as blocks
 

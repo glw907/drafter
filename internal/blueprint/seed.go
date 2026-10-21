@@ -62,7 +62,7 @@ func Seed(root string, layout Layout, blueprints []string) ([]string, error) {
 func seedEntry(root string, layout Layout, lock *Lock, bp string) (string, LockEntry, error) {
 	page, ok := PagePath(layout.BlueprintRoot, bp)
 	if !ok {
-		return "", LockEntry{}, fmt.Errorf("%s is not a blueprint; name a .blueprint.yaml file under %s", bp, layout.BlueprintRoot)
+		return "", LockEntry{}, fmt.Errorf("%s is not a blueprint; name a .blueprint.md or .blueprint.yaml file under %s", bp, layout.BlueprintRoot)
 	}
 	for _, f := range []string{page, bp} {
 		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(f))); errors.Is(err, fs.ErrNotExist) {
@@ -96,7 +96,7 @@ func seedEntry(root string, layout Layout, lock *Lock, bp string) (string, LockE
 	if err != nil {
 		return "", LockEntry{}, err
 	}
-	b, findings := Decode(bp, bpData)
+	b, findings := Load(bp, bpData)
 	if b == nil || len(findings) > 0 {
 		return "", LockEntry{}, fmt.Errorf("%s does not decode; run drafter check", bp)
 	}

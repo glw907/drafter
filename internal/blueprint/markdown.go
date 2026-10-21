@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -21,12 +22,14 @@ const checkMarkdown = "markdown"
 // Markdown is a decoded markdown blueprint: YAML front matter, a level-1 title, a :::reader block,
 // then the page's sections as headings. Text is the file as written, which is what a draft
 // request carries. The other fields are the parts the checks, refs, the lock, and section scoping
-// read; Go decodes no further than they need.
+// read; Go decodes no further than they need. ReaderLines holds the line of every :::reader
+// block's opening fence, Reader being the first.
 type Markdown struct {
-	Front    Front
-	Text     string
-	Reader   Reader
-	Sections []MDSection
+	Front       Front
+	Text        string
+	Reader      Reader
+	ReaderLines []int
+	Sections    []MDSection
 }
 
 // Front is the front matter. Page is the page's title, Type the outline's type name for it,
@@ -40,20 +43,31 @@ type Front struct {
 	Line int `yaml:"-"`
 }
 
-// Reader is the :::reader block, the page's statement of who reads it and why. Line is its
-// opening fence's line, zero when the file has none.
-type Reader struct {
+// Cite is one :fact tag: the id as written and the line it sits on.
+type Cite struct {
 	Line int
-	Text string
+	ID   string
+}
+
+// Reader is the :::reader block, the page's statement of who reads it and why. Line is its
+// opening fence's line, zero when the file has none. Text omits the :fact tags; Facts lists their
+// ids in order and Cites the same with their lines.
+type Reader struct {
+	Line  int
+	Text  string
+	Facts []string
+	Cites []Cite
 }
 
 // MDSection is one heading and what sits under it up to the next heading. ID is the heading's
 // slug, unique in the file, which keys the section in the lock as a YAML section's id does. Job
-// is the italic line under the heading that says what the section does for the reader.
+// is the italic line under the heading that says what the section does for the reader. Raw is the
+// section's text as written, heading line included, trimmed of surrounding blank lines.
 type MDSection struct {
 	ID, Heading string
 	Level, Line int
 	Job         string
+	Raw         string
 	Lines       []MDLine
 	Rows        []Row
 }
@@ -66,25 +80,41 @@ type MDLine struct {
 	Facts []string
 }
 
-// Row is one :::row block of a symptom page: what the reader sees, why, and what to do. Facts are
-// the ids its parts cite.
+// Row is one :::row block of a symptom page: what the reader sees, why, and what to do. Line is
+// its opening fence's line. Facts are the ids its parts cite, and Cites the same with their lines.
 type Row struct {
 	Line                int
 	Symptom, Cause, Fix string
 	Facts               []string
+	Cites               []Cite
 }
 
 var (
 	factTag     = regexp.MustCompile(`\s*:fact\[([^\]\s]+)\]`)
 	listMarker  = regexp.MustCompile(`^\s*(?:[-*+]|\d+[.)])\s+`)
 	headingLine = regexp.MustCompile(`^(#{1,6})\s+(.*?)\s*#*\s*$`)
+	rowPart     = regexp.MustCompile(`^\*\*(Symptom|Cause|Fix)\.\*\*\s*`)
+	seeLink     = regexp.MustCompile(`^See \[(.+)\]\(([^()\s]+)\)\.$`)
 )
 
-// DecodeMarkdown parses data as a markdown blueprint. It reads the front matter, the headings,
-// each section's job line, and each bullet's :fact tags, skipping fenced code. A directive block
-// (a line opening with ":::" up to the line that is ":::" alone) is skipped whole, so Reader and
-// Rows stay empty; reading :::reader and :::row into them completes the format. The result is nil only when the front matter is
-// missing or is not a YAML mapping; every other fault is a finding at its line.
+// DecodeMarkdown parses data as a markdown blueprint. The front matter is YAML between two ---
+// lines and takes the keys page, type, track, and exemplar. After it a line scanner reads the
+// body, since goldmark has no directive extension, and skips fenced code:
+//
+//   - A heading of level 2 to 6 opens a section, and a level-1 heading is the page title and ends
+//     the section above it. A section's ID is its heading's slug, taken in page order under the
+//     front matter's page title.
+//   - The first non-blank line under a heading, when it is one italic span, is the section's job.
+//   - A bullet or numbered line is an MDLine, with its :fact[id] tags lifted out of its text.
+//   - A line that opens with ":::" opens a directive block that runs to the next line holding
+//     only ":::". :::reader fills Reader; a second one adds only its line to ReaderLines. :::row
+//     adds a Row to the section above it, reading its **Symptom.**, **Cause.**, and **Fix.**
+//     lines, each of which may wrap onto the lines after it.
+//
+// A fault in the markup itself is a finding at its line: a block that never closes, a ":::" that
+// closes nothing, a directive of another name, and a :::row above every heading. A section with no
+// job and a row missing a part are not faults here; the blueprint check reports them. The result
+// is nil only when the front matter is missing or is not a YAML mapping.
 func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 	var findings []plan.Finding
 	add := func(line int, msg, fix string) {
@@ -117,8 +147,14 @@ func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 	m.Front.Line = 1
 
 	var headings []string
-	var sec *MDSection
-	fence, directive := "", false
+	cur, rawStart := -1, 0
+	closeSection := func(at int) {
+		if cur >= 0 {
+			m.Sections[cur].Raw = strings.TrimSpace(strings.Join(lines[rawStart:at], "\n"))
+		}
+	}
+	var open *block
+	fence := ""
 	for i := end + 1; i < len(lines); i++ {
 		line, n := lines[i], i+1
 		trimmed := strings.TrimSpace(line)
@@ -132,31 +168,56 @@ func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 			fence = trimmed[:3]
 			continue
 		}
-		if directive {
-			if trimmed == ":::" {
-				directive = false
+		if open != nil {
+			if trimmed != ":::" {
+				open.add(n, line)
+				continue
 			}
+			switch open.name {
+			case "reader":
+				m.ReaderLines = append(m.ReaderLines, open.line)
+				if len(m.ReaderLines) == 1 {
+					m.Reader = open.reader()
+				}
+			case "row":
+				if cur < 0 {
+					add(open.line, "a :::row block sits above the first heading, so it belongs to no section", "move the row under the section it explains")
+					break
+				}
+				m.Sections[cur].Rows = append(m.Sections[cur].Rows, open.row())
+			}
+			open = nil
 			continue
 		}
 		if strings.HasPrefix(trimmed, ":::") {
-			directive = true
+			name, _, _ := strings.Cut(strings.TrimSpace(trimmed[3:]), " ")
+			switch name {
+			case "":
+				add(n, "a ::: line closes no block", "delete the line, or open a block above it with :::reader or :::row")
+				continue
+			case "reader", "row":
+			default:
+				add(n, "the directive :::"+name+" is not one the format has", "use :::reader or :::row")
+			}
+			open = &block{name: name, line: n}
 			continue
 		}
 		if h := headingLine.FindStringSubmatch(line); h != nil {
-			level := len(h[1])
-			if level == 1 {
-				sec = nil
+			closeSection(i)
+			if len(h[1]) == 1 {
+				cur = -1
 				continue
 			}
-			m.Sections = append(m.Sections, MDSection{Heading: h[2], Level: level, Line: n})
+			m.Sections = append(m.Sections, MDSection{Heading: h[2], Level: len(h[1]), Line: n})
 			headings = append(headings, h[2])
-			sec = &m.Sections[len(m.Sections)-1]
+			cur, rawStart = len(m.Sections)-1, i
 			continue
 		}
-		if sec == nil || trimmed == "" {
+		if cur < 0 || trimmed == "" {
 			continue
 		}
-		if sec.Job == "" && len(sec.Lines) == 0 && isItalicLine(trimmed) {
+		sec := &m.Sections[cur]
+		if sec.Job == "" && len(sec.Lines) == 0 && len(sec.Rows) == 0 && isItalicLine(trimmed) {
 			sec.Job = trimmed[1 : len(trimmed)-1]
 			continue
 		}
@@ -169,10 +230,72 @@ func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 			sec.Lines = append(sec.Lines, MDLine{Line: n, Text: strings.TrimSpace(factTag.ReplaceAllString(body, "")), Facts: ids})
 		}
 	}
+	closeSection(len(lines))
+	if open != nil {
+		add(open.line, "the :::"+open.name+" block has no closing ::: line", "close the block with a line holding only :::")
+	}
 	for i, slug := range plan.HeadingSlugs(m.Front.Page, headings) {
 		m.Sections[i].ID = slug
 	}
 	return m, findings
+}
+
+// block is a directive block being read: the lines between its fences and where each sits.
+type block struct {
+	name string
+	line int
+	text []string
+	nums []int
+}
+
+func (b *block) add(n int, line string) {
+	b.text = append(b.text, line)
+	b.nums = append(b.nums, n)
+}
+
+func (b *block) tags() (ids []string, cites []Cite) {
+	for i, l := range b.text {
+		for _, t := range factTag.FindAllStringSubmatch(l, -1) {
+			ids = append(ids, t[1])
+			cites = append(cites, Cite{Line: b.nums[i], ID: t[1]})
+		}
+	}
+	return ids, cites
+}
+
+func (b *block) reader() Reader {
+	r := Reader{Line: b.line}
+	r.Facts, r.Cites = b.tags()
+	stripped := make([]string, len(b.text))
+	for i, l := range b.text {
+		stripped[i] = factTag.ReplaceAllString(l, "")
+	}
+	r.Text = strings.TrimSpace(strings.Join(stripped, "\n"))
+	return r
+}
+
+func (b *block) row() Row {
+	r := Row{Line: b.line}
+	r.Facts, r.Cites = b.tags()
+	var part *string
+	for _, l := range b.text {
+		l = strings.TrimSpace(factTag.ReplaceAllString(l, ""))
+		if m := rowPart.FindStringSubmatch(l); m != nil {
+			switch m[1] {
+			case "Symptom":
+				part = &r.Symptom
+			case "Cause":
+				part = &r.Cause
+			default:
+				part = &r.Fix
+			}
+			l = l[len(m[0]):]
+		}
+		if part != nil && l != "" {
+			*part = strings.TrimSpace(*part + " " + l)
+		}
+	}
+	return r
 }
 
 // isItalicLine reports whether s is one emphasized span, *like this* or _like this_.
@@ -186,6 +309,49 @@ func isItalicLine(s string) bool {
 		}
 	}
 	return false
+}
+
+// resolveFact maps a :fact tag to the id the facts store holds. A tag omits the store's "f:"
+// prefix, as in :fact[rkj7tn] for f:rkj7tn, but a tag written whole matches too. An id the store
+// does not hold comes back as written, so the facts check can name it.
+func resolveFact(facts *plan.Facts, tag string) string {
+	if facts == nil || facts.Count(tag) > 0 {
+		return tag
+	}
+	if facts.Count("f:"+tag) > 0 {
+		return "f:" + tag
+	}
+	return tag
+}
+
+func resolveFacts(facts *plan.Facts, tags []string) []string {
+	var out []string
+	for _, t := range tags {
+		out = append(out, resolveFact(facts, t))
+	}
+	return out
+}
+
+// FactIDs lists the ids of every fact the section cites, in page order, resolved against facts.
+func (s *MDSection) FactIDs(facts *plan.Facts) []string {
+	var ids []string
+	for _, l := range s.Lines {
+		ids = append(ids, resolveFacts(facts, l.Facts)...)
+	}
+	for _, r := range s.Rows {
+		ids = append(ids, resolveFacts(facts, r.Facts)...)
+	}
+	return ids
+}
+
+// FactIDs lists the sorted, distinct ids of every fact the blueprint cites, resolved against facts.
+func (m *Markdown) FactIDs(facts *plan.Facts) []string {
+	ids := resolveFacts(facts, m.Reader.Facts)
+	for i := range m.Sections {
+		ids = append(ids, m.Sections[i].FactIDs(facts)...)
+	}
+	slices.Sort(ids)
+	return slices.Compact(ids)
 }
 
 // Source is a blueprint in either format, as the draft path reads it. [Load] returns one.
@@ -261,35 +427,53 @@ func (b *Blueprint) CodeSources() []string {
 func (m *Markdown) CodeSources() []string { return nil }
 
 // View projects m onto a plan so the code that reads a YAML blueprint's view reads a markdown one.
-// The page's path, title, and type come from entry. The reader block is the introduction's
-// covers. Each bullet becomes an example item whose id is <section id>.p<n>, the anchor form a
-// review note uses, and each row an example item holding its three parts. facts is unused: a
-// markdown blueprint cites facts only through :fact tags.
-func (m *Markdown) View(entry Page, _ *plan.Facts) *plan.Plan {
+// The page's path, title, and type come from entry. The reader block is the introduction: its
+// text the covers, its tags the facts. Each bullet becomes an example item whose id is
+// <section id>.p<n>, the anchor form a review note uses, except a "See [text](target)." bullet,
+// which becomes a link item so the links check reads its target; each row becomes an example item
+// holding its three parts, with id <section id>.row<n>. Every :fact tag resolves against facts,
+// so the plan checks look up the id the store holds; a nil facts leaves the tags as written.
+func (m *Markdown) View(entry Page, facts *plan.Facts) *plan.Plan {
 	p := &plan.Plan{
-		Version:      plan.Version,
-		Page:         plan.Page{Path: entry.Path, Title: entry.Title, Type: entry.Type, Line: 1, Lines: map[string]int{"path": 1, "title": 1, "type": 1}},
-		Introduction: plan.Introduction{Covers: m.Reader.Text, Line: m.Reader.Line},
-		Line:         1,
+		Version: plan.Version,
+		Page:    plan.Page{Path: entry.Path, Title: entry.Title, Type: entry.Type, Line: 1, Lines: map[string]int{"path": 1, "title": 1, "type": 1}},
+		Introduction: plan.Introduction{
+			Covers: m.Reader.Text, Facts: resolveFacts(facts, m.Reader.Facts), Line: m.Reader.Line,
+			Lines: map[string]int{"facts": citeLine(m.Reader.Cites, m.Reader.Line)},
+		},
+		Line: 1,
 	}
 	for _, s := range m.Sections {
 		ps := plan.Section{Heading: s.Heading, Level: s.Level, Anchor: s.ID, Opens: s.Job, Line: s.Line, Lines: map[string]int{"heading": s.Line}}
 		for i, l := range s.Lines {
-			ps.Items = append(ps.Items, plan.Item{
-				ID: fmt.Sprintf("%s.p%d", s.ID, i+1), Kind: "example", Text: l.Text, Facts: l.Facts, Line: l.Line,
+			it := plan.Item{
+				ID: fmt.Sprintf("%s.p%d", s.ID, i+1), Kind: "example", Text: l.Text, Facts: resolveFacts(facts, l.Facts), Line: l.Line,
 				Lines: map[string]int{"text": l.Line, "facts": l.Line},
-			})
+			}
+			if see := seeLink.FindStringSubmatch(l.Text); see != nil {
+				it.Kind, it.Text, it.Target, it.Facts = "link", see[1], see[2], nil
+				it.Lines = map[string]int{"text": l.Line, "target": l.Line}
+			}
+			ps.Items = append(ps.Items, it)
 		}
 		for i, r := range s.Rows {
 			ps.Items = append(ps.Items, plan.Item{
-				ID: fmt.Sprintf("%s.row%d", s.ID, i+1), Kind: "example", Facts: r.Facts, Line: r.Line,
+				ID: fmt.Sprintf("%s.row%d", s.ID, i+1), Kind: "example", Facts: resolveFacts(facts, r.Facts), Line: r.Line,
 				Text:  "Symptom. " + r.Symptom + "\nCause. " + r.Cause + "\nFix. " + r.Fix,
-				Lines: map[string]int{"text": r.Line, "facts": r.Line},
+				Lines: map[string]int{"text": r.Line, "facts": citeLine(r.Cites, r.Line)},
 			})
 		}
 		p.Sections = append(p.Sections, ps)
 	}
 	return p
+}
+
+// citeLine is the line of the first cite, or def when there are none.
+func citeLine(cites []Cite, def int) int {
+	if len(cites) > 0 {
+		return cites[0].Line
+	}
+	return def
 }
 
 // ExemplarSources lists the front matter's exemplar, when it names one.

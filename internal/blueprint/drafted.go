@@ -17,7 +17,7 @@ func DraftedEntry(root, start, bp, pagePath, accepted string) (LockEntry, error)
 	if err != nil {
 		return LockEntry{}, err
 	}
-	b, findings := Decode(bp, bpBytes)
+	b, findings := Load(bp, bpBytes)
 	if b == nil || len(findings) > 0 {
 		return LockEntry{}, fmt.Errorf("%s at %s does not decode; run drafter check", bp, start)
 	}
