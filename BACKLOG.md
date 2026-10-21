@@ -12,9 +12,6 @@
 
 ## Medium
 
-- [ ] **#28** Resolve a dotted excerpt anchor to a nested declaration `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-20)*
-  A pointer like `file.ts#outer.inner` excerpts as "declaration not found", so the fact seat can't see the claim's source. The acceptance pass re-anchored 35 such cairn pointers to line ranges by hand (finding 8). `internal/assemble/excerpt.go:86-92`
-
 - [ ] **#29** Refuse a resume on a binary other than the run's `drafter_version` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-20)*
   A run started under one build resumes under another, so a stock change like the 64000-to-128000 draft ceiling can split one run across two configurations. `internal/pipeline/resume.go`
 
@@ -89,6 +86,9 @@
 
 
 ## Done
+
+- [x] **#28** Resolve a dotted excerpt anchor to a nested declaration `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-20 → 2026-10-21)*
+  A pointer like `file.ts#outer.inner` excerpts as "declaration not found", so the fact seat can't see the claim's source. The acceptance pass re-anchored 35 such cairn pointers to line ranges by hand (finding 8). Harvested from the parked `worktree-blueprint-first` branch in the reviewed-pages pass. `internal/assemble/excerpt.go`
 
 - [x] **#26** Raise the stock `seat.draft.max_tokens` above 64000 `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-19 → 2026-10-20)*
   Two of cairn's longest task guides stopped at 64000 tokens of page, brief, and thinking; at 128000 the same drafts fit. `internal/config/stock.toml`
