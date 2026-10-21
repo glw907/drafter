@@ -17,6 +17,9 @@ git -C "$repo" init -q
 echo page >"$repo/docs/extend/rotate-the-key.md"
 echo page >"$repo/docs/extend/notes.md"
 echo "page: rotate" >"$repo/blueprints/docs/extend/rotate-the-key.blueprint.yaml"
+echo page >"$repo/docs/extend/debug.md"
+echo page >"$repo/blueprints/docs/extend/debug.blueprint.yaml"
+printf -- '---\npage: Debug\n---\n' >"$repo/blueprints/docs/extend/debug.blueprint.md"
 ln -s "$tmp/real" "$tmp/link"
 
 # A repo with no blueprints root.
@@ -51,6 +54,12 @@ expect_silent() {
 
 expect_context "managed page" "$repo/docs/extend/rotate-the-key.md"
 expect_context "managed page through a symlinked parent" "$tmp/link/repo/docs/extend/rotate-the-key.md"
+
+out=$(payload "$repo/docs/extend/debug.md" | "$hook")
+if ! jq -e '.hookSpecificOutput.additionalContext | contains("blueprints/docs/extend/debug.blueprint.md")' <<<"$out" >/dev/null; then
+    echo "FAIL: a markdown blueprint wins over a YAML one: output was: $out" >&2
+    fail=1
+fi
 
 expect_silent "unmanaged page" "$(payload "$repo/docs/extend/notes.md")" HOME="$HOME"
 expect_silent "non-md file" "$(payload "$repo/docs/extend/rotate-the-key.txt")" HOME="$HOME"
