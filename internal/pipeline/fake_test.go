@@ -356,6 +356,8 @@ func defaultAnswer(r batch.Request) string {
 	schema := string(r.Schema)
 	stage, seat := stageSeat(r.CustomID)
 	switch {
+	case strings.Contains(schema, `"resolutions"`) && seat == "edit":
+		return `{"edits":[],"resolutions":[{"finding":1,"status":"declined","edits":[],"reason":"the page needs no edit"}]}`
 	case strings.Contains(schema, `"resolutions"`):
 		return `{"edits":[],"resolutions":[]}`
 	case strings.Contains(schema, `"conflicts"`):

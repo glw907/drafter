@@ -55,6 +55,13 @@ func newRunner(ctx context.Context, o Options) (*runner, error) {
 		now = time.Now
 	}
 	r := &runner{o: o, api: o.API, now: now, root: root, mods: map[string]*prompts.Module{}}
+	if p := cfg.Editing.Preferences; p != "" {
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(p)))
+		if err != nil {
+			return nil, fmt.Errorf("editing.preferences: %w", err)
+		}
+		r.prefs = string(data)
+	}
 	r.led = ledger.Open(cfg.StateDir)
 	r.led.Now = now
 	var err error
@@ -283,6 +290,9 @@ func (r *runner) addPages() error {
 			p.w.Bar, p.w.BarFrom, p.w.Since = r.o.Bars[h.Page.Path], from, from
 		}
 		p.w.Draft, p.w.SkipRead = r.o.Draft, r.o.SkipRead[h.Page.Path]
+		p.w.Edit = p.blueprint && r.o.Draft
+		p.w.Narrow = p.w.Edit && !r.o.Judge
+		p.w.SkipRead = p.w.SkipRead || p.w.Narrow
 		r.state.Pages[p.key] = p.ps
 		r.pages = append(r.pages, p)
 		if err := p.snapshotPre(); err != nil {

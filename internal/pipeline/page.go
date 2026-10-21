@@ -42,8 +42,8 @@ type page struct {
 
 func (r *runner) newPage(h handoff.Handoff) (*page, error) {
 	p := &page{r: r, h: h, key: run.PageKey(h.Page.Path)}
-	p.markdown = !strings.HasSuffix(h.Plan, ".yaml") && !strings.HasSuffix(h.Plan, ".yml")
-	p.blueprint = strings.HasSuffix(h.Plan, ".blueprint.yaml")
+	p.blueprint = strings.HasSuffix(h.Plan, ".blueprint.yaml") || p.mdBlueprint()
+	p.markdown = !p.blueprint && !strings.HasSuffix(h.Plan, ".yaml") && !strings.HasSuffix(h.Plan, ".yml")
 	if !r.o.DryRun {
 		p.dir = filepath.Join(r.dir, p.key)
 		if err := os.MkdirAll(p.dir, 0o755); err != nil {
@@ -52,6 +52,9 @@ func (r *runner) newPage(h handoff.Handoff) (*page, error) {
 	}
 	return p, nil
 }
+
+// mdBlueprint reports whether the page's plan is a blueprint in the Markdown format.
+func (p *page) mdBlueprint() bool { return strings.HasSuffix(p.h.Plan, ".blueprint.md") }
 
 func (p *page) abs(rel string) string { return filepath.Join(p.r.root, filepath.FromSlash(rel)) }
 
@@ -154,6 +157,9 @@ func (p *page) initRecord() {
 // runs reports whether the seat is configured to run on this page. The consistency read also
 // needs a facts store.
 func (p *page) runs(seat string) bool {
+	if p.w.Narrow && seat != "draft" {
+		return false
+	}
 	if seat == "consistency" && p.r.cfg.Facts.Dir == "" {
 		return false
 	}
@@ -179,7 +185,10 @@ func (p *page) missingSeats() []string {
 				need = append(need, seat)
 			}
 		}
-		if p.blueprint && p.w.Scope != nil && p.w.Scope.Kind == blueprint.ScopeScoped && len(p.w.Scope.IDs) > 0 {
+		if p.w.Edit {
+			need = append(need, "edit")
+		}
+		if p.blueprint && !p.w.Narrow && p.w.Scope != nil && p.w.Scope.Kind == blueprint.ScopeScoped && len(p.w.Scope.IDs) > 0 {
 			need = append(need, "coherence")
 		}
 	}

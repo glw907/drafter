@@ -379,7 +379,7 @@ func (p *page) bound(ex *exchange) (*edits.Bound, error) {
 		return nil, nil
 	}
 	switch ex.Kind {
-	case exSection, exRedraft, exFinal, exSmall:
+	case exSection, exRedraft, exFinal, exSmall, exEdit:
 	default:
 		return nil, nil
 	}
@@ -407,7 +407,7 @@ func (p *page) draftingBlocks(ctx context.Context, seat string) (cached []string
 		return nil, "", nil
 	}
 	switch seat {
-	case "draft", "structure", "editor", "fact", "coherence":
+	case "draft", "edit", "structure", "editor", "fact", "coherence":
 	default:
 		return nil, "", nil
 	}
@@ -416,9 +416,9 @@ func (p *page) draftingBlocks(ctx context.Context, seat string) (cached []string
 		return nil, "", err
 	}
 	extra = assemble.BlueprintBlock(in.raw, in.entryJSON)
-	if seat == "draft" && p.w.Section {
+	if (seat == "draft" || seat == "edit") && p.w.Section {
 		extra += "\n\n" + scopeSentence(p.sectionScope())
-		if p.w.Change != "" {
+		if seat == "draft" && p.w.Change != "" {
 			extra += "\n\n" + p.w.Change
 		}
 	}

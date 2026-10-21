@@ -41,6 +41,7 @@ func withDrafting(h *harness) {
 	}
 	h.cfg.Prompts = module
 	h.cfg.Seat["coherence"] = h.cfg.Seat["structure"]
+	h.cfg.Seat["edit"] = h.cfg.Seat["structure"]
 	h.api.answer = func(r batch.Request) string {
 		if strings.Contains(string(r.Schema), `"quote"`) {
 			return jsonText(map[string]any{"items": []map[string]string{{"id": "h-retry", "quote": healthQuote}}})
@@ -54,6 +55,8 @@ type drafting struct {
 	scopes   map[string]blueprint.Scope
 	changes  map[string]string
 	skipRead map[string]bool
+	// narrow runs without Judge, the default path of drafter page.
+	narrow bool
 }
 
 // sectionScope is a drafting run that scopes page A to the named sections of its blueprint.
@@ -70,6 +73,7 @@ func (h *harness) runDrafting(d drafting) (Summary, error) {
 	h.t.Helper()
 	h.opts = h.options()
 	h.opts.Draft, h.opts.Scopes, h.opts.Changes, h.opts.SkipRead = true, d.scopes, d.changes, d.skipRead
+	h.opts.Judge = !d.narrow
 	if d.scopes != nil {
 		h.opts.Since = h.head()
 	}
@@ -338,8 +342,10 @@ func TestSectionRedraftDecision(t *testing.T) {
 }
 
 func TestMissingSeatsForDraftingPages(t *testing.T) {
-	const noCoherence = `return { blueprint: (c) => "b", draft: (c) => "d", structure: (c) => "s", editor: (c) => "e", fact: (c) => "f", reader: (c) => "r" };` + "\n"
-	const noBlueprint = `return { draft: (c) => "d", structure: (c) => "s", editor: (c) => "e", fact: (c) => "f", reader: (c) => "r" };` + "\n"
+	const noCoherence = `return { blueprint: (c) => "b", draft: (c) => "d", edit: (c) => "x", structure: (c) => "s", editor: (c) => "e", fact: (c) => "f", reader: (c) => "r" };` + "\n"
+	const noBlueprint = `return { draft: (c) => "d", edit: (c) => "x", structure: (c) => "s", editor: (c) => "e", fact: (c) => "f", reader: (c) => "r" };` + "\n"
+	const noEdit = `return { blueprint: (c) => "b", draft: (c) => "d", structure: (c) => "s", editor: (c) => "e", fact: (c) => "f", reader: (c) => "r", coherence: (c) => "c" };` + "\n"
+	const noReviews = `return { draft: (c) => "d", edit: (c) => "x" };` + "\n"
 	tests := []struct {
 		name   string
 		module string
@@ -350,6 +356,8 @@ func TestMissingSeatsForDraftingPages(t *testing.T) {
 		{"a scoped Draft page with no IDs does not", noCoherence, sectionScope(), ""},
 		{"a whole Draft page does not", noCoherence, drafting{}, ""},
 		{"a Draft page needs the blueprint seat for its read", noBlueprint, drafting{}, "no seat blueprint"},
+		{"a Draft page needs the edit seat", noEdit, drafting{}, "no seat edit"},
+		{"a page that runs without judge needs no review seats", noReviews, drafting{narrow: true}, ""},
 		{"a skipped read does not", noBlueprint, drafting{skipRead: map[string]bool{pageA: true}}, ""},
 	}
 	for _, tt := range tests {
