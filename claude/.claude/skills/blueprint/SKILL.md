@@ -55,7 +55,7 @@ An approve prints `{"decision":"approve","file":...,"commit":...,"blob":...,"cal
 
 ## Draft
 
-For a new page, or a change that adds or removes a section or changes the reader's path, draft only after Geoff approves the blueprint: `approval-queue approved <file> <blob>` must exit 0, with `<blob>` from `git rev-parse HEAD:<file>`. Then run `drafter page <blueprint>` without `--judge`. With no flag it runs the draft seat, the edit pass that applies the project's editing preferences, and the deterministic gate; `--judge` adds review seats and reads that spend credit this process does not use. Exit 0 means the page was accepted. On exit 3, rerun with `--resume <run-id>` and the same arguments; on exit 1, report the escalation.
+For a new page, or a change that adds or removes a section or changes the reader's path, draft only after Geoff approves the blueprint: `approval-queue approved <file> <blob>` must exit 0, with `<blob>` from `git rev-parse HEAD:<file>`. Then run `drafter page <blueprint>` without `--judge`. With no flag it runs the draft seat, the edit pass that applies the project's editing preferences, and the deterministic gate; `--judge` adds review seats and reads that spend credit this process does not use. Exit 0 means the page was accepted. On exit 3, rerun with `--resume <run-id>` and the same arguments; on exit 1, report the escalation; on exit 2 the run could not start, so fix the cause it names and run again.
 
 Fact-check the draft, settle it the same way, run the project's docs gate, and queue it with `approval-queue page`. Geoff's edits to the page are final: when one changes a claim, update the blueprint or the fact in the same PR. The PR merges after he approves the page.
 

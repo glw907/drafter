@@ -189,6 +189,16 @@ func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 			open = nil
 			continue
 		}
+		loc := listMarker.FindStringIndex(line)
+		heading := headingLine.FindStringSubmatch(line)
+		// A tag drafter never reads would drop out of the check, refs, and staleness alike. Only a
+		// bullet or step inside a section, and the lines of an open block, are read for tags.
+		if factTag.MatchString(line) && (loc == nil || cur < 0 || heading != nil) {
+			add(n, "this :fact tag is not on a bullet, step, row, or reader line, so drafter does not read it", "put the tag at the end of the bullet or step's first line, or inside the row")
+			if heading == nil && !strings.HasPrefix(trimmed, ":::") {
+				continue
+			}
+		}
 		if strings.HasPrefix(trimmed, ":::") {
 			name, _, _ := strings.Cut(strings.TrimSpace(trimmed[3:]), " ")
 			switch name {
@@ -202,7 +212,7 @@ func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 			open = &block{name: name, line: n}
 			continue
 		}
-		if h := headingLine.FindStringSubmatch(line); h != nil {
+		if h := heading; h != nil {
 			closeSection(i)
 			if len(h[1]) == 1 {
 				cur = -1
@@ -211,12 +221,6 @@ func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 			m.Sections = append(m.Sections, MDSection{Heading: h[2], Level: len(h[1]), Line: n})
 			headings = append(headings, h[2])
 			cur, rawStart = len(m.Sections)-1, i
-			continue
-		}
-		loc := listMarker.FindStringIndex(line)
-		// A tag drafter never reads would drop out of the check, refs, and staleness alike.
-		if loc == nil && factTag.MatchString(line) {
-			add(n, "this :fact tag is not on a bullet, step, row, or reader line, so drafter does not read it", "put the tag at the end of the bullet or step's first line, or inside the row")
 			continue
 		}
 		if cur < 0 || trimmed == "" {
