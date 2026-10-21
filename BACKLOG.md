@@ -87,6 +87,9 @@
 
 ## Done
 
+- [x] **#33** Give the fact-truth seat repository access, an agentic read `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-20 → 2026-10-21)*
+  Closed, superseded by the reviewed-pages design (glw907/initiatives `docs-system/specs/2026-10-21-drafter-reviewed-pages-design.md`): a fresh-context session agent with repository access now fact-checks each blueprint and page, so no API seat needs an agentic read. The item was filed only on the parked `worktree-blueprint-first` branch, so it is recorded here to keep the number from being reused.
+
 - [x] **#28** Resolve a dotted excerpt anchor to a nested declaration `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-20 → 2026-10-21)*
   A pointer like `file.ts#outer.inner` excerpts as "declaration not found", so the fact seat can't see the claim's source. The acceptance pass re-anchored 35 such cairn pointers to line ranges by hand (finding 8). Harvested from the parked `worktree-blueprint-first` branch in the reviewed-pages pass. `internal/assemble/excerpt.go`
 
