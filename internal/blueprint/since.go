@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/glw907/drafter/internal/plan"
 	"go.yaml.in/yaml/v3"
@@ -45,8 +46,8 @@ type Revision struct {
 	Facts     *plan.Facts
 }
 
-// Compare says what changed from old to cur for the blueprint at file. A section is changed when
-// its id is new, its decoded content differs, or it places or cites a fact whose bullet changed;
+// Compare says what changed from old to cur for the blueprint at file. A file with the
+// .blueprint.md suffix is read as a markdown blueprint, by its sections' raw text. For YAML, a section is changed when its id is new, its decoded content differs, or it places or cites a fact whose bullet changed;
 // formatting alone changes nothing. The page is whole only where no diff can be built: the
 // blueprint is absent or does not decode at the earlier revision, the current blueprint does not
 // decode (which leaves its fault to the blueprint check), or the outline lists the page at neither
@@ -59,6 +60,9 @@ type Revision struct {
 // either revision whose bullet changed. Scope.Bullets lists every fact in either store whose bullet
 // changed, cited or not, so a conflict with a changed bullet never reads as already present.
 func Compare(file string, old, cur Revision) Scope {
+	if strings.HasSuffix(file, markdownSuffix) {
+		return compareMarkdown(file, old, cur)
+	}
 	whole := func(why string) Scope { return Scope{Kind: ScopeWhole, Why: why} }
 	ob, ofs := Decode(file, old.Blueprint)
 	if ob == nil || plan.HasError(ofs) {
@@ -150,21 +154,6 @@ func Compare(file string, old, cur Revision) Scope {
 		}
 	}
 
-	var bullets []string
-	for _, id := range slices.Compact(slices.Sorted(slices.Values(slices.Concat(old.Facts.IDs(), cur.Facts.IDs())))) {
-		if bulletChanged(id) {
-			bullets = append(bullets, id)
-		}
-	}
-	atBase := citedFacts(ob, old.Facts)
-	var joined []string
-	for _, id := range citedFacts(cb, cur.Facts) {
-		if id != "" && !slices.Contains(atBase, id) && !slices.Contains(joined, id) {
-			joined = append(joined, id)
-		}
-	}
-	slices.Sort(joined)
-
 	var changed []string
 	for i := range cb.Sections {
 		s := &cb.Sections[i]
@@ -180,9 +169,123 @@ func Compare(file string, old, cur Revision) Scope {
 		Kind:    ScopeScoped,
 		IDs:     changed,
 		Facts:   append([]string{}, slices.Sorted(maps.Keys(facts))...),
-		Bullets: append([]string{}, bullets...),
-		Joined:  append([]string{}, joined...),
+		Bullets: changedBullets(old.Facts, cur.Facts),
+		Joined:  joinedFacts(citedFacts(ob, old.Facts), citedFacts(cb, cur.Facts)),
 	}
+}
+
+// compareMarkdown is Compare for a markdown blueprint. A section is changed when its id is new,
+// its raw text differs, or it cites a fact whose bullet changed. The front matter, the reader
+// block, and the outline entry are the fields outside sections: a difference in any of them
+// scopes the page without naming a section. Scope.Facts holds the facts the old and new versions
+// of every changed, new, or removed section cite, those of the reader block when it differs, and
+// every fact the page cites at either revision whose bullet changed.
+func compareMarkdown(file string, old, cur Revision) Scope {
+	whole := func(why string) Scope { return Scope{Kind: ScopeWhole, Why: why} }
+	om, ofs := DecodeMarkdown(file, old.Blueprint)
+	if om == nil || plan.HasError(ofs) {
+		return whole("the blueprint is absent or undecodable at the earlier revision")
+	}
+	cm, cfs := DecodeMarkdown(file, cur.Blueprint)
+	if cm == nil || plan.HasError(cfs) {
+		return whole("the blueprint does not decode")
+	}
+	if old.Entry == nil || cur.Entry == nil {
+		return whole("the outline does not list the page at both revisions")
+	}
+
+	facts := map[string]bool{}
+	addFacts := func(ids []string) {
+		for _, id := range ids {
+			facts[id] = true
+		}
+	}
+	differs := !sameYAML(old.Entry, cur.Entry) || om.Front != cm.Front
+	if om.Reader.Text != cm.Reader.Text || !slices.Equal(om.Reader.Facts, cm.Reader.Facts) {
+		differs = true
+		addFacts(resolveFacts(old.Facts, om.Reader.Facts))
+		addFacts(resolveFacts(cur.Facts, cm.Reader.Facts))
+	}
+
+	oldSec, curSec := map[string]*MDSection{}, map[string]*MDSection{}
+	var sharedOld, sharedCur []string
+	for i := range om.Sections {
+		oldSec[om.Sections[i].ID] = &om.Sections[i]
+	}
+	for i := range cm.Sections {
+		curSec[cm.Sections[i].ID] = &cm.Sections[i]
+		if _, ok := oldSec[cm.Sections[i].ID]; ok {
+			sharedCur = append(sharedCur, cm.Sections[i].ID)
+		}
+	}
+	for i := range om.Sections {
+		s := &om.Sections[i]
+		if _, ok := curSec[s.ID]; !ok {
+			differs = true
+			addFacts(s.FactIDs(old.Facts))
+			continue
+		}
+		sharedOld = append(sharedOld, s.ID)
+	}
+	if !slices.Equal(sharedOld, sharedCur) {
+		differs = true
+	}
+
+	bulletChanged := func(id string) bool { return FactChanged(old.Facts, cur.Facts, id) }
+	atBase, now := om.FactIDs(old.Facts), cm.FactIDs(cur.Facts)
+	for _, id := range slices.Concat(atBase, now) {
+		if bulletChanged(id) {
+			facts[id] = true
+			differs = true
+		}
+	}
+
+	var changed []string
+	for i := range cm.Sections {
+		s := &cm.Sections[i]
+		o, ok := oldSec[s.ID]
+		if ok && o.Raw == s.Raw && !slices.ContainsFunc(s.FactIDs(cur.Facts), bulletChanged) {
+			continue
+		}
+		changed = append(changed, s.ID)
+		if ok {
+			addFacts(o.FactIDs(old.Facts))
+		}
+		addFacts(s.FactIDs(cur.Facts))
+	}
+	if len(changed) == 0 && !differs {
+		return Scope{Kind: ScopeUnchanged}
+	}
+	return Scope{
+		Kind:    ScopeScoped,
+		IDs:     changed,
+		Facts:   append([]string{}, slices.Sorted(maps.Keys(facts))...),
+		Bullets: changedBullets(old.Facts, cur.Facts),
+		Joined:  joinedFacts(atBase, now),
+	}
+}
+
+// changedBullets lists, sorted, every fact in either store whose bullet changed, cited or not.
+func changedBullets(old, cur *plan.Facts) []string {
+	bullets := []string{}
+	for _, id := range slices.Compact(slices.Sorted(slices.Values(slices.Concat(old.IDs(), cur.IDs())))) {
+		if FactChanged(old, cur, id) {
+			bullets = append(bullets, id)
+		}
+	}
+	return bullets
+}
+
+// joinedFacts lists, sorted and without repeats, the facts now cited that the base did not cite.
+func joinedFacts(atBase, now []string) []string {
+	joined := []string{}
+	for _, id := range now {
+		if id != "" && !slices.Contains(atBase, id) && !slices.Contains(joined, id) {
+			joined = append(joined, id)
+		}
+	}
+	slices.Sort(joined)
+	return joined
 }
 
 // withoutSections is the blueprint with its sections dropped, the fields Compare holds apart.

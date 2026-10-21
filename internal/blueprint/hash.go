@@ -18,14 +18,15 @@ const IntroKey = "_intro"
 // the first of them. The text of a section is the region below its heading up to the next
 // section's heading, as the coverage check splits a page, so a level-3 child's text is the
 // child's own. A section with no matching heading has no key.
-func SectionHashes(b *Blueprint, page []byte) map[string]string {
-	headings := make([]string, len(b.Sections))
-	for i := range b.Sections {
-		headings[i] = b.Sections[i].Heading
+func SectionHashes(src Source, page []byte) map[string]string {
+	heads := src.SectionHeads()
+	headings := make([]string, len(heads))
+	for i, h := range heads {
+		headings[i] = h.Heading
 	}
 	preamble, text, found := coverage.Regions(headings, page)
 	out := map[string]string{IntroKey: hashText(preamble)}
-	for i, s := range b.Sections {
+	for i, s := range heads {
 		if found[i] {
 			out[s.ID] = hashText(text[i])
 		}

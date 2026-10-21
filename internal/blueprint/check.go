@@ -92,15 +92,19 @@ func (c *projectCheck) blueprint(rel string) {
 		c.add(rel, 1, plan.SeverityError, checkBlueprints, "the blueprint cannot be read: "+err.Error(), "fix the file's permissions")
 		return
 	}
+	if page, _ := PagePath(c.BlueprintRoot, rel); strings.HasSuffix(rel, blueprintSuffix) && c.Locate(page) != rel {
+		c.shadowed(rel)
+		return
+	}
 	c.blueprintData(rel, data)
 }
 
-// CheckSource checks one blueprint from its bytes against the outline's bytes, which a caller
-// reads from a commit instead of the disk. rel is the blueprint's repo-relative slash path. It
-// returns the decoded blueprint and its outline entry when the checks ran far enough to find
-// them, nil and a zero Page otherwise, and every finding. The error means the outline, the lock,
-// or the facts directory could not be read. Pairing, the lock's entries, and the convention are
-// the project walk's, not this check's.
+// CheckSource checks one blueprint, in either format, from its bytes against the outline's bytes,
+// which a caller reads from a commit instead of the disk. rel is the blueprint's repo-relative
+// slash path, whose suffix names the format. It returns the decoded blueprint and its outline
+// entry when the checks ran far enough to find them, nil and a zero Page otherwise, and every
+// finding. The error means the outline, the lock, or the facts directory could not be read.
+// Pairing, the lock's entries, and the convention are the project walk's, not this check's.
 func (p Project) CheckSource(rel string, blueprint, outline []byte) (Source, Page, []plan.Finding, error) {
 	l, err := p.loadOutline(outline)
 	if err != nil {
@@ -109,16 +113,14 @@ func (p Project) CheckSource(rel string, blueprint, outline []byte) (Source, Pag
 	c := &projectCheck{Project: p, l: l, usedTypes: map[string]bool{}}
 	c.findings = append(c.findings, l.findings...)
 	b, entry := c.blueprintData(rel, blueprint)
-	if b == nil {
-		return nil, entry, c.findings, nil
-	}
 	return b, entry, c.findings, nil
 }
 
 // blueprintData is blueprint on bytes already read. It returns the blueprint and its entry when
-// the file decoded cleanly and its page is a managed one the outline lists.
-func (c *projectCheck) blueprintData(rel string, data []byte) (*Blueprint, Page) {
-	b, findings := Decode(rel, data)
+// the file decoded cleanly and its page is a managed one the outline lists, and a nil Source
+// otherwise.
+func (c *projectCheck) blueprintData(rel string, data []byte) (Source, Page) {
+	src, findings := Load(rel, data)
 	c.findings = append(c.findings, findings...)
 	pagePath, _ := PagePath(c.BlueprintRoot, rel)
 	entry, listed := c.l.pages[pagePath]
@@ -134,17 +136,93 @@ func (c *projectCheck) blueprintData(rel string, data []byte) (*Blueprint, Page)
 			"delete the blueprint, or remove managed: false from the outline entry")
 		return nil, Page{}
 	}
-	if b == nil || plan.HasError(findings) {
+	if src == nil || plan.HasError(findings) {
 		return nil, Page{}
 	}
 	opts := plan.CheckOptions{Root: c.Root, FactsDir: c.FactsDir, Outline: c.l.plan}
-	c.findings = append(c.findings, plan.Check(rel, View(b, entry, c.l.facts), opts)...)
-	c.references(rel, b)
-	c.sections(rel, b)
-	c.framing(rel, b)
-	c.handlers(rel, b, entry.Title)
+	c.findings = append(c.findings, plan.Check(rel, src.View(entry, c.l.facts), opts)...)
+	switch b := src.(type) {
+	case *Markdown:
+		c.markdown(rel, b, entry)
+	case *Blueprint:
+		c.references(rel, b)
+		c.sections(rel, b)
+		c.framing(rel, b)
+		c.handlers(rel, b, entry.Title)
+	}
 	c.pageType(entry)
-	return b, entry
+	return src, entry
+}
+
+// markdown runs the checks only a markdown blueprint has, each finding at its line: the front
+// matter's keys and their agreement with the outline, one reader block, a job line on every
+// section, three parts on every row, and a heading slug used once.
+func (c *projectCheck) markdown(rel string, m *Markdown, entry Page) {
+	fault := func(line int, msg, fix string) { c.add(rel, line, plan.SeverityError, checkMarkdown, msg, fix) }
+	f := m.Front
+	for _, key := range [...]struct{ name, val string }{{"page", f.Page}, {"type", f.Type}, {"track", f.Track}} {
+		if strings.TrimSpace(key.val) == "" {
+			fault(f.Line, fmt.Sprintf("the front matter has no %s", key.name), "add "+key.name+": to the front matter")
+		}
+	}
+	if f.Page != "" && entry.Title != "" && f.Page != entry.Title {
+		fault(f.Line, fmt.Sprintf("the front matter's page is %q, but the outline titles %s %q", f.Page, entry.Path, entry.Title),
+			"set page to the outline's title, or change the title in the outline")
+	}
+	if f.Type != "" && entry.Type != f.Type {
+		fault(f.Line, fmt.Sprintf("the front matter's type is %q, but the outline gives %s the type %q", f.Type, entry.Path, entry.Type),
+			"set type to the outline's type for the page, or change the entry in the outline")
+	}
+	if f.Track != "" {
+		c.track(rel, f, entry)
+	}
+
+	if len(m.ReaderLines) == 0 {
+		fault(1, "the blueprint has no :::reader block", "add a :::reader block under the title that says who reads the page and why")
+	} else {
+		for _, line := range m.ReaderLines[1:] {
+			fault(line, fmt.Sprintf("the page has a second :::reader block (the first is at line %d)", m.ReaderLines[0]), "keep one :::reader block and merge this one into it")
+		}
+	}
+
+	seen := map[string]int{}
+	for _, s := range m.Sections {
+		if s.Job == "" {
+			fault(s.Line, fmt.Sprintf("the section %q has no job line", s.Heading), "add an italic line under the heading that says what the section does for the reader")
+		}
+		slug := plan.HeadingSlugs("", []string{s.Heading})[0]
+		if at, dup := seen[slug]; dup {
+			fault(s.Line, fmt.Sprintf("the heading %q has the same slug as the heading at line %d", s.Heading, at), "reword one of the two headings")
+		} else {
+			seen[slug] = s.Line
+		}
+		for _, r := range s.Rows {
+			for _, part := range [...]struct{ name, val string }{{"Symptom", r.Symptom}, {"Cause", r.Cause}, {"Fix", r.Fix}} {
+				if part.val == "" {
+					fault(r.Line, fmt.Sprintf("the row has no **%s.** part", part.name), "add a **"+part.name+".** line to the row")
+				}
+			}
+		}
+	}
+}
+
+// track checks that the front matter's track is one the outline declares and that its paths hold
+// the page. An outline that declares no tracks leaves nothing to check the name against.
+func (c *projectCheck) track(rel string, f Front, entry Page) {
+	tracks := c.l.outline.Tracks
+	if len(tracks) == 0 {
+		return
+	}
+	i := slices.IndexFunc(tracks, func(t Track) bool { return t.Name == f.Track })
+	switch {
+	case i < 0:
+		c.add(rel, f.Line, plan.SeverityError, checkMarkdown,
+			fmt.Sprintf("the front matter's track %q is not a track the outline declares", f.Track), "name a track from "+c.Outline)
+	case !slices.Contains(matches(tracks, path.Clean(entry.Path)), i):
+		c.add(rel, f.Line, plan.SeverityError, checkMarkdown,
+			fmt.Sprintf("the paths of the track %q do not hold %s", f.Track, entry.Path),
+			"name the track whose paths hold the page, or add the page to this track's paths")
+	}
 }
 
 // framing requires the framing record to plan the page's introduction. The decoder does not, so a
@@ -315,13 +393,23 @@ func (c *projectCheck) pageType(entry Page) {
 	c.usedTypes[entry.Type] = true
 }
 
+// shadowed reports the .blueprint.yaml at rel, whose page also has a .blueprint.md that wins.
+func (c *projectCheck) shadowed(rel string) {
+	c.add(rel, 1, plan.SeverityError, checkBlueprints,
+		"the page has both a .blueprint.md and this .blueprint.yaml, and the markdown file is the blueprint",
+		"delete this file, or run drafter convert markdown to replace it")
+}
+
 // pairing reports blueprint-like files at no path-rule location and managed pages without a
 // blueprint. The second is a warning until blueprints.required is set.
 func (c *projectCheck) pairing() {
 	for _, rel := range c.l.strays {
 		c.add(rel, 1, plan.SeverityError, checkBlueprints,
 			"the file is not at a path-rule location, so no page maps to it",
-			"name it <page path without .md>.blueprint.yaml under "+c.BlueprintRoot)
+			"name it <page path without .md>.blueprint.md under "+c.BlueprintRoot)
+	}
+	for _, rel := range c.l.shadowed {
+		c.shadowed(rel)
 	}
 	have := map[string]bool{}
 	for _, rel := range c.l.files {

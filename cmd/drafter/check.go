@@ -117,8 +117,15 @@ func noExcerptFindings(ctx context.Context, p blueprint.Project, named []string)
 		if err != nil {
 			continue // Check already reported a file it could not read
 		}
-		if b, _ := blueprint.Decode(rel, data); b != nil {
-			for _, id := range blueprint.CitedFacts(b, facts) {
+		if src, _ := blueprint.Load(rel, data); src != nil {
+			var ids []string
+			switch b := src.(type) {
+			case *blueprint.Blueprint:
+				ids = blueprint.CitedFacts(b, facts)
+			case *blueprint.Markdown:
+				ids = b.FactIDs(facts)
+			}
+			for _, id := range ids {
 				cited[id] = true
 			}
 		}
