@@ -54,6 +54,8 @@ func (p *page) stepSeats() []string {
 		return []string{"coverage"}
 	case stDraft, stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix, stSmall:
 		return []string{"draft"}
+	case stEdit:
+		return []string{"edit"}
 	case stCoherence:
 		return []string{"coherence"}
 	case stRound1:
@@ -107,7 +109,7 @@ func (p *page) noRetry() bool {
 
 // isRead reports whether the seat's answer is a read, so a failure to produce one is a fault.
 func isRead(seat string) bool {
-	return seat != "draft" && seat != "consistency"
+	return seat != "draft" && seat != "consistency" && seat != "edit"
 }
 
 // take applies the failures table to one result.
@@ -214,7 +216,7 @@ func (p *page) validate(seat, text string) error {
 		if !json.Valid([]byte(a.Brief)) {
 			return errors.New("the brief is not JSON")
 		}
-	case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix, stSmall:
+	case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix, stSmall, stEdit:
 		var a edits.Answer
 		return decodeAnswer(text, &a)
 	case stCoverage:
@@ -250,7 +252,7 @@ func (p *page) complete(ctx context.Context) error {
 		return p.completeConsistency()
 	case stDraft:
 		return p.completeDraft(ctx)
-	case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix, stSmall:
+	case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix, stSmall, stEdit:
 		return p.completeExchange(ctx)
 	case stCoherence:
 		return p.completeCoherence()
@@ -421,12 +423,12 @@ func (p *page) completeCoherence() error {
 // completeExchange applies an edit-contract answer, or sends its refusal back.
 func (p *page) completeExchange(ctx context.Context) error {
 	ex := p.w.Ex
-	text := p.w.Got["draft"]
+	text := p.w.Got[ex.seat()]
 	var ans edits.Answer
 	if err := decodeAnswer(text, &ans); err != nil {
 		return err
 	}
-	ex.History = append(slices.Clone(p.w.Sent["draft"]), batch.Message{Role: "assistant", Text: text})
+	ex.History = append(slices.Clone(p.w.Sent[ex.seat()]), batch.Message{Role: "assistant", Text: text})
 	p.w.Got = nil
 	pageText, briefText, err := p.current()
 	if err != nil {
@@ -462,7 +464,7 @@ func (p *page) refused(ex *exchange, ref *edits.Refusal, briefBefore string) err
 		}
 	}
 	if p.w.spend(ex.Kind+".contract") > p.r.cfg.Retries.EditContract {
-		return p.escalate("contract", "draft", nil, strings.Join(ref.Problems, "; "))
+		return p.escalate("contract", ex.seat(), nil, strings.Join(ref.Problems, "; "))
 	}
 	var b strings.Builder
 	b.WriteString("Your answer was refused, and nothing in it was applied. The problems:\n")

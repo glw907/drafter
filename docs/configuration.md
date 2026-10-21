@@ -305,24 +305,37 @@ The resume fingerprint leaves `require_prompts` out, because it changes no reque
 A resume still runs the check. A run that started on the stock module refuses to resume after the
 project sets `require_prompts` and leaves `prompts` unset.
 
-The nine seats are `draft`, `structure`, `editor`, `fact`, `reader`, `coverage`, `consistency`,
-`blueprint`, and `coherence`. `seats` lists the ones that run in `drafter page`, and by default
-it names the first seven. The list must include `draft`, which always runs. Leaving a review seat out removes
-its stages, and the run record notes each seat that didn't run. The `consistency` seat runs only
-when `facts.dir` is set.
+The ten seats are `draft`, `structure`, `editor`, `fact`, `reader`, `coverage`, `consistency`,
+`blueprint`, `coherence`, and `edit`. `seats` lists the ones that run in `drafter page --judge`,
+and by default it names the first seven. The list must include `draft`, which always runs. Leaving
+a review seat out removes its stages, and the run record notes each seat that didn't run. The
+`consistency` seat runs only when `facts.dir` is set.
 
-The `blueprint` seat reads a blueprint in `drafter read`. It stays out of the default `seats`
-list, so `drafter page` runs as it did before the seat existed. `drafter read` always runs the
-seat, and it refuses to start, with exit status 2, when `[seat.blueprint]` lacks a model, an
-effort, or `max_tokens`, or when the model has no entry under `prices.models`.
+`drafter page` on a blueprint without `--judge` runs only the `draft` seat and the `edit` seat. It
+skips the blueprint read and the consistency read, and it sends no review round, no final reader,
+no coverage read, and no coherence read. The page is accepted when the gate holds after the edit
+pass. `--judge` runs the seats in `seats` as before, and the `blueprint` and `coherence` seats, and
+adds the edit pass after the draft's gate holds.
+
+The `blueprint` seat reads a blueprint in `drafter read` and, with `--judge`, in `drafter page`.
+It stays out of the default `seats` list. `drafter read` always runs the seat, and it refuses to
+start, with exit status 2, when `[seat.blueprint]` lacks a model, an effort, or `max_tokens`, or
+when the model has no entry under `prices.models`.
 
 The `coherence` seat reads a whole page after a section redraft passes review, to check the
-transitions, repetition, and flow around the sections that changed. It runs on every section
-redraft and isn't governed by `seats`, so a project can't turn it off. `drafter page` on a
-blueprint refuses to start, with exit status 2, when `[seat.coherence]` lacks a model, an effort,
-or `max_tokens`, or when the model has no entry under `prices.models`.
+transitions, repetition, and flow around the sections that changed. It runs on every judged
+section redraft and isn't governed by `seats`, so a project can't turn it off. `drafter page
+--judge` on a blueprint refuses to start, with exit status 2, when `[seat.coherence]` or
+`[seat.blueprint]` lacks a model, an effort, or `max_tokens`, or when the model has no entry under
+`prices.models`.
 
-The stock defaults set a model, an effort, and `max_tokens` for all nine seats, so a project
+The `edit` seat edits a drafted blueprint page once, after the draft's gate holds, as one request
+through the edit contract. It runs on the default path and under `--judge`, and isn't governed by
+`seats`. `drafter page` on a blueprint refuses to start, with exit status 2, when `[seat.edit]`
+lacks a model, an effort, or `max_tokens`, or when the model has no entry under `prices.models`. A
+gate that is red after the edit goes to the same gate-fix exchange a draft's red gate does.
+
+The stock defaults set a model, an effort, and `max_tokens` for all ten seats, so a project
 sets a seat's value only to change it. They are the values the cairn docs project measured.
 
 Replace `<name>` with a seat name. A `seat.<name>` table for any other name is an error.
@@ -384,6 +397,22 @@ without `.md`. With `brief_path = "notes/briefs/{dir}/{name}.json"`, the brief f
 pages in one directory never share a brief, and it must stay inside the project. Use it when a
 project's own tooling already reads briefs from another place, until the project moves to the
 convention.
+
+### Editing
+
+| Setting | Layers | Default | Environment variable |
+|---|---|---|---|
+| `editing.preferences` | project | Unset. No preferences file. | None. |
+
+`editing.preferences` is the path of a file of the project's editing preferences, relative to the
+project root, that must stay inside the project. The draft prompt and the edit prompt carry the
+file's text verbatim. A run refuses to start, with exit status 2 and before any request, when the
+setting names a file that doesn't exist. `drafter config` shows the setting.
+
+The resume fingerprint leaves `editing.preferences` out. A run that resumes after the preferences
+file changed sends the new text from then on, so the requests before and after the edit read
+different preferences. That is a cost of editing the file mid-run, and a project that wants one
+reading finishes or abandons the run first.
 
 ## Example
 

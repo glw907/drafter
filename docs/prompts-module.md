@@ -13,7 +13,7 @@ When `prompts` is unset, drafter runs the stock module that ships in its binary.
 shows it as `drafter:prompts.js` with a short hash. A run copies the module into its run
 directory, so a resume after an upgrade uses the module the run started with.
 
-The stock module drafts and reviews a page from its blueprint. It defines seven seats:
+The stock module drafts and reviews a page from its blueprint. It defines eight seats:
 
 | Seat | What it does | What it returns |
 |---|---|---|
@@ -24,6 +24,7 @@ The stock module drafts and reviews a page from its blueprint. It defines seven 
 | `fact` | Checks each id the brief cites against the facts and their source excerpts. | A read. |
 | `reader` | Reads the page cold, as its reader, and then against its job. | On turn 1, a paraphrase and a summary. On turn 2, a read. |
 | `coherence` | After a section redraft, reads the whole page as one argument: its transitions, its repetition, and its flow. | A read. |
+| `edit` | Edits a drafted page once, after the draft's gate holds, against the Google rubric and the patterns the standard rules out. | Edits. |
 
 A run that needs a seat the module lacks refuses before it spends anything, and the error names
 the missing seats.
@@ -87,8 +88,8 @@ return {
 };
 ```
 
-The seat names are `draft`, `structure`, `editor`, `fact`, `reader`, `blueprint`, and
-`coherence`. The module needs a builder for each of these seats that runs. drafter builds the
+The seat names are `draft`, `structure`, `editor`, `fact`, `reader`, `blueprint`, `coherence`,
+and `edit`. The module needs a builder for each of these seats that runs. drafter builds the
 `coverage` and `consistency` prompts itself, so a module never defines them. Asking for a seat the
 module doesn't define fails with an error that lists the seats it does define.
 
@@ -131,6 +132,8 @@ module, so every value is plain data.
 | `narrow` | At round 2, an object `{baseline, own}`: the id of the snapshot of the page that round 1 read, and the seat's own round-1 answer. Otherwise `null`. |
 | `turn` | The turn number, for a seat that runs more than one turn, such as `reader`. |
 | `facts` | `true` when the project has a facts store, so a module can word the fact read for either case. |
+| `markdown` | `true` when the page's blueprint is a Markdown file, not YAML, so a module can describe the format its seat reads. |
+| `preferences` | The text of the project's editing preferences file, verbatim, or an empty string. The `draft` and `edit` seats carry it into their prompts. |
 
 A round-2 prompt must contain each finding of `narrow.own`, and `drafter check-prompts` checks
 that it does. The stock module has no seat input command, so its round-2 read verifies its own
@@ -158,7 +161,7 @@ them:
 3. For a section redraft's draft request, a sentence naming the sections in scope and the change
    block: the blueprint's diff and the old and new text of each fact bullet that changed.
 
-The `draft`, `structure`, `editor`, `fact`, and `coherence` requests carry these blocks. The
+The `draft`, `edit`, `structure`, `editor`, `fact`, and `coherence` requests carry these blocks. The
 `reader` requests carry none of them. The reader sees only the page. A prompt names the page and
 its brief by path, so drafter inlines them as files. It never names the blueprint's path.
 
@@ -168,6 +171,7 @@ The answer a seat returns depends on the turn:
 
 - `draft` returns the page, the brief, and any friction for a whole draft, at round 1 with no
   findings. Every other `draft` turn returns edits.
+- `edit` returns edits. Its one finding stands for the pass, and the answer may decline it.
 - `structure`, `editor`, `fact`, `coherence`, and the reader's turn 2 return a read: a verdict,
   the findings, and a summary.
 - The reader's turn 1 returns a paraphrase and a summary.

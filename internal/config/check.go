@@ -9,11 +9,12 @@ import (
 	"strings"
 )
 
-// seatNames are the nine seats a configuration may name. A default run lists the first seven;
-// the blueprint seat runs under drafter read and drafter page on a blueprint, and the coherence
-// seat runs on every section redraft. Neither is governed by seats, so each command validates the
+// seatNames are the ten seats a configuration may name. A default run lists the first seven;
+// the blueprint seat runs under drafter read and drafter page --judge on a blueprint, the
+// coherence seat runs on every judged section redraft, and the edit seat runs once on every
+// drafted blueprint page. None of the three is governed by seats, so each command validates the
 // seat itself.
-var seatNames = []string{"draft", "structure", "editor", "fact", "reader", "coverage", "consistency", "blueprint", "coherence"}
+var seatNames = []string{"draft", "structure", "editor", "fact", "reader", "coverage", "consistency", "blueprint", "coherence", "edit"}
 
 // defaultSeats are the seats a run lists when no layer sets seats.
 var defaultSeats = seatNames[:7]
@@ -70,6 +71,9 @@ func (l *layer) checkValues() error {
 	}
 	if err := l.checkBlueprints(); err != nil {
 		return err
+	}
+	if e := f.Editing; e != nil && e.Preferences != nil && !filepath.IsLocal(*e.Preferences) {
+		return l.fail("editing.preferences", "must be a path inside the project, relative to its root, not %q", *e.Preferences)
 	}
 	return l.checkSeats()
 }

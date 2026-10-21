@@ -16,6 +16,7 @@ const seats = {
     return `Redraft ${c.page.path}${after}.\nFindings:\n${c.findings}`;
   },
   blueprint: (c) => "Read the blueprint below.",
+  edit: (c) => `Edit ${c.page.path}.\nFindings:\n${c.findings}`,
   structure: (c) => `Structure read of ${c.page.path} round ${c.round}.${narrowText(c)}`,
   editor: (c) => `Editor read of ${c.page.path} round ${c.round}.${c.scope ? "\nScope: " + c.scope : ""}${narrowText(c)}`,
   fact: (c) => `Fact read of ${c.page.path} round ${c.round}.${c.scope ? "\nScope: " + c.scope : ""}${narrowText(c)}`,

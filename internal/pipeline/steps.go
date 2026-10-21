@@ -83,6 +83,7 @@ func (p *page) bothReviewers() bool {
 func (p *page) context(round prompts.Round) prompts.Context {
 	return prompts.Context{
 		Page: p.pageJSON(), Inputs: marshalRaw(p.h.Inputs), Round: round, Facts: p.r.cfg.Facts.Dir != "",
+		Markdown: p.mdBlueprint(), Preferences: p.r.prefs,
 	}
 }
 
@@ -156,7 +157,7 @@ func (p *page) advance(ctx context.Context) (*stage, error) {
 			stg, err = p.stageConsistency(ctx)
 		case stDraft:
 			stg, err = p.stageDraft(ctx)
-		case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix, stSmall:
+		case stGateFix, stRedraft, stFinalRedraft, stSection, stCoherenceFix, stSmall, stEdit:
 			stg, err = p.stageExchange(ctx)
 		case stCoherence:
 			stg, err = p.stageCoherence(ctx)
@@ -230,6 +231,8 @@ func exchangeStage(kind string) string {
 		return s8
 	case exSmall:
 		return s6b
+	case exEdit:
+		return s2e
 	}
 	return s2
 }
@@ -245,13 +248,13 @@ func (p *page) stageExchange(ctx context.Context) (*stage, error) {
 		c.Findings = edits.Render(ex.Findings)
 		c.Scope = p.sectionScope()
 		switch ex.Kind {
-		case exSection:
+		case exSection, exEdit:
 			c.Round = prompts.Round1
 		case exFinal:
 			c.Round, c.AfterFinalRead = prompts.RoundFinal, true
 		}
 		var err error
-		if prompt, err = p.render("draft", c); err != nil {
+		if prompt, err = p.render(ex.seat(), c); err != nil {
 			return nil, err
 		}
 	}
@@ -260,14 +263,14 @@ func (p *page) stageExchange(ctx context.Context) (*stage, error) {
 		return nil, err
 	}
 	name := exchangeStage(ex.Kind)
-	req, err := p.build(ctx, name, "draft", assemble.AnswerEdits, prompt, ex.History, nil)
+	req, err := p.build(ctx, name, ex.seat(), assemble.AnswerEdits, prompt, ex.History, nil)
 	if err != nil {
 		return nil, err
 	}
 	if b != nil {
 		last := &req.Messages[len(req.Messages)-1]
 		last.Text += "\n\n" + edits.BoundInstructions()
-		p.w.Sent["draft"] = req.Messages
+		p.w.Sent[ex.seat()] = req.Messages
 	}
 	return &stage{page: p, name: name, reqs: []batch.Request{req}}, nil
 }

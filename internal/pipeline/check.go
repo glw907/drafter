@@ -101,8 +101,8 @@ func (p *page) gateStepOnce(ctx context.Context, kind string) error {
 	}
 	switch {
 	case res.Green:
-		p.toCoverage(coveragePhase(kind))
 		p.w.Held = nil
+		return p.afterGate(kind)
 	case foreign:
 		p.w.Held = &held{Kind: kind, OnGreen: coveragePhase(kind)}
 		p.ps.Status = StatusHeld
@@ -110,6 +110,38 @@ func (p *page) gateStepOnce(ctx context.Context, kind string) error {
 		return p.redGate(kind, own)
 	}
 	return nil
+}
+
+// afterGate moves the page on after a green gate. The first green gate of a drafting blueprint
+// page's draft, or of its section redraft, opens the edit pass. After the pass, a page that runs
+// without --judge is accepted on the gate; any other page goes on to the coverage check, as it
+// does from every other write.
+func (p *page) afterGate(kind string) error {
+	switch {
+	case p.w.Edit && !p.w.Edited && (kind == exDraft || kind == exSection):
+		p.openEdit()
+		return nil
+	case p.w.Narrow:
+		return p.accept()
+	}
+	p.toCoverage(coveragePhase(kind))
+	return nil
+}
+
+// openEdit opens the edit pass: an exchange on the edit seat with the one finding that stands for
+// the pass, which gives the pass's edits their claim under the edit contract. It is not blocking,
+// so the answer may decline it.
+func (p *page) openEdit() {
+	fs := []edits.Finding{{
+		N: 1, Seat: "edit", Location: "the page",
+		Text:    "The edit pass: edit the page's prose to the style guide and keep every claim.",
+		Rewrite: "Make the edits, or decline with the reason when the page needs none.",
+	}}
+	p.w.Edited = true
+	p.w.Ex = &exchange{Kind: exEdit, Findings: fs}
+	p.w.Rec.findings(s2e, fs)
+	p.w.Got = nil
+	p.ps.Step = stEdit
 }
 
 // coveragePhase names the coverage check that follows a write of the exchange kind. A section
@@ -141,6 +173,8 @@ func exchangeStep(kind string) string {
 		return stCoherenceFix
 	case exSmall:
 		return stSmall
+	case exEdit:
+		return stEdit
 	}
 	return stGateFix
 }
@@ -208,15 +242,22 @@ func gateFindings(own []gate.Section, first int) []edits.Finding {
 // redGate opens or continues a fix exchange for a gate that names the page, inside the budget
 // of its stop-table row.
 func (p *page) redGate(kind string, own []gate.Section) error {
-	if kind == exDraft {
-		if p.w.spend("s2.gatefix") > p.r.cfg.Retries.GateFix {
+	switch kind {
+	case exDraft, exEdit:
+		budget := "s2.gatefix"
+		if kind == exEdit {
+			budget = "s2e.gatefix"
+		}
+		if p.w.spend(budget) > p.r.cfg.Retries.GateFix {
 			return p.escalate("red gate", "gate", nil, strings.Join(p.w.Rec.GateExcerpts, "\n"))
 		}
-		if p.w.Ex == nil {
+		if kind == exDraft && p.w.Ex == nil {
 			p.w.Ex = &exchange{Kind: exDraft, History: p.w.DraftHist}
 		}
-	} else if p.w.spend(kind+".contract") > p.r.cfg.Retries.EditContract {
-		return p.escalate("contract", "gate", nil, "the gate stayed red after the edits applied")
+	default:
+		if p.w.spend(kind+".contract") > p.r.cfg.Retries.EditContract {
+			return p.escalate("contract", "gate", nil, "the gate stayed red after the edits applied")
+		}
 	}
 	ex := p.w.Ex
 	ex.GateFix = true
@@ -250,7 +291,9 @@ func (p *page) regate(ctx context.Context) (bool, error) {
 	case res.Green:
 		p.ps.Status = StatusRunning
 		p.w.Held = nil
-		p.toCoverage(h.OnGreen)
+		if err := p.afterGate(h.Kind); err != nil {
+			return false, err
+		}
 	case foreign:
 		return false, nil
 	default:

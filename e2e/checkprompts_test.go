@@ -159,7 +159,7 @@ func TestStockCheckPromptsOnTheFixture(t *testing.T) {
 	if r.code != 0 || r.stdout != "" {
 		t.Errorf("exit %d, stdout %q, stderr %q", r.code, r.stdout, r.stderr)
 	}
-	if !strings.Contains(r.stderr, "22 cases, 0 failed") {
+	if !strings.Contains(r.stderr, "28 cases, 0 failed") {
 		t.Errorf("stderr %q", r.stderr)
 	}
 }

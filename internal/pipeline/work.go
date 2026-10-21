@@ -30,6 +30,8 @@ const (
 	stSection      = "section"
 	stCoherence    = "coherence"
 	stCoherenceFix = "coherencefix"
+	// stEdit asks the edit pass's turns: its one edit, then any gate-fix turn after it.
+	stEdit = "edit"
 	// stSmall asks the one scoped fix of small findings that a fix verdict in round 2, or a miss
 	// in the coverage check after the redraft, opens in place of an escalation.
 	stSmall = "small"
@@ -47,6 +49,8 @@ const (
 	s6b = "s6b"
 	s7  = "s7"
 	s8  = "s8"
+	// s2e is the edit pass, which follows the draft's gate.
+	s2e = "s2e"
 )
 
 // Exchange kinds. A draft exchange is the gate-fix conversation after the draft; a redraft
@@ -60,6 +64,9 @@ const (
 	exSection   = "section"
 	exCoherence = "coherence"
 	exSmall     = "small"
+	// exEdit is the edit pass: one exchange on the edit seat, opened once after the draft's gate
+	// holds, whose later turns answer a red gate.
+	exEdit = "edit"
 )
 
 // exchange is one edit-contract conversation: the turns so far, every numbered finding it
@@ -73,6 +80,15 @@ type exchange struct {
 	// GateFix says a red gate has reopened the exchange. Every later turn of it answers gate
 	// findings or a refusal of them, so it stays set, and no region bound applies to those turns.
 	GateFix bool `json:"gate_fix,omitempty"`
+}
+
+// seat names the seat that answers the exchange's turns: the edit seat for the edit pass, and the
+// draft seat for every other exchange.
+func (ex *exchange) seat() string {
+	if ex.Kind == exEdit {
+		return "edit"
+	}
+	return "draft"
 }
 
 // coverageState is where a coverage check stands: its phase (initial, redraft, final, coherence,
@@ -153,6 +169,13 @@ type work struct {
 	// A state saved before drafting existed decodes both as false: a read, not a draft.
 	Draft    bool `json:"draft,omitempty"`
 	SkipRead bool `json:"skip_read,omitempty"`
+	// Edit says the page gets the edit pass after its draft's gate holds, and Edited that the pass
+	// has been opened. Narrow says the page runs without --judge: it takes no blueprint read, no
+	// review round, no reader, no coverage read, and no coherence read, and is accepted on the
+	// gate after the edit pass. A state saved before they existed decodes all three as false.
+	Edit   bool `json:"edit,omitempty"`
+	Edited bool `json:"edited,omitempty"`
+	Narrow bool `json:"narrow,omitempty"`
 	// Section says the page is a section redraft, decided once when it reached its draft path,
 	// since the page changes after the first write. CoherenceRetest says the coherence read is the
 	// retest after its fix.

@@ -149,7 +149,7 @@ func (f *cliFixture) scopeWith(whole bool, warn io.Writer) (draftPlan, error) {
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	return scopeFromLock(c, f.root, head, hs, whole, warn)
+	return scopeFromLock(c, f.root, head, hs, whole, true, warn)
 }
 
 // editFact rewrites the shared fact's bullet and commits it.

@@ -631,7 +631,7 @@ func TestPageScopeWithABar(t *testing.T) {
 		f := newCLIFixture(t)
 		f.pageBar(f.rev("HEAD"))
 		t.Setenv("DRAFTER_API_KEY", "")
-		code, out, errOut := f.page(tallyPage)
+		code, out, errOut := f.page("--judge", tallyPage)
 		if code != 1 || !strings.Contains(out, tallyPage+": held: unchanged since the blocked read at") {
 			t.Errorf("exit %d, want 1 with the held line\n%s%s", code, out, errOut)
 		}
@@ -654,7 +654,7 @@ func TestPageScopeWithABar(t *testing.T) {
 		f.commit("a lock from a later format", tallyLock)
 		head := f.rev("HEAD")
 		for name, call := range map[string]func() error{
-			"drafter page's scopeFromLock": func() error { _, err := scopeFromLock(c, f.root, head, hs, false, io.Discard); return err },
+			"drafter page's scopeFromLock": func() error { _, err := scopeFromLock(c, f.root, head, hs, false, true, io.Discard); return err },
 			"drafter read's bar lookup": func() error {
 				_, _, err := readBars(c, f.root, head, hs, barMaps{}, io.Discard)
 				return err

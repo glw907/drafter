@@ -8,11 +8,13 @@ function echo(seat) {
       `turn ${c.turn || 0}`,
       `scope [${c.scope || ""}]`,
       `findings [${c.findings || ""}]`,
+      `markdown [${c.markdown}]`,
+      `preferences [${c.preferences || ""}]`,
     ].join("\n");
 }
 
 const seats = {};
-for (const s of ["blueprint", "draft", "structure", "editor", "fact", "reader", "coherence"]) {
+for (const s of ["blueprint", "draft", "edit", "structure", "editor", "fact", "reader", "coherence"]) {
   seats[s] = echo(s);
 }
 return seats;

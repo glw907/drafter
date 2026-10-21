@@ -158,6 +158,9 @@ func (c *Config) apply(l *layer) {
 		put(c, l, "blueprints.outline", &c.Blueprints.Outline, b.Outline)
 		put(c, l, "blueprints.brief_path", &c.Blueprints.BriefPath, b.BriefPath)
 	}
+	if e := f.Editing; e != nil {
+		put(c, l, "editing.preferences", &c.Editing.Preferences, e.Preferences)
+	}
 	for track, sections := range f.Register {
 		c.Register[track] = sections
 		c.record("register."+track, l.from("register."+track), format(sections))

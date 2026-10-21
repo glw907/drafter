@@ -60,3 +60,8 @@ max_tokens = 32000
 model = "claude-opus-5-5"
 effort = "medium"
 max_tokens = 32000
+
+[seat.edit]
+model = "claude-opus-5-5"
+effort = "medium"
+max_tokens = 32000

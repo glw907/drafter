@@ -57,4 +57,8 @@ type Context struct {
 	Narrow         json.RawMessage `json:"narrow"`
 	Turn           int             `json:"turn"`
 	Facts          bool            `json:"facts"`
+	// Markdown says the page's blueprint is a Markdown file, not YAML.
+	Markdown bool `json:"markdown"`
+	// Preferences is the text of the project's editing preferences file, verbatim, or empty.
+	Preferences string `json:"preferences"`
 }
