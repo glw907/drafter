@@ -4,7 +4,7 @@ Use this procedure when a docs page does not exist yet. You write the page's ent
 
 ## 1. Settle the page's job and type
 
-Write down the job: what the reader accomplishes with the page. Pick its page type from the types `outline.yaml` declares. Read the anatomy the type names in [anatomies.md](anatomies.md) for its introduction and ending, or, when the project's register has an entry for the anatomy, that entry. The entry's fields and what each requires are in [outline.yaml](format.md#outlineyaml).
+Write down the job: what the reader accomplishes with the page. Pick its page type from the types `outline.yaml` declares. Read the anatomy the type names in [anatomies.md](anatomies.md) for its introduction and ending, or, when the page's track names a register with an entry for the anatomy, that entry. The outline entry's fields and what each requires are in [outline.yaml](format.md#outlineyaml).
 
 Set `covers` and `outOfScope` from the neighbors: read the outline whole, so you know each page's job and what another page owns. Keep out of this page whatever a neighbor owns.
 
@@ -21,7 +21,7 @@ Never file a fact tagged `candidate` or `docs-drift`. Edit fact bullets with the
 
 ## 3. Write the blueprint
 
-Write `<page>.blueprint.md` in [the markdown format](format.md#markdown-blueprints): the front matter (`page`, `type`, `track`, `exemplar`), the `:::reader` block that says who reads the page, why they arrive, what the page does for them, and what it leaves to other pages, then the sections. Argue their order from the reader: Google's outline guidance is the source, so the page introduces information when it is most relevant to the reader, and the order of `covers` is only an inventory.
+Write `<page>.blueprint.md` in [the markdown format](format.md#markdown-blueprints): the front matter (`page`, `type`, `track`, and an optional `exemplar`), then the `:::reader` block, written from the questions in [introductions.md](introductions.md): who reads the page, why they arrive, what they already know, what the page does for them, and what it leaves to other pages. Then the sections. Order them by when the reader needs each one; Google's outline guidance is the source. Don't copy the order of `covers`: it is an inventory.
 
 Under each heading, write the italic job line that says what the section does for the reader, then the lines the page will carry, each a bullet or numbered step ending in its `:fact[id]` tags. A symptom page gives each symptom a `:::row` with its Symptom, Cause, and Fix. Write each line as the page should say it to its reader: the blueprint is what Geoff reads and approves, so it reads as the page's plan in plain sentences, not as notes.
 

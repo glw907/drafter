@@ -213,6 +213,12 @@ func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 			cur, rawStart = len(m.Sections)-1, i
 			continue
 		}
+		loc := listMarker.FindStringIndex(line)
+		// A tag drafter never reads would drop out of the check, refs, and staleness alike.
+		if loc == nil && factTag.MatchString(line) {
+			add(n, "this :fact tag is not on a bullet, step, row, or reader line, so drafter does not read it", "put the tag at the end of the bullet or step's first line, or inside the row")
+			continue
+		}
 		if cur < 0 || trimmed == "" {
 			continue
 		}
@@ -221,7 +227,7 @@ func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 			sec.Job = trimmed[1 : len(trimmed)-1]
 			continue
 		}
-		if loc := listMarker.FindStringIndex(line); loc != nil {
+		if loc != nil {
 			body := line[loc[1]:]
 			var ids []string
 			for _, t := range factTag.FindAllStringSubmatch(body, -1) {

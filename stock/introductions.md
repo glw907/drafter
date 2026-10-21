@@ -93,6 +93,7 @@ who lacks it, and in one of two forms:
 Don't explain what the page's readers already know.
 Source: [Google Technical Writing One, Audience](https://developers.google.com/tech-writing/one/audience).
 
-The background you record while planning stays a planning note about what the page rests on. It
-is never drafted as content; the lines above are. The format is in drafter's
+The `**Background.**` paragraph of the `:::reader` block (`framing.background` in an older YAML
+blueprint) is a planning note about what the page rests on. The draft reads it as part of the
+brief, but only the section lines are drafted as content. The format is in drafter's
 [blueprint format](https://github.com/glw907/drafter/blob/main/docs/blueprint-format.md).

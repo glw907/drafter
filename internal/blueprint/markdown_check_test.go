@@ -110,6 +110,8 @@ func TestCheckMarkdownDefects(t *testing.T) {
 		{"section without a job line", edit("*Gets the reader ready to rotate.*\n\n", ""), nil, guideMD, 0, "## Before you begin", "no job line"},
 		{"row without a cause", edit("**Cause.** The account lacks the admin role.\n", ""), nil, guideMD, 0, ":::row", "no **Cause.** part"},
 		{"headings sharing a slug", edit("## Rotate the key", "## Before you begin"), nil, guideMD, 0, "## Before you begin", "same slug"},
+		{"tag on a wrapped bullet's second line", edit("- You need the admin role. :fact[bbbbbb]", "- You need the admin\n  role. :fact[bbbbbb]"), nil, guideMD, 0, "  role.", "not on a bullet, step, row, or reader line"},
+		{"tag in a paragraph", edit("1. Generate", "The key is generated once. :fact[bbbbbb]\n\n1. Generate"), nil, guideMD, 0, "The key is generated", "not on a bullet, step, row, or reader line"},
 		{"fact the store lacks", edit(":fact[bbbbbb]\n- See", ":fact[zzzzzz]\n- See"), nil, guideMD, 0, "zzzzzz", "in no facts file"},
 		{"a yaml blueprint beside the markdown one", goodMD, map[string]string{guideBlueprint: readFixture(t, "base.blueprint.yaml")},
 			guideBlueprint, 1, "", "both a .blueprint.md"},

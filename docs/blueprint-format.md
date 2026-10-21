@@ -123,7 +123,9 @@ one italic span: what the section does for the reader. A section without one is 
 A bullet or numbered step states one thing the section must say. End it with a `:fact[id]` tag for
 each fact it places or cites. Leave off the `f:` prefix the facts store uses, so `:fact[bbbbbb]`
 cites `f:bbbbbb`. A bullet of the form `See [text](target).` is a link, and `drafter check` checks
-its target as it does a link item in YAML.
+its target as it does a link item in YAML. A tag belongs on a bullet's or step's first line, a row
+line, or a reader line; `drafter check` reports a tag anywhere else as an error, since drafter
+reads no other line for tags.
 
 A `:::row` block is one row of a symptom page. It holds three lines, each opening with a bold label:
 `**Symptom.**` for what the reader sees, `**Cause.**` for why, and `**Fix.**` for what to do. A row

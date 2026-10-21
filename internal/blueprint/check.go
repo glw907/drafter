@@ -406,7 +406,7 @@ func (c *projectCheck) pairing() {
 	for _, rel := range c.l.strays {
 		c.add(rel, 1, plan.SeverityError, checkBlueprints,
 			"the file is not at a path-rule location, so no page maps to it",
-			"name it <page path without .md>.blueprint.md under "+c.BlueprintRoot)
+			"name it <page path without .md>.blueprint.md (or .blueprint.yaml) under "+c.BlueprintRoot)
 	}
 	for _, rel := range c.l.shadowed {
 		c.shadowed(rel)

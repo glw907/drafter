@@ -41,9 +41,7 @@ track: cli-docs
 `
 
 // TestDefaultPageDraftsFromAMarkdownBlueprint names the page, finds its .blueprint.md, and sends
-// the draft and the edit with the blueprint's text verbatim. It holds once the blueprint check
-// decodes Markdown blueprints; until then the check reads the file as YAML and the page escalates,
-// which this test reports as a skip.
+// the draft and the edit with the blueprint's text verbatim.
 func TestDefaultPageDraftsFromAMarkdownBlueprint(t *testing.T) {
 	e := newDraftEnv(t)
 	const md = "blueprints/docs/count-items.blueprint.md"

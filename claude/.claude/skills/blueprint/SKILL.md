@@ -13,21 +13,21 @@ Every blueprint and every drafted page reaches Geoff only after a fresh agent ha
 
 1. **A page is missing.** Follow [new-page.md](new-page.md).
 2. **A code change alters documented behavior.** Update the fact bullet for the behavior. Run `drafter refs f:<id>` before you correct a fact: it lists every line on every blueprint that cites it. Fix each line the new fact makes wrong, then redraft the page with `drafter page <blueprint>`. The blueprint, the page, and the facts ride in the code PR. Fact-check the changed lines, settle the findings, and queue one change review for the PR (see [Review](#review)).
-3. **You notice a deficiency while reading.** Fix the blueprint, not the page, and take it through the same review as case 2. When the deficiency is a wrong fact, run `drafter refs f:<id>` first and fix each line the corrected fact makes wrong.
+3. **You notice a deficiency while reading.** Fix the blueprint, not the page. When the deficiency is a wrong fact, run `drafter refs f:<id>` first and fix each line the corrected fact makes wrong. Redraft with `drafter page <blueprint>`, open a PR carrying the blueprint and page edits, and take it through the same review as case 2.
 
 A change that adds or removes a section, or changes the reader's path through the page, gets its blueprint approved before the redraft, as a new page does.
 
 ## Edit
 
-Read the blueprint whole before you edit it. Each section is a heading with an italic job line under it, then the lines the page carries: bullets and numbered steps, each ending in the `:fact[id]` tags of the facts it rests on, and `:::row` blocks on a symptom page. [Markdown blueprints](format.md#markdown-blueprints) gives every rule. Edit fact bullets with the Edit tool, never a shell append. Never edit `drafted.lock`.
+Read the blueprint whole before you edit it. Each section is a heading with an italic job line under it, then the lines the page carries: bullets and numbered steps, each ending in the `:fact[id]` tags of the facts it rests on, and `:::row` blocks on a symptom page. [Markdown blueprints](format.md#markdown-blueprints) gives every rule. Edit fact bullets with the Edit tool, never a shell append. Never edit `drafted.lock`: drafter writes it, and a hand edit desyncs the page from its blueprint.
 
 ## Check
 
-Run `drafter check <blueprint>` after every edit and fix each error before you commit. A run that names a blueprint skips the facts store, so its `store` warnings are not yours to chase. When a fact changes, `drafter refs f:<id>` is the lookup.
+Run `drafter check <blueprint>` after every edit and fix each error before you commit. A run that names a blueprint skips the facts store, so its `store` warnings are not yours to chase.
 
 ## Fact-check
 
-Commit, then dispatch the `fact-checker` agent on the file at that commit. It must be a fresh agent, never the session that wrote the file. It returns one JSON array of claims, each with a verdict (`holds`, `wrong`, `imprecise`, or `unsupported`), the `file:line` that settles it, and a proposed fix. Save the array verbatim to `<approval-queue state>/findings/<repo>/<file path with / as __>/<commit>.json`.
+Commit, then dispatch the `fact-checker` agent on the file at that commit. It must be a fresh agent, never the session that wrote the file. It returns one JSON array of claims, each with a verdict (`holds`, `wrong`, `imprecise`, or `unsupported`), the `file:line` that settles it, and a proposed fix. Save the array verbatim to `${XDG_STATE_HOME:-$HOME/.local/state}/approval-queue/findings/<repo>/<file path with / as __>/<commit>.json`.
 
 Settle every finding that is not `holds`, as the author:
 
@@ -39,7 +39,9 @@ Fact-check the fixed lines again with a fresh agent. After three rounds on one d
 
 ## Review
 
-Write the notes file the queue shows under each line: an `info` note with `was` and `now` for each fix, a `decide` note with `sides` and `choices` for each dispute, and a `question` note for each question. Then queue the document and wait for Geoff's decision:
+Write the notes file the queue shows under each line: a JSON array, one object per note, with `id`, `kind` (`info`, `decide`, or `question`), `anchor`, `title`, and `body` (an array of paragraphs). The anchor names the line the note sits under: `<heading slug>.heading`, or `<heading slug>.p<n>` for the n-th bullet, step, or row under that heading counting from 0, with `.symptom`, `.cause`, or `.fix` for a row's part. Write an `info` note with `was` and `now` for each fix, a `decide` note with `sides` (`who`, `text`) and `choices` (`label`, `done`, and `text` for a wording the choice puts in) for each dispute, and a `question` note with `choices` for each question. The command refuses any other shape.
+
+Then queue the document. `<file>` is relative to `<worktree>` and must be committed:
 
 | What | Command |
 |---|---|
@@ -47,11 +49,15 @@ Write the notes file the queue shows under each line: an `info` note with `was` 
 | A drafted page | `approval-queue page <worktree> <title> <file> --pr <owner/repo#n> --notes <notes.json>` |
 | A code PR carrying blueprint and page edits | `approval-queue change <owner/repo#n> <title> --notes <notes.json>` |
 
-Each save Geoff makes in the review is a commit in the worktree, so do not edit the file while the review is open. An approve prints the approved blob; a send-back prints his note, and you fix forward from it, fact-check the touched lines, and queue again.
+Run the command under `setsid -f` with its stdout to a decision file, and watch that file. Never leave the wait to a background task alone: the command's exit trap deletes the queued item when the command dies. Each save Geoff makes in the review is a commit in the worktree, so do not edit the file while the review is open.
+
+An approve prints `{"decision":"approve","file":...,"commit":...,"blob":...,"calls":[...]}`. A send-back prints `{"decision":"reject","note":...}`: fix forward from the note, fact-check the touched lines, and queue again.
 
 ## Draft
 
-Draft only after Geoff approves the blueprint: `approval-queue approved <file> <blob>` must exit 0 for the blueprint's current blob. Then run `drafter page <blueprint>`. With no flag it runs the draft seat, the edit pass that applies the project's editing preferences, and the deterministic gate; `--judge` adds the older judging seats, which this order does not use. Fact-check the draft, settle it the same way, and queue it with `approval-queue page`. Geoff's edits to the page are final: when one changes a claim, update the blueprint or the fact in the same PR. The PR merges after he approves the page.
+For a new page, or a change that adds or removes a section or changes the reader's path, draft only after Geoff approves the blueprint: `approval-queue approved <file> <blob>` must exit 0, with `<blob>` from `git rev-parse HEAD:<file>`. Then run `drafter page <blueprint>` without `--judge`. With no flag it runs the draft seat, the edit pass that applies the project's editing preferences, and the deterministic gate; `--judge` adds review seats and reads that spend credit this process does not use. Exit 0 means the page was accepted. On exit 3, rerun with `--resume <run-id>` and the same arguments; on exit 1, report the escalation.
+
+Fact-check the draft, settle it the same way, run the project's docs gate, and queue it with `approval-queue page`. Geoff's edits to the page are final: when one changes a claim, update the blueprint or the fact in the same PR. The PR merges after he approves the page.
 
 ## Page prose
 
