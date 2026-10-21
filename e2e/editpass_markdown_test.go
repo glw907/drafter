@@ -50,9 +50,6 @@ func TestDefaultPageDraftsFromAMarkdownBlueprint(t *testing.T) {
 	e.write(md, tallyMarkdownBlueprint)
 	e.commit("a Markdown blueprint", md)
 	r := e.pageDefault(draftPage)
-	if strings.Contains(r.stdout+r.stderr, "malformed YAML") {
-		t.Skip("the blueprint check does not decode Markdown blueprints yet")
-	}
 	if r.code != 0 {
 		t.Fatalf("exit %d, sent %v\n%s%s", r.code, e.stub.sent(), r.stdout, r.stderr)
 	}

@@ -430,7 +430,7 @@ func blueprintHandoffs(c *config.Config, root, head string, args []string) ([]ha
 		}
 		pagePath, ok := blueprint.PagePath(c.Blueprints.Root, rel)
 		if !ok {
-			return nil, fmt.Errorf("%s is not a .blueprint.yaml file under %s", rel, c.Blueprints.Root)
+			return nil, fmt.Errorf("%s is not a .blueprint.yaml or .blueprint.md file under %s", rel, c.Blueprints.Root)
 		}
 		var entry *blueprint.Page
 		for i := range o.Pages {
