@@ -154,3 +154,30 @@ func TestExcerptMatchesTheDraftRequest(t *testing.T) {
 		}
 	}
 }
+
+func TestExcerptCountsCommentary(t *testing.T) {
+	tests := []struct {
+		name, source, want string
+	}{
+		{"no parenthetical pointer", "`blueprints` (no pointer here)", "no block shows source lines; point"},
+		{"one parenthetical pointer", "`blueprints` (see `main.go:5`)", "no block shows source lines (1 pointer in parentheses was read as commentary); point"},
+		{"two parenthetical pointers", "`blueprints` (see `main.go:5` and `main.go:9`)", "(2 pointers in parentheses were read as commentary)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newCLIFixture(t)
+			f.dirBlueprint("verified")
+			facts := strings.Replace(f.read1(tallyFacts), "Source: `blueprints`.", "Source: "+tt.source+".", 1)
+			f.write(tallyFacts, facts)
+			f.commit("add commentary", tallyFacts)
+			_, errs, code := run(t, "excerpt", "--root", f.root, "tally-dir-only")
+			if code != 1 || !strings.Contains(errs, tt.want) {
+				t.Errorf("code %d, stderr %q, want 1 containing %q", code, errs, tt.want)
+			}
+			out, _, _ := run(t, "check", "--root", f.root)
+			if strings.Contains(tt.source, "main.go") && !strings.Contains(out, "yields an excerpt (") {
+				t.Errorf("check warning does not count the commentary:\n%s", out)
+			}
+		})
+	}
+}

@@ -74,13 +74,14 @@ func runExcerpt(cmd *cobra.Command, arg string, f *checkFlags) error {
 		}
 	}
 	var res excerptResult
+	commentary := 0
 	switch {
 	case facts != nil && facts.Count(arg) > 0:
 		fact, ok := facts.Get(arg)
 		if !ok {
 			return exitError{code: exitCannotRun, msg: fmt.Sprintf("fact %s is held by more than one bullet", arg)}
 		}
-		res.ID, res.Raw = arg, fact.Raw
+		res.ID, res.Raw, commentary = arg, fact.Raw, fact.Commentary
 		if res.Blocks, res.Excerpt, err = ex.Fact(facts, arg); err != nil {
 			return exitError{code: exitCannotRun, msg: err.Error()}
 		}
@@ -95,7 +96,19 @@ func runExcerpt(cmd *cobra.Command, arg string, f *checkFlags) error {
 	if res.Excerpt {
 		return nil
 	}
-	return exitError{code: exitFindings, msg: "no block shows source lines; point the fact at the code that shows the claim"}
+	return exitError{code: exitFindings, msg: "no block shows source lines" + commentaryNote(commentary) + "; point the fact at the code that shows the claim"}
+}
+
+// commentaryNote says how many pointers of a fact's Source: part were read as commentary because
+// they sit in parentheses, which is the usual reason a fact that names code still shows none.
+func commentaryNote(n int) string {
+	switch n {
+	case 0:
+		return ""
+	case 1:
+		return " (1 pointer in parentheses was read as commentary)"
+	}
+	return fmt.Sprintf(" (%d pointers in parentheses were read as commentary)", n)
 }
 
 func writeExcerpt(w io.Writer, res *excerptResult, asJSON bool) error {

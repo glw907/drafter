@@ -99,7 +99,8 @@ type verifier struct {
 //
 // A bullet outside a Harvest record or Provenance section needs a leading id, a Source:, and one
 // valid tag, and its id must be unique in the store. Each pointer in its Source: part is
-// checked: path:lines for the file, the lines, and an anchor within 10 lines of them; path#name
+// checked: path:lines for the file, the lines, and an anchor within 10 lines of them (a warning when
+// it sits off the cited lines); path#name
 // for the declaration of a Go or TypeScript name; a bare path for existence, as a warning when
 // missing. A pointer with a dotted symbol, a symbol in another kind of file, or a character
 // outside [A-Za-z0-9_./-] is skipped and counted.
@@ -386,6 +387,19 @@ func (v *verifier) verify(p pointer) (severity, message, fix string, err error) 
 	if missing := absentWords(p.anchor, strings.Join(src.lines[start-1:end], "\n")); len(missing) > 0 {
 		return SeverityError, fmt.Sprintf("the anchor for %q names %s, not found within %d lines of the cited range", p.span, quoteAll(missing), anchorWindow),
 			"update the cited lines or the anchor", nil
+	}
+	if moved := absentWords(p.anchor, strings.Join(src.lines[p.lo-1:p.hi], "\n")); len(moved) > 0 {
+		var now []string
+		for _, w := range moved {
+			for i := start; i <= end; i++ {
+				if strings.Contains(src.lines[i-1], w) {
+					now = append(now, fmt.Sprintf("%q on line %d", w, i))
+					break
+				}
+			}
+		}
+		return SeverityWarning, fmt.Sprintf("the anchor for %q has drifted off the cited lines: %s now", p.span, strings.Join(now, ", ")),
+			"update the pointer to the line the anchor is on now", nil
 	}
 	return "", "", "", nil
 }

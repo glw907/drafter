@@ -82,6 +82,7 @@ func TestVerifyFactsStore(t *testing.T) {
 		message  string
 	}{
 		{"`f:moved1`", "error", `names ["farWord"], not found within 10 lines`},
+		{"`f:near01`", "warning", `"nearWord" on line 12`},
 		{"`f:missng`", "error", `names ["nowhereWord"]`},
 		{"The first bullet of a repeated id", "error", `fact "f:dupe01" is on 2 bullets (facts/store.md:`},
 		{"The second bullet of a repeated id", "error", `fact "f:dupe01" is on 2 bullets (facts/store.md:`},
@@ -102,7 +103,6 @@ func TestVerifyFactsStore(t *testing.T) {
 
 		{"`f:edge01`", "", ""},
 		{"`f:substr`", "", ""},
-		{"`f:near01`", "", ""},
 		{"`f:uniqbn`", "", ""},
 		{"`f:gometh`", "", ""},
 		{"`f:gogrp1`", "", ""},
@@ -155,7 +155,7 @@ func TestVerifyFactsIDs(t *testing.T) {
 		checked, skipped int
 	}{
 		{"a repeated id selects both bullets", []string{"f:dupe01"}, 2, 2, 0},
-		{"a clean fact", []string{"f:near01"}, 0, 1, 0},
+		{"a clean fact", []string{"f:substr"}, 0, 1, 0},
 		{"a skipped pointer", []string{"f:dotted", "f:mdhead"}, 0, 0, 2},
 		{"an id in no bullet", []string{"f:absent"}, 0, 0, 0},
 		{"no ids selects nothing", []string{}, 0, 0, 0},
