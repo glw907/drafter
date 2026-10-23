@@ -28,12 +28,13 @@ The introduction comes first and has no heading of its own. It has these parts:
    covers.
 2. A definition of the concept. When the page relies on more terms, define each one here as a list
    item.
-3. Optionally, a figure that shows the concept, with a title that says what it shows.
+3. Optionally, a figure that shows the concept, with a title that says what it shows. In a
+   blueprint it is a `Figure:` bullet in the reader block.
 
 The sections follow in this order:
 
 1. Background (optional): the history or context that explains why the concept works the way it
-   does.
+   does. A figure that explains one section is a `Figure:` bullet in that section.
 2. Use cases: the situations where the concept applies and what the reader gains from it.
 3. Comparison (optional): how the concept compares with alternatives, often as a table.
 
@@ -55,7 +56,8 @@ The sections follow in this order:
 
 1. Prerequisites (optional): what the reader must have or have done before the first step.
 2. The task: its numbered steps, each starting with a verb. A step can add a short explanation, a
-   code sample or screenshot, and the result the reader sees. A step with parts uses substeps.
+   code sample or screenshot, and the result the reader sees. In a blueprint, a code sample is a
+   `Code:` bullet with its fence, in the step or section it supports. A step with parts uses substeps.
 3. Subtasks (optional): a large task splits into subtasks, each with its own steps.
 
 Closing section: see also. It links to related task guides, concepts, reference entries, and

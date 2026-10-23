@@ -8,6 +8,8 @@ Write down the job: what the reader accomplishes with the page. Pick its page ty
 
 Set `covers` and `outOfScope` from the neighbors: read the outline whole, so you know each page's job and what another page owns. Keep out of this page whatever a neighbor owns.
 
+Write the reader block from the outline entry's job and `covers`. A plan's worked example illustrates one case of that job and never narrows the reader; Geoff sent back the custom admin screen page (2026-10-22) because its reader shrank to the plan's example.
+
 ## 2. File or re-verify each fact from the code
 
 Every command, step, warning, success signal, and assertion the page makes is a claim, and each one rests on a fact bullet in the facts store. Before the blueprint cites a fact, read the code it points at:
@@ -19,9 +21,11 @@ Every command, step, warning, success signal, and assertion the page makes is a 
 
 Never file a fact tagged `candidate` or `docs-drift`. Edit fact bullets with the Edit tool, never a shell append.
 
+When several authors share one facts store, each shared fact has one owner for its correction. An author who finds a shared fact wrong fixes the bullet and says so in the report. An author who sees another author's fix re-verifies the fact against the code and never reverts it; the pilot's parallel authors reverted each other's fixes. Run the project's facts check before you commit, and install its dependencies first when it needs them: cairn's `check:facts` needs `npm ci`.
+
 ## 3. Write the blueprint
 
-Write `<page>.blueprint.md` in [the markdown format](format.md#markdown-blueprints): the front matter (`page`, `type`, `track`, and an optional `exemplar`), then the `:::reader` block, written from the questions in [introductions.md](introductions.md): who reads the page, why they arrive, what they already know, what the page does for them, and what it leaves to other pages. Then the sections. Order them by when the reader needs each one; Google's outline guidance is the source. Don't copy the order of `covers`: it is an inventory.
+Write `<page>.blueprint.md` in [the markdown format](format.md#markdown-blueprints): the front matter (`page`, `type`, `track`, and an optional `exemplar`), then the `:::reader` block, written from the questions in [introductions.md](introductions.md): who reads the page, why they arrive, what they already know, what the page does for them, and what it leaves to other pages. Then, when the page has page-wide instructions such as "state no version range", a `:::constraints` block, never the reader block (the pilot's authors improvised a `**Background.**` paragraph for them). Then the sections. Order them by when the reader needs each one; Google's outline guidance is the source. Don't copy the order of `covers`: it is an inventory.
 
 Under each heading, write the italic job line that says what the section does for the reader, then the lines the page will carry, each a bullet or numbered step ending in its `:fact[id]` tags. A symptom page gives each symptom a `:::row` with its Symptom, Cause, and Fix. Write each line as the page should say it to its reader: the blueprint is what Geoff reads and approves, so it reads as the page's plan in plain sentences, not as notes.
 
