@@ -14,8 +14,8 @@ below names its source.
 Before you plan the introduction, answer three questions about the page's readers. Record the
 answers in the `:::reader` block (`framing.readers` in an older YAML blueprint).
 
-- **Who arrives at the page?** Name each role that reads it, from the outline entry's job and `covers`, never from one worked example in a plan. Google's technical writing course
-  starts here: "Begin by identifying your audience's role(s)."
+- **Who arrives at the page?** Name each role that reads it. Take the roles from the page's job in
+  the outline, not from one example of that job. Google's technical writing course starts here: "Begin by identifying your audience's role(s)."
   Source: [Google Technical Writing One, Audience](https://developers.google.com/tech-writing/one/audience).
 - **What do they already know?** A page owes its reader only what they lack for the task. Name
   what each reader already brings, so the page can skip it.
