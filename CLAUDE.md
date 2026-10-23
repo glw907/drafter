@@ -3,6 +3,7 @@
 A Go tool that validates documentation page plans and, in later releases, drafts and reviews pages
 through the Claude API.
 
+- `docs/STATUS.md` holds the current state, the next action, and its launch prompt; read it first.
 - `make check` is the gate before every commit: vet, lint, and the full test suite.
 - Write Go to the `go-conventions` skill: stdlib assertions only, table-driven tests, errors
   returned and printed only in `main`.
