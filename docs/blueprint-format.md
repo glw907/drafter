@@ -119,7 +119,7 @@ The front matter is YAML between two `---` lines. It takes four keys, and only t
 | --- | --- |
 | `page` | The page's title. It must equal the title of the page's outline entry. |
 | `type` | The outline's type name for the page, such as `task guide`. It must equal the entry's type. |
-| `track` | The track that holds the page. When the outline declares tracks, the named track's `paths` must hold the page. |
+| `track` | The track that holds the page. Required when the outline declares tracks, and the named track's `paths` must hold the page. When the outline declares no tracks, leave it out: naming a track is an error. |
 | `exemplar` | The source of one published page to imitate. Optional. |
 
 ### The reader block
@@ -552,6 +552,7 @@ as an example item.
 | `lock` | An entry with a `page` id names a page on disk, and an entry with only an `accepted` id names a page the outline lists. | error |
 | `convention` | `blueprints.root` is `blueprints`, and `facts.dir` is `<root>/facts`. | warning |
 | `handler` | A `failure`'s handler gives the reader a next action. A `handledBy` that names only a `fact` item, a `sentence` with `mode: verbatim`, or a `link` or `handoff` that sends the reader back to the section holding the failure's `from` step warns. The message carries the fix: hand off to the step or section that gives the reader a next action. | warning |
+| `exhaustive` | A bullet, step, row, reader line, or constraints line of a Markdown blueprint, and a fact bullet in the facts store, holds no word that claims a complete set: `only`, `every`, `all`, `no`, `none`, `never`, `always`, or a count before a plural noun, spelled from two to twelve or written in digits (`three roles`, `4 steps`). Words in code spans don't count. A draft may repeat the claim as fact, so check that the source says the set is complete, or give examples instead. | warning |
 | `no-excerpt` | A `verified` fact that a checked blueprint cites has a pointer that yields an excerpt, so a read can check the claim against source lines. Each fact is reported once, at its bullet, and the fix names `drafter excerpt`. | warning |
 | `store` | Every fact bullet in the facts store has an id no other bullet has, a `Source:`, and one valid tag, and each source pointer names something that exists. See [The facts store](#the-facts-store). | error, or warning for a bare path that doesn't exist |
 

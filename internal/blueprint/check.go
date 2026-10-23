@@ -144,6 +144,7 @@ func (c *projectCheck) blueprintData(rel string, data []byte) (Source, Page) {
 	switch b := src.(type) {
 	case *Markdown:
 		c.markdown(rel, b, entry)
+		c.exhaustive(rel, b)
 	case *Blueprint:
 		c.references(rel, b)
 		c.sections(rel, b)
@@ -160,7 +161,7 @@ func (c *projectCheck) blueprintData(rel string, data []byte) (Source, Page) {
 func (c *projectCheck) markdown(rel string, m *Markdown, entry Page) {
 	fault := func(line int, msg, fix string) { c.add(rel, line, plan.SeverityError, checkMarkdown, msg, fix) }
 	f := m.Front
-	for _, key := range [...]struct{ name, val string }{{"page", f.Page}, {"type", f.Type}, {"track", f.Track}} {
+	for _, key := range [...]struct{ name, val string }{{"page", f.Page}, {"type", f.Type}} {
 		if strings.TrimSpace(key.val) == "" {
 			fault(f.Line, fmt.Sprintf("the front matter has no %s", key.name), "add "+key.name+": to the front matter")
 		}
@@ -173,9 +174,7 @@ func (c *projectCheck) markdown(rel string, m *Markdown, entry Page) {
 		fault(f.Line, fmt.Sprintf("the front matter's type is %q, but the outline gives %s the type %q", f.Type, entry.Path, entry.Type),
 			"set type to the outline's type for the page, or change the entry in the outline")
 	}
-	if f.Track != "" {
-		c.track(rel, f, entry)
-	}
+	c.track(rel, f, entry)
 
 	if len(m.ReaderLines) == 0 {
 		fault(1, "the blueprint has no :::reader block", "add a :::reader block under the title that says who reads the page and why")
@@ -218,11 +217,21 @@ func (c *projectCheck) markdown(rel string, m *Markdown, entry Page) {
 	}
 }
 
-// track checks that the front matter's track is one the outline declares and that its paths hold
-// the page. An outline that declares no tracks leaves nothing to check the name against.
+// track checks the front matter's track against the outline's. An outline that declares no tracks
+// leaves a track optional and any name an error; one that declares tracks requires a track the
+// outline declares and whose paths hold the page.
 func (c *projectCheck) track(rel string, f Front, entry Page) {
 	tracks := c.l.outline.Tracks
 	if len(tracks) == 0 {
+		if f.Track != "" {
+			c.add(rel, f.Line, plan.SeverityError, checkMarkdown,
+				fmt.Sprintf("the front matter names the track %q, but the outline declares no tracks", f.Track),
+				"remove track from the front matter, or declare tracks in "+c.Outline)
+		}
+		return
+	}
+	if f.Track == "" {
+		c.add(rel, f.Line, plan.SeverityError, checkMarkdown, "the front matter has no track", "add track: to the front matter")
 		return
 	}
 	i := slices.IndexFunc(tracks, func(t Track) bool { return t.Name == f.Track })
@@ -234,6 +243,30 @@ func (c *projectCheck) track(rel string, f Front, entry Page) {
 		c.add(rel, f.Line, plan.SeverityError, checkMarkdown,
 			fmt.Sprintf("the paths of the track %q do not hold %s", f.Track, entry.Path),
 			"name the track whose paths hold the page, or add the page to this track's paths")
+	}
+}
+
+// exhaustive warns on each line of a markdown blueprint that claims a complete set: bullets and
+// steps, the three parts of a row, and the lines of the reader and constraints blocks.
+func (c *projectCheck) exhaustive(rel string, m *Markdown) {
+	warn := func(line int, text string) {
+		if claim := plan.ExhaustiveClaim(text); claim != "" {
+			c.findings = append(c.findings, plan.ExhaustiveFinding(rel, line, claim))
+		}
+	}
+	lines := strings.Split(strings.ReplaceAll(m.Text, "\r\n", "\n"), "\n")
+	for _, open := range []int{m.Reader.Line, m.Constraints.Line} {
+		for n := open + 1; open > 0 && n <= len(lines) && strings.TrimSpace(lines[n-1]) != ":::"; n++ {
+			warn(n, sourceTag.ReplaceAllString(factTag.ReplaceAllString(lines[n-1], ""), ""))
+		}
+	}
+	for _, s := range m.Sections {
+		for _, l := range s.Lines {
+			warn(l.Line, l.Text)
+		}
+		for _, r := range s.Rows {
+			warn(r.Line, strings.Join([]string{r.Symptom, r.Cause, r.Fix}, " "))
+		}
 	}
 }
 

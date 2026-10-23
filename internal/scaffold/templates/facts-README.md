@@ -4,7 +4,7 @@ This directory is the project's facts store. Every other Markdown file here hold
 bullet each, and a blueprint places or cites a fact by its id.
 
 ```markdown
-- `f:k3x9a2` A key is 32 bytes long. Source: `src/keys.go:12` (`KeyBytes`). [verified]
+- `f:k3x9a2` A key is a 32-byte value. Source: `src/keys.go:12` (`KeyBytes`). [verified]
 ```
 
 - The bullet opens with its id as a code span: `f:` plus six base36 characters.

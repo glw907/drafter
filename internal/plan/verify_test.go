@@ -96,7 +96,7 @@ func TestVerifyFactsStore(t *testing.T) {
 		{"`f:backwd`", "error", "runs backward"},
 		{"`f:dirptr`", "error", "names a directory"},
 		{"`f:badfile`", "error", "out of range (src/notes.md has 4 lines)"},
-		{"A claim with no id at all", "error", "no leading fact id"},
+		{"A claim without an id", "error", "no leading fact id"},
 		{"`f:prov01`", "error", "Provenance bullet carries the fact id"},
 		{"`f:barewn`", "warning", `source "src/gone/" does not exist`},
 
