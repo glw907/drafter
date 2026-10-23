@@ -620,7 +620,7 @@ otherwise. Every file in it except `README.md` is a facts file. Each fact is one
 blueprint places or cites a fact by its id.
 
 ```markdown
-- `f:k3x9a2` A key is 32 bytes long. Source: `src/keys.go:12` (`KeyBytes`), `src/keys.go#KeyBytes`. [verified]
+- `f:k3x9a2` A key is a 32-byte value. Source: `src/keys.go:12` (`KeyBytes`), `src/keys.go#KeyBytes`. [verified]
 ```
 
 ### The bullet grammar
