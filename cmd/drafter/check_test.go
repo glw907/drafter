@@ -22,7 +22,7 @@ const catalogDir = "../../internal/blueprint/testdata/catalog"
 // registers them later.
 func blueprintRoot() *cobra.Command {
 	root := &cobra.Command{Use: "drafter", SilenceUsage: true, SilenceErrors: true}
-	root.AddCommand(newCheckCmd(), newRefsCmd(), newExcerptCmd())
+	root.AddCommand(newCheckCmd(), newRefsCmd(), newOutlineCmd(), newExcerptCmd())
 	return root
 }
 

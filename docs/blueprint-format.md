@@ -524,6 +524,10 @@ blueprint root, or the ones you name, with no network call. It prints each findi
 when any is, and 2 when the command can't run. It reports every file's findings and continues
 past a blueprint that fails to decode. `--json` prints the findings as one array.
 
+`--fact <id>`, repeatable, checks only those facts' source pointers, as the `store` check does for
+the whole store, and runs no blueprint check. The id may omit its `f:` prefix. An id the store
+doesn't hold is an error. After you correct one fact, this is the quick check.
+
 The command can't run, and exits 2, in these states:
 
 - The blueprint root doesn't exist.
@@ -606,6 +610,18 @@ for a fact. For a fact id it prints the fact's bullet, then each excerpt block e
 read's request carries it. For a pointer, such as `src/panel.ts#Panel.open`, it prints that
 pointer's block, so you can try an anchor before you write the bullet. The exit status is 0 when
 at least one block shows source lines, 1 when none does, and 2 when the command can't run.
+
+A fact whose sources are URLs has no block to show. The command prints each URL with the read date
+the bullet gives as a checklist to verify by hand, and exits 0. A fact whose only source is a
+prose file draws the exit status 1 and a message to verify the claim by hand, or to drop it where
+the project's rules exclude prose sources. Output stops at 200 lines and names the rest, unless
+`--full` is set.
+
+### Look up a page's outline entry
+
+`drafter outline [--root dir] [--json] <slug | page path>` prints the page's entry from
+`outline.yaml` as YAML, or as one JSON object with `--json`. The exit status is 0 when the outline
+lists the page and 1 when it doesn't. `drafter --version` prints the build's module version.
 
 A block that reads `no excerpt:` gives the reason a read sees nothing there: `missing`,
 `untracked`, `directory`, `prose`, `not a regular file`, `declaration not found`, or `range beyond

@@ -23,7 +23,7 @@ Read the blueprint whole before you edit it. Each section is a heading with an i
 
 ## Check
 
-Run `drafter check <blueprint>` after every edit and fix each error before you commit. A run that names a blueprint skips the facts store, so its `store` warnings are not yours to chase.
+Run `drafter check <blueprint>` after every edit and fix each error before you commit. A run that names a blueprint skips the facts store, so its `store` warnings are not yours to chase. After you correct one fact, `drafter check --fact <id>` verifies just its pointers.
 
 ## Fact-check
 
