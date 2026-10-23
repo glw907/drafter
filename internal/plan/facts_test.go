@@ -196,10 +196,11 @@ func TestFactSourcesAndGet(t *testing.T) {
 	tests := []struct {
 		name, id, text string
 		sources        []string
+		commentary     int
 	}{
-		{"comma list of ranges and a declaration", "f:one", "The widget retries twice.", []string{"src/x.ts:100-110,163-166", "src/y.go#Retry"}},
-		{"parentheses, commands, URL, bare name, external part", "f:two", "Wrapped claim.", []string{"src/z.ts:7", "package.json"}},
-		{"no source part", "f:bare", "No source part here.", nil},
+		{"comma list of ranges and a declaration", "f:one", "The widget retries twice.", []string{"src/x.ts:100-110,163-166", "src/y.go#Retry"}, 0},
+		{"parentheses, commands, URL, bare name, external part", "f:two", "Wrapped claim.", []string{"src/z.ts:7", "package.json"}, 1},
+		{"no source part", "f:bare", "No source part here.", nil, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -212,6 +213,9 @@ func TestFactSourcesAndGet(t *testing.T) {
 			}
 			if !slices.Equal(f.Sources, tt.sources) {
 				t.Errorf("Sources = %q, want %q", f.Sources, tt.sources)
+			}
+			if f.Commentary != tt.commentary {
+				t.Errorf("Commentary = %d, want %d", f.Commentary, tt.commentary)
 			}
 		})
 	}

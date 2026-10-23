@@ -155,7 +155,7 @@ func noExcerptFindings(ctx context.Context, p blueprint.Project, named []string)
 		out = append(out, plan.Finding{
 			File: path.Join(filepath.ToSlash(mustRel(p.Root, p.FactsDir)), f.File), Line: f.Line,
 			Severity: plan.SeverityWarning, Check: checkNoExcerpt,
-			Message: "verified fact " + id + " has no pointer that yields an excerpt, so a read cannot check it against source",
+			Message: "verified fact " + id + " has no pointer that yields an excerpt" + commentaryNote(f.Commentary) + ", so a read cannot check it against source",
 			Fix:     "point it at the code that shows the claim; `drafter excerpt " + id + "` shows what a read sees",
 		})
 	}

@@ -685,6 +685,13 @@ A pointer is skipped, and counted as skipped, rather than checked in these cases
 - A pointer whose path has a character outside letters, digits, `_`, `.`, `/`, and `-`. Route
   paths such as `src/routes/(site)/[id]/+page.svelte` and `@scope` package paths fall here.
 
+A pointer in parentheses is commentary and isn't checked, but it is counted. When a fact shows no
+source lines, `drafter excerpt` and the `no-excerpt` warning say how many pointers of its
+`Source:` part were read as commentary, since a pointer that sits in parentheses is the usual
+reason. An anchor that is inside the 10-line window but off the cited lines is a warning, not an
+error. The message names the line the anchor is on now, and the fix is to update the pointer to
+that line. An anchor outside the window stays an error.
+
 ### Where it runs
 
 `drafter check` with no blueprint named verifies the whole store, adds the findings under the
