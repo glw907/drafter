@@ -192,9 +192,11 @@ mapping dropped or could not decide: a section without a `why`, a failure withou
 ### Find where a fact is used in a markdown blueprint
 
 `drafter refs f:bbbbbb` lists each line of a markdown blueprint that carries a tag for the fact, as
-`file:line: item (kind)`. A bullet's item id is `<section id>.p<n>`, with the kind `code` for a
-`Code:` bullet and `figure` for a `Figure:` bullet. A row's is `<section id>.row<n>`, the reader
-block's is `reader`, and the constraints block's is `constraints`.
+`file:line: item (kind) in section`. A bullet's item id is `<section id>.p<n>`, with the kind
+`code` for a `Code:` bullet and `figure` for a `Figure:` bullet. A row's is `<section id>.row<n>`,
+the reader block's is `reader`, and the constraints block's is `constraints`. The section is the
+one a correction redrafts; the reader and constraints blocks sit in none, so their lines carry
+no section. The command takes several ids, as the next section describes.
 
 ## Write prose fields as blocks
 
@@ -567,19 +569,35 @@ from a run without names.
 
 ### Find where a fact is used
 
-`drafter refs <fact-id> [--root dir] [--json]` lists every blueprint item, on every page, that
-places or cites the fact. It prints one `file:line: item-id (kind)` per line. It covers `fact`
-items, every `facts` list, the introduction's facts, dispositions, and framing citations.
+`drafter refs <fact-id>... [--root dir] [--json]` takes one or more ids and lists every blueprint
+item, on every page, that places or cites each fact. An id matches with or without its `f:`
+prefix. It prints one `file:line: item-id (kind) in section` per line, where the section is the id
+of the section that holds the item, the one a correction redrafts. It covers `fact` items, every
+`facts` list, the introduction's facts, dispositions, and framing citations.
 
 - A framing citation has the item id `_framing-<part>` and the kind `example`.
 - The introduction's `facts` list has the item id `introduction` and the kind `introduction`.
 - A disposition has the item id `dispositions` and the kind `disposition`, at the line of its
   `fact`.
+- The introduction, framing citations, and dispositions sit in no section, so their lines end
+  after the kind.
 
-The exit status is 0 when the command lists at least one place and 1 when it lists none. The
-message for none says whether the facts store holds the id, which tells a mistyped id from a fact
-no page uses yet. The status is 2 when the command can't run, for the same reasons as `drafter
-check`.
+After the blueprint lines, the command reads the brief of each page the blueprints cover, from
+the path [`blueprints.brief_path`](configuration.md) names, and lists each sentence that cites the
+fact as `brief-file:line: s<n>: sentence [page]`. The page is the one the brief belongs to, which
+a correction to the fact leaves out of date. A page with no brief adds nothing. With more than one
+id, the lines for each id sit under that id.
+
+`--json` prints one array. Each object holds `file`, `line`, `item`, `kind`, and `id` (the id as
+you typed it). A blueprint line adds `section` when it has one. A brief sentence has the kind
+`brief`, the item `s<n>` for its place in the brief, and adds `brief` (the brief file), `page`, and
+`sentence`.
+
+With one id, the exit status is 0 when the command lists at least one place and 1 when it lists
+none. The message for none says whether the facts store holds the id, which tells a mistyped id
+from a fact no page uses yet. With several ids, the status is 1 only when an id isn't in the facts
+store. An id the store holds that nothing cites is named on standard error and doesn't fail the
+run. The status is 2 when the command can't run, for the same reasons as `drafter check`.
 
 ### See what a read sees
 
