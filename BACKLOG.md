@@ -4,18 +4,6 @@
 
 ## High
 
-- [ ] **#47** Blueprint format: give code examples, figures, and page constraints a markdown form `#feature` `#drafter` `#initiative:docs-system` *(2026-10-22)*
-  All three pilot authors improvised: a code item's source no longer reaches the draft seat (`CodeSources` returns nil for markdown), and figures and YAML `constraints`/`orderReason`/`argument` have no home (record 13, 14).
-  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
-- [ ] **#46** Blueprint skill: frame the reader from the outline's job, never the worked example `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22)*
-  Geoff sent back the custom admin screen: the plan's signups example had narrowed the reader to screens over non-markdown data, though the outline's job was general. new-page.md should say to frame from the job (record, The numbers).
-  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
-- [ ] **#43** Accept framing-heading variants in `convert plan` and write the seeded blob `#bug` `#drafter` `#initiative:docs-system` *(2026-10-22)*
-  Two of three v1 framing records failed on exact heading matches, and the lock it seeds names a blob absent from the object store, so `convert markdown` calls the page stale with the wrong remedy. `internal/blueprint/convert.go:162` (record 1, 2).
-  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
-- [ ] **#42** Make `convert markdown` emit a reviewable blueprint `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22)*
-  Three of three pilot pages came out as skeletons (44 check errors, no job lines, duplicated fact text, glued reader block, lost code sources) and needed a full author rewrite (record 3).
-  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
 - [ ] **#1** Scope the blueprint read by item, or drop findings already present at the base `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
   The scoped read blocks per section, so a tweak anywhere in a section meets that section's older findings. In the B2 format test, 0 of 5 tweaks passed and every miss but two carried only findings on untouched items. The same defects also change severity between reads. Evidence is in the B2 PR and on #43.
   The change-read pass (2026-10-18) fixed the cause: the rerun scored 1 of 5, and no blocking finding sat on an untouched item. The four misses were blocking findings on the tweak's own added content, so the bar now measures the skill's output. Left open for Geoff's ruling on what comes next.
@@ -24,24 +12,15 @@
 
 ## Medium
 
-- [ ] **#45** Blueprint skill: fix format.md's stale YAML wording, hinge example, and lead-in rule `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22)*
-  format.md still calls a blueprint one YAML file; its job-line example uses the banned trailing hinge; the skill doesn't say whether a task section may open with a lead-in line (record 15-17).
+- [ ] **#43** Accept framing-heading variants in `convert plan` and write the seeded blob `#bug` `#drafter` `#initiative:docs-system` *(2026-10-22)*
+  Two of three v1 framing records failed on exact heading matches, and the lock it seeds names a blob absent from the object store, so `convert markdown` calls the page stale with the wrong remedy. `internal/blueprint/convert.go:162` (record 1, 2).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
-- [ ] **#44** Blueprint skill: a rule for parallel authors sharing one facts store `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22)*
-  `f:9xthnq` was flagged wrong by one author and corrected by another; two authors split on charter-sourced facts until Geoff ruled. Say who fixes a shared fact, and tell an author to run `npm ci` so `check:facts` can run (record 18; cairn-cms 26).
+  Deferred to Medium by Geoff on 2026-10-22: the next fifteen cairn pages have prose plans only, so neither converter runs on them.
+- [ ] **#42** Make `convert markdown` emit a reviewable blueprint `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22)*
+  Three of three pilot pages came out as skeletons (44 check errors, no job lines, duplicated fact text, glued reader block, lost code sources) and needed a full author rewrite (record 3).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
-- [ ] **#41** Lint blueprint lines and fact bullets for unqualified exhaustive words `#feature` `#drafter` `#initiative:docs-system` *(2026-10-22)*
-  Every imprecise fact-check finding in the pilot was a line or fact saying more than its source; "only", "every", "no", and counts were the returning cause across rounds. A lint would aim the fact-checker before it runs (record, The numbers).
-  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
-- [ ] **#40** Validate `track` when the outline declares no tracks `#bug` `#drafter` `#initiative:docs-system` *(2026-10-22)*
-  An empty or wrong `track` passes `drafter check` silently (record 4).
-  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
-- [ ] **#39** Flag pointer drift inside the excerpt window and parenthetical skips `#bug` `#drafter` `#initiative:docs-system` *(2026-10-22)*
-  Six drifted pointers passed the store check while their anchor stayed within ±10 lines; a pointer in parentheses is read as commentary with only "no block shows source lines" (record 5, 6).
-  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
-- [ ] **#38** Show what a fact correction will redraft and break `#feature` `#drafter` `#initiative:docs-system` *(2026-10-22)*
-  `drafter refs` lists blueprint lines only, one id per call. A correction to `f:39sn8c` broke a published page's sentence brief (`check:provenance`), seen only in the full static leg. Cover briefs and drafted pages, and take several ids (record 10, 30).
-  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
+  Deferred to Medium by Geoff on 2026-10-22: the next fifteen cairn pages have prose plans only, so neither converter runs on them.
+
 - [ ] **#35** Read a code fence inside an open `:::row` or `:::reader` block as block text `#bug` `#drafter` `#initiative:docs-system` *(2026-10-21)*
   `DecodeMarkdown` checks for a fence before it checks for an open block, so a fence line inside a row or the reader block starts a fence, and the block's closing `:::` inside that fence is swallowed. The block can then be misread or never close. Found by the reviewed-pages CT1 recheck. `internal/blueprint/markdown.go:161-170`
 
@@ -74,12 +53,6 @@
 
 ## Low
 
-- [ ] **#37** Make `drafter excerpt` serve non-code and long sources `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22)*
-  A vendor fact exits 1 and prints only the bullet; print its URLs and read dates as a checklist. A charter-sourced fact's warning says "point it at the code"; name the drop rule or `facts.prose_sources`. Cap or summarize very long excerpts (`f:0gihxq`: 2,110 lines) (record 7-9).
-  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
-- [ ] **#36** Add a single-fact check, an outline query, and `--version` `#feature` `#drafter` `#initiative:docs-system` *(2026-10-22)*
-  No subcommand checks one fact's pointers, so its output mixes in the whole store's findings; there is no `drafter outline <slug>` and no `--version` (record 11, 12).
-  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
 - [ ] **#34** Refuse a `:fact` tag in front matter and a malformed tag `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-21)*
   `page: Rotate keys :fact[bbbbbb]` decodes with the tag left in the title, and `:fact[]` or `:fact[a b]` does not match `factTag`, so each is ignored with no finding, although the format doc says a tag anywhere else is an error. The reviewed-pages tests also lack a case for a tag on a `:::reader` opener. Found by the reviewed-pages CT1 recheck. `internal/blueprint/markdown.go:93,129-147`
 
@@ -128,6 +101,56 @@
 
 
 ## Done
+
+- [x] **#36** Add a single-fact check, an outline query, and `--version` `#feature` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-22)*
+  No subcommand checks one fact's pointers, so its output mixes in the whole store's findings; there is no `drafter outline <slug>` and no `--version` (record 11, 12).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
+  Landed in glw907/drafter#58: `drafter check --fact`, `drafter outline`, and `drafter --version`.
+
+- [x] **#37** Make `drafter excerpt` serve non-code and long sources `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-22)*
+  A vendor fact exits 1 and prints only the bullet; print its URLs and read dates as a checklist. A charter-sourced fact's warning says "point it at the code"; name the drop rule or `facts.prose_sources`. Cap or summarize very long excerpts (`f:0gihxq`: 2,110 lines) (record 7-9).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
+  Landed in glw907/drafter#58: `drafter excerpt` prints a URL-sourced fact as a checklist, says to verify a prose-sourced fact by hand, and stops at 200 lines unless `--full`.
+
+- [x] **#38** Show what a fact correction will redraft and break `#feature` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-22)*
+  `drafter refs` lists blueprint lines only, one id per call. A correction to `f:39sn8c` broke a published page's sentence brief (`check:provenance`), seen only in the full static leg. Cover briefs and drafted pages, and take several ids (record 10, 30).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
+  Landed in glw907/drafter#58: `drafter refs` takes several ids and lists the section, brief entry, and drafted page of each hit.
+
+- [x] **#39** Flag pointer drift inside the excerpt window and parenthetical skips `#bug` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-22)*
+  Six drifted pointers passed the store check while their anchor stayed within ±10 lines; a pointer in parentheses is read as commentary with only "no block shows source lines" (record 5, 6).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
+  Landed in glw907/drafter#58: an anchor off its cited lines is a warning naming the new line, and a parenthetical pointer is counted in the no-excerpt message.
+
+- [x] **#40** Validate `track` when the outline declares no tracks `#bug` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-22)*
+  An empty or wrong `track` passes `drafter check` silently (record 4).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
+  Landed in glw907/drafter#58: `track` is optional when the outline declares no tracks, and naming one is an error.
+
+- [x] **#41** Lint blueprint lines and fact bullets for unqualified exhaustive words `#feature` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-22)*
+  Every imprecise fact-check finding in the pilot was a line or fact saying more than its source; "only", "every", "no", and counts were the returning cause across rounds. A lint would aim the fact-checker before it runs (record, The numbers).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
+  Landed in glw907/drafter#58: the `exhaustive` warning on blueprint lines and fact bullets.
+
+- [x] **#44** Blueprint skill: a rule for parallel authors sharing one facts store `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-22)*
+  `f:9xthnq` was flagged wrong by one author and corrected by another; two authors split on charter-sourced facts until Geoff ruled. Say who fixes a shared fact, and tell an author to run `npm ci` so `check:facts` can run (record 18; cairn-cms 26).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
+  Landed in glw907/drafter#58: `new-page.md` says who fixes a shared fact and to run the facts check with its dependencies installed.
+
+- [x] **#45** Blueprint skill: fix format.md's stale YAML wording, hinge example, and lead-in rule `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-22)*
+  format.md still calls a blueprint one YAML file; its job-line example uses the banned trailing hinge; the skill doesn't say whether a task section may open with a lead-in line (record 15-17).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
+  Landed in glw907/drafter#58.
+
+- [x] **#46** Blueprint skill: frame the reader from the outline's job, never the worked example `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-22)*
+  Geoff sent back the custom admin screen: the plan's signups example had narrowed the reader to screens over non-markdown data, though the outline's job was general. new-page.md should say to frame from the job (record, The numbers).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
+  Landed in glw907/drafter#58: `new-page.md` and `introductions.md` frame the reader from the outline entry's job.
+
+- [x] **#47** Blueprint format: give code examples, figures, and page constraints a markdown form `#feature` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-22)*
+  All three pilot authors improvised: a code item's source no longer reaches the draft seat (`CodeSources` returns nil for markdown), and figures and YAML `constraints`/`orderReason`/`argument` have no home (record 13, 14).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
+  Landed in glw907/drafter#58: the `Code:` and `Figure:` bullets and the `:::constraints` block.
 
 - [x] **#33** Give the fact-truth seat repository access, an agentic read `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-20 → 2026-10-21)*
   Closed, superseded by the reviewed-pages design (glw907/initiatives `docs-system/specs/2026-10-21-drafter-reviewed-pages-design.md`): a fresh-context session agent with repository access now fact-checks each blueprint and page, so no API seat needs an agentic read. The item was filed only on the parked `worktree-blueprint-first` branch, so it is recorded here to keep the number from being reused.
