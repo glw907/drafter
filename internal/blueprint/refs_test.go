@@ -61,3 +61,80 @@ func TestRefsLines(t *testing.T) {
 		t.Errorf("refs %+v, want one at the fact line %d", refs, lineOf(t, base, "fact: f:bbbbbb"))
 	}
 }
+
+const refsBrief = `{
+  "sentences": [
+    {"text": "Rotating a key needs the admin role.", "id": "f:bbbbbb"},
+    {"text": "The check returns the id of the key that signed.", "id": ["f:cccccc", "f:aaaaaa"]},
+    {"text": "Here is how the rotation works.", "id": "no-claim"}
+  ]
+}
+`
+
+func TestRefHitsSection(t *testing.T) {
+	p := catalogProject(t, nil)
+	hits, _, err := p.RefHits("f:bbbbbb")
+	if err != nil || len(hits) != 1 {
+		t.Fatalf("RefHits = %+v, %v", hits, err)
+	}
+	if hits[0].Item != "needs-admin" || hits[0].Section != "before-you-begin" {
+		t.Errorf("hit = %+v, want item needs-admin in section before-you-begin", hits[0])
+	}
+	hits, _, err = p.RefHits("f:aaaaaa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range hits {
+		if (h.Kind == "introduction" || strings.HasPrefix(h.Item, "_framing-")) && h.Section != "" {
+			t.Errorf("hit %+v has a section, want none", h)
+		}
+	}
+}
+
+func TestRefHitsBriefs(t *testing.T) {
+	tests := []struct {
+		name     string
+		template string
+		briefAt  string
+		id       string
+		want     []string // item and sentence of each brief hit
+	}{
+		{"a string id", "", "blueprints/docs/guide.brief.json", "f:bbbbbb", []string{"s1 Rotating a key needs the admin role."}},
+		{"an id without its prefix", "", "blueprints/docs/guide.brief.json", "bbbbbb", []string{"s1 Rotating a key needs the admin role."}},
+		{"an array of ids", "", "blueprints/docs/guide.brief.json", "f:aaaaaa", []string{"s2 The check returns the id of the key that signed."}},
+		{"a non-default brief path", "notes/{dir}/{name}.json", "notes/docs/guide.json", "f:bbbbbb", []string{"s1 Rotating a key needs the admin role."}},
+		{"the default path is ignored under a template", "notes/{dir}/{name}.json", "blueprints/docs/guide.brief.json", "f:bbbbbb", nil},
+		{"no citing sentence", "", "blueprints/docs/guide.brief.json", "f:dddddd", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := catalogProject(t, map[string]string{tt.briefAt: refsBrief})
+			p.BriefPath = tt.template
+			hits, _, err := p.RefHits(tt.id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, h := range hits {
+				if h.Kind != "brief" {
+					continue
+				}
+				if h.Brief != tt.briefAt || h.File != tt.briefAt || h.Page != "docs/guide.md" || h.Line < 2 {
+					t.Errorf("brief hit = %+v", h)
+				}
+				got = append(got, h.Item+" "+h.Sentence)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("brief hits %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRefHitsNoBrief(t *testing.T) {
+	p := catalogProject(t, nil)
+	hits, held, err := p.RefHits("f:eeeeee")
+	if err != nil || len(hits) != 0 || !held {
+		t.Errorf("RefHits = %+v, held %v, %v; want none, held, no error", hits, held, err)
+	}
+}
