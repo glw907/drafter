@@ -19,8 +19,9 @@ import (
 )
 
 type checkFlags struct {
-	root string
-	json bool
+	root  string
+	json  bool
+	facts []string
 }
 
 func newCheckCmd() *cobra.Command {
@@ -45,6 +46,7 @@ could not run.`,
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error { return usageError(cmd, err.Error()) })
 	cmd.Flags().StringVar(&f.root, "root", "", "project root (default: the git top level of the working directory)")
 	cmd.Flags().BoolVar(&f.json, "json", false, "print the findings as one JSON array")
+	cmd.Flags().StringArrayVar(&f.facts, "fact", nil, "check only this fact's source pointers; repeat for several, and no blueprint is checked")
 	return cmd
 }
 
@@ -155,7 +157,7 @@ func noExcerptFindings(ctx context.Context, p blueprint.Project, named []string)
 		out = append(out, plan.Finding{
 			File: path.Join(filepath.ToSlash(mustRel(p.Root, p.FactsDir)), f.File), Line: f.Line,
 			Severity: plan.SeverityWarning, Check: checkNoExcerpt,
-			Message: "verified fact " + id + " has no pointer that yields an excerpt, so a read cannot check it against source",
+			Message: "verified fact " + id + " has no pointer that yields an excerpt" + commentaryNote(f.Commentary) + ", so a read cannot check it against source",
 			Fix:     "point it at the code that shows the claim; `drafter excerpt " + id + "` shows what a read sees",
 		})
 	}
@@ -195,6 +197,12 @@ func runCheck(cmd *cobra.Command, args []string, f *checkFlags) error {
 	if err != nil {
 		return err
 	}
+	if len(f.facts) > 0 {
+		if len(args) > 0 {
+			return usageError(cmd, "--fact checks the facts store and takes no blueprint")
+		}
+		return runCheckFacts(cmd, p, f)
+	}
 	named := make([]string, 0, len(args))
 	for _, a := range args {
 		rel, err := repoRelative(p.Root, a)
@@ -221,6 +229,47 @@ func runCheck(cmd *cobra.Command, args []string, f *checkFlags) error {
 		findings = append(findings, store...)
 		storeLine = fmt.Sprintf("facts store: %d pointers checked, %d skipped\n", checked, skipped)
 	}
+	return reportFindings(cmd, f, findings, storeLine)
+}
+
+// runCheckFacts verifies the source pointers of the facts f.facts names and nothing else. An id
+// the store does not hold is an error finding.
+func runCheckFacts(cmd *cobra.Command, p blueprint.Project, f *checkFlags) error {
+	if p.FactsDir == "" {
+		return exitError{code: exitCannotRun, msg: "no facts store; set facts.dir, or create the blueprints/facts directory"}
+	}
+	facts, err := plan.LoadFacts(p.FactsDir)
+	if err != nil {
+		return exitError{code: exitCannotRun, msg: err.Error()}
+	}
+	var findings []plan.Finding
+	var ids []string
+	for _, id := range f.facts {
+		switch {
+		case facts.Count(id) > 0:
+			ids = append(ids, id)
+		case facts.Count("f:"+id) > 0:
+			ids = append(ids, "f:"+id)
+		default:
+			findings = append(findings, plan.Finding{
+				File: filepath.ToSlash(mustRel(p.Root, p.FactsDir)), Line: 1, Severity: plan.SeverityError, Check: "store",
+				Message: fmt.Sprintf("fact %s is not in the facts store", id), Fix: "name an id from the facts store",
+			})
+		}
+	}
+	var checked, skipped int
+	if len(ids) > 0 { // VerifyFacts reads a nil id list as the whole store
+		store, c, s, err := plan.VerifyFacts(p.FactsDir, p.Root, ids)
+		if err != nil {
+			return exitError{code: exitCannotRun, msg: err.Error()}
+		}
+		findings, checked, skipped = append(findings, store...), c, s
+	}
+	return reportFindings(cmd, f, findings, fmt.Sprintf("facts store: %d pointers checked, %d skipped\n", checked, skipped))
+}
+
+// reportFindings prints the findings and their count, and returns the exit status they call for.
+func reportFindings(cmd *cobra.Command, f *checkFlags, findings []plan.Finding, storeLine string) error {
 	out, stderr := cmd.OutOrStdout(), cmd.ErrOrStderr()
 	if f.json {
 		if err := writeJSON(out, findings); err != nil {

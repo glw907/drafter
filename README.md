@@ -81,27 +81,40 @@ The command validates every blueprint under the project's blueprint root, or the
 offline. It decodes each blueprint, runs the plan checks on it, and adds the blueprint checks:
 each managed page has a blueprint, every `[[id]]` reference resolves, every section says why, and
 `drafted.lock` agrees with the disk. Findings print as `file:line: severity: check: message
-(fix)`, and the exit status follows `check-plan`'s. [Blueprint format](docs/blueprint-format.md)
-describes the format and each check.
+(fix)`, and the exit status follows `check-plan`'s. `drafter check --fact <id>`, repeatable,
+verifies only those facts' source pointers and runs no blueprint check. [Blueprint
+format](docs/blueprint-format.md) describes the format and each check.
 
 ### refs
 
 ```sh
-drafter refs [--root <dir>] [--json] <fact-id>
+drafter refs [--root <dir>] [--json] <fact-id>...
 ```
 
-The command lists every blueprint item, on every page, that places or cites the fact, one
-`file:line: item-id (kind)` per line. It exits 1 when there are none.
+The command lists every blueprint item, on every page, that places or cites each fact, with the
+section it sits in, and the brief entries and drafted pages that cite it. It exits 1 when a named
+id is not in the facts store, or, for a single id, when nothing cites it.
+
+### outline
+
+```sh
+drafter outline [--root <dir>] [--json] <slug | page path>
+```
+
+The command prints the page's outline entry as YAML, or as a JSON object with `--json`. It exits 1
+when the outline lists no such page.
 
 ### excerpt
 
 ```sh
-drafter excerpt [--root <dir>] [--json] <fact-id | pointer>
+drafter excerpt [--root <dir>] [--json] [--full] <fact-id | pointer>
 ```
 
 The command prints the source lines a read gets for a fact: the fact's bullet, then each excerpt
 block as a read's request carries it. Given a source pointer instead of a fact id, it prints that
-pointer's block. It exits 0 when at least one block shows source lines and 1 when none does.
+pointer's block. It exits 0 when at least one block shows source lines and 1 when none does. A
+fact whose sources are URLs prints each URL with its read date as a checklist and exits 0. Output
+stops at 200 lines unless `--full` is set. `drafter --version` prints the build's version.
 [Blueprint format](docs/blueprint-format.md#see-what-a-read-sees) lists what each pointer form
 yields.
 

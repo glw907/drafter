@@ -19,9 +19,15 @@ Every command, step, warning, success signal, and assertion the page makes is a 
 
 Never file a fact tagged `candidate` or `docs-drift`. Edit fact bullets with the Edit tool, never a shell append.
 
+When several authors share one facts store, an author who finds a shared fact wrong fixes the bullet and names the fix in the hand-back report. An author who sees another author's fix re-verifies it against the code and never reverts it; the pilot's parallel authors reverted each other's fixes. Before you commit, install the project's dependencies and run its facts check. Cairn's `check:facts`, for one, needs `npm ci` first.
+
 ## 3. Write the blueprint
 
-Write `<page>.blueprint.md` in [the markdown format](format.md#markdown-blueprints): the front matter (`page`, `type`, `track`, and an optional `exemplar`), then the `:::reader` block, written from the questions in [introductions.md](introductions.md): who reads the page, why they arrive, what they already know, what the page does for them, and what it leaves to other pages. Then the sections. Order them by when the reader needs each one; Google's outline guidance is the source. Don't copy the order of `covers`: it is an inventory.
+Write `<page>.blueprint.md` in [the markdown format](format.md#markdown-blueprints): the front matter (`page`, `type`, `track` only when the outline declares tracks, and an optional `exemplar`), then the `:::reader` block, written from the questions in [introductions.md](introductions.md): who reads the page, why they arrive, what they already know, what the page does for them, and what it leaves to other pages. Take the reader from the outline entry's job and `covers`, never from a worked example in a plan; Geoff sent back the custom admin screen page (2026-10-22) because its reader shrank to the plan's example.
+
+Put instructions that bind the whole page in a [`:::constraints` block](format.md#the-constraints-block); the pilot's authors put them in a `**Background.**` paragraph inside the reader block.
+
+Then the sections. Order them by when the reader needs each one; Google's outline guidance is the source. Don't copy the order of `covers`: it is an inventory.
 
 Under each heading, write the italic job line that says what the section does for the reader, then the lines the page will carry, each a bullet or numbered step ending in its `:fact[id]` tags. A symptom page gives each symptom a `:::row` with its Symptom, Cause, and Fix. Write each line as the page should say it to its reader: the blueprint is what Geoff reads and approves, so it reads as the page's plan in plain sentences, not as notes.
 

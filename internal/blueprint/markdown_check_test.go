@@ -142,22 +142,83 @@ func TestCheckMarkdownDefects(t *testing.T) {
 }
 
 func TestCheckMarkdownTrackWhenOutlineHasNone(t *testing.T) {
+	noTrack := strings.Replace(goodMD, "track: operate\n", "", 1)
 	tests := []struct {
-		name, md string
-		wantErrs int
+		name, md, outline, msg string
 	}{
-		{"any track name passes", strings.Replace(goodMD, "track: operate", "track: whatever", 1), 0},
-		{"a missing track key still fails", strings.Replace(goodMD, "track: operate\n", "", 1), 1},
+		{"no tracks and no track key passes", noTrack, "", ""},
+		{"no tracks and a track named fails", goodMD, "", "the outline declares no tracks"},
+		{"tracks declared and no track key fails", noTrack, tracksBlock, "has no track"},
+		{"tracks declared and the right track passes", goodMD, tracksBlock, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := mdProject(t, tt.md, map[string]string{"blueprints/outline.yaml": readFixture(t, "outline.yaml")})
+			p := mdProject(t, tt.md, map[string]string{"blueprints/outline.yaml": readFixture(t, "outline.yaml") + tt.outline})
 			got, err := p.Check(nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if errs := errorsOf(got); len(errs) != tt.wantErrs {
-				t.Errorf("errors = %+v, want %d", errs, tt.wantErrs)
+			errs := errorsOf(got)
+			if tt.msg == "" {
+				if len(errs) != 0 {
+					t.Errorf("errors = %+v, want none", errs)
+				}
+				return
+			}
+			if len(errs) != 1 || !strings.Contains(errs[0].Message, tt.msg) {
+				t.Errorf("errors = %+v, want exactly one containing %q", errs, tt.msg)
+			}
+		})
+	}
+}
+
+func TestCheckMarkdownExhaustive(t *testing.T) {
+	const bullet = "- You need the admin role."
+	tests := []struct {
+		name, old, new string
+		anch           string // the text whose line the warning is on
+		want           string // "" for no warning
+	}{
+		{"clean blueprint", bullet, bullet, "", ""},
+		{"bullet", bullet, "- Only an admin can rotate a key.", "Only an admin", "only"},
+		{"step", "1. Generate a key", "1. Always generate a key", "Always generate", "always"},
+		{"row fix", "**Fix.** Ask an admin", "**Fix.** Never ask an admin", ":::row", "never"},
+		{"reader", "An operator who rotates keys.", "Every operator who rotates keys.", "Every operator", "every"},
+		{"constraints", "## Before you begin", ":::constraints\nSkip all setup.\n:::\n\n## Before you begin", "Skip all setup", "all"},
+		{"spelled count", bullet, "- Three roles can rotate a key.", "Three roles", "three roles"},
+		{"a digit count is no claim", bullet, "- Keys have 4 steps.", "", ""},
+		{"none", bullet, "- None of the roles rotate a key.", "None of", "none"},
+		{"no", bullet, "- No role rotates a key.", "No role", "no"},
+		{"mixed case", bullet, "- ONLY an admin rotates.", "ONLY", "only"},
+		{"inside a code span", bullet, "- Run `rotate --all` to start.", "", ""},
+		{"inside a fact tag", bullet, "- You need the role. :fact[bbbbbb-all]", "", ""},
+		{"part of a longer word", bullet, "- Call the normal allocator, a no-op.", "", ""},
+		{"count before a singular", bullet, "- Make 4 attempt at once, then a 3 minute wait.", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			md := strings.Replace(goodMD, tt.old, tt.new, 1)
+			got, err := mdProject(t, md, nil).Check(nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var ws []plan.Finding
+			for _, f := range got {
+				if f.Check == plan.CheckExhaustive {
+					ws = append(ws, f)
+				}
+			}
+			if tt.want == "" {
+				if len(ws) != 0 {
+					t.Fatalf("warnings = %+v, want none", ws)
+				}
+				return
+			}
+			if len(ws) != 1 || ws[0].Severity != plan.SeverityWarning || !strings.Contains(ws[0].Message, `"`+tt.want+`"`) {
+				t.Fatalf("warnings = %+v, want one on %q", ws, tt.want)
+			}
+			if want := strings.Count(md[:strings.Index(md, tt.anch)], "\n") + 1; ws[0].Line != want {
+				t.Errorf("line = %d, want %d", ws[0].Line, want)
 			}
 		})
 	}

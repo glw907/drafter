@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -21,7 +22,7 @@ const catalogDir = "../../internal/blueprint/testdata/catalog"
 // registers them later.
 func blueprintRoot() *cobra.Command {
 	root := &cobra.Command{Use: "drafter", SilenceUsage: true, SilenceErrors: true}
-	root.AddCommand(newCheckCmd(), newRefsCmd(), newExcerptCmd())
+	root.AddCommand(newCheckCmd(), newRefsCmd(), newOutlineCmd(), newExcerptCmd())
 	return root
 }
 
@@ -275,7 +276,7 @@ func TestRefs(t *testing.T) {
 	if code != 0 || len(lines) != 4 {
 		t.Fatalf("code %d, stdout %q", code, out)
 	}
-	for i, want := range []string{"(example)", "needs-admin (fact)", "needs-admin-again (fact)", "c-admin (sentence)"} {
+	for i, want := range []string{"(example)", "needs-admin (fact) in before-you-begin", "needs-admin-again (fact) in before-you-begin", "c-admin (sentence) in before-you-begin"} {
 		if !strings.HasPrefix(lines[i], "blueprints/docs/guide.blueprint.yaml:") || !strings.HasSuffix(lines[i], want) {
 			t.Errorf("line %d = %q, want a suffix %q", i, lines[i], want)
 		}
@@ -325,4 +326,67 @@ func TestRefsUsage(t *testing.T) {
 	if _, _, code := run(t, "refs"); code != 2 {
 		t.Errorf("code %d with no fact id, want 2", code)
 	}
+}
+
+const refsTestBrief = `{
+  "sentences": [
+    {"text": "Rotating a key needs the admin role.", "id": "f:bbbbbb"},
+    {"text": "The check returns the id of the key that signed.", "id": ["f:cccccc", "f:dddddd"]}
+  ]
+}
+`
+
+func TestRefsSeveralIDs(t *testing.T) {
+	root := project(t, map[string]string{"blueprints/docs/guide.brief.json": refsTestBrief})
+
+	t.Run("one id has hits and one is held but unplaced", func(t *testing.T) {
+		out, errs, code := run(t, "refs", "--root", root, "bbbbbb", "f:eeeeee")
+		if code != 0 {
+			t.Fatalf("code %d, stderr %q", code, errs)
+		}
+		if !strings.HasPrefix(out, "bbbbbb\n  blueprints/docs/guide.blueprint.yaml:") || strings.Contains(out, "f:eeeeee") {
+			t.Errorf("stdout %q", out)
+		}
+		if !strings.Contains(out, ": needs-admin (fact) in before-you-begin\n") {
+			t.Errorf("stdout %q lacks the section", out)
+		}
+		if !strings.Contains(out, "  blueprints/docs/guide.brief.json:3: s1: Rotating a key needs the admin role. [docs/guide.md]\n") {
+			t.Errorf("stdout %q lacks the brief line", out)
+		}
+		if errs != "fact f:eeeeee is in the facts store, but no blueprint places or cites it\n" {
+			t.Errorf("stderr %q", errs)
+		}
+	})
+
+	t.Run("an unknown id fails the run", func(t *testing.T) {
+		out, errs, code := run(t, "refs", "--root", root, "f:bbbbbb", "f:nothing")
+		if code != 1 || !strings.Contains(out, "f:bbbbbb\n") || !strings.Contains(errs, "fact f:nothing is not in the facts store") {
+			t.Errorf("code %d, stdout %q, stderr %q", code, out, errs)
+		}
+	})
+
+	t.Run("json", func(t *testing.T) {
+		out, _, code := run(t, "refs", "--root", root, "--json", "f:bbbbbb", "f:dddddd", "f:eeeeee")
+		var rows []refRow
+		if err := json.Unmarshal([]byte(out), &rows); err != nil || code != 0 {
+			t.Fatalf("json %q, code %d, err %v", out, code, err)
+		}
+		type key struct{ id, item, section, page string }
+		var got []key
+		for _, r := range rows {
+			got = append(got, key{r.ID, r.Item, r.Section, r.Page})
+		}
+		want := []key{
+			{"f:bbbbbb", "needs-admin", "before-you-begin", ""},
+			{"f:bbbbbb", "s1", "", "docs/guide.md"},
+			{"f:dddddd", "dispositions", "", ""},
+			{"f:dddddd", "s2", "", "docs/guide.md"},
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("rows %+v, want %+v", got, want)
+		}
+		if last := rows[3]; last.Brief != "blueprints/docs/guide.brief.json" || last.Sentence != "The check returns the id of the key that signed." {
+			t.Errorf("brief row %+v", last)
+		}
+	})
 }

@@ -15,6 +15,10 @@ other parts of an anatomy guide the plan and the prose, and no read returns a fi
 A section marked optional appears only when the page has material for it. Heading text is yours to
 write; the names below describe each section's job, not its heading.
 
+In a blueprint, a figure is a `Figure:` bullet in the reader block or the section it supports, and a
+code sample is a `Code:` bullet in the section it supports, as [the blueprint
+format](../docs/blueprint-format.md#markdown-blueprints) describes.
+
 ## Concept page
 
 A concept page explains an idea so the reader understands it: what it is, why it matters, and how

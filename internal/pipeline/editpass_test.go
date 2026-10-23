@@ -194,7 +194,7 @@ func TestAMissingPreferencesFileRefusesTheRunBeforeAnyRequest(t *testing.T) {
 func (h *harness) markdownBlueprint() (path, body string) {
 	h.t.Helper()
 	path = "blueprints/docs/guides/rotate-the-api-key.blueprint.md"
-	body = "---\npage: Rotate the API key\ntype: task-guide\ntrack: operate\n---\n\n# Rotate the API key\n\n" +
+	body = "---\npage: Rotate the API key\ntype: task-guide\n---\n\n# Rotate the API key\n\n" +
 		":::reader\nAn operator whose key is about to expire.\n:::\n\n" +
 		"## Before you begin\n\n*Tells the reader what to have ready.*\n\n- You have an API key. :fact[lumen-key-ttl]\n\n" +
 		"## Rotate the key\n\n*Walks the reader through the rotation.*\n\n1. Create a new key. :fact[lumen-key-ttl]\n"

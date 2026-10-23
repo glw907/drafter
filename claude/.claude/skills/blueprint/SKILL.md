@@ -12,8 +12,8 @@ Every blueprint and every drafted page reaches Geoff only after a fresh agent ha
 ## Pick the case
 
 1. **A page is missing.** Follow [new-page.md](new-page.md).
-2. **A code change alters documented behavior.** Update the fact bullet for the behavior. Run `drafter refs f:<id>` before you correct a fact: it lists every line on every blueprint that cites it. Fix each line the new fact makes wrong, then redraft the page with `drafter page <blueprint>`. The blueprint, the page, and the facts ride in the code PR. Fact-check the changed lines, settle the findings, and queue one change review for the PR (see [Review](#review)).
-3. **You notice a deficiency while reading.** Fix the blueprint, not the page. When the deficiency is a wrong fact, run `drafter refs f:<id>` first and fix each line the corrected fact makes wrong. Redraft with `drafter page <blueprint>`, open a PR carrying the blueprint and page edits, and take it through the same review as case 2.
+2. **A code change alters documented behavior.** Update the fact bullet for the behavior. Run `drafter refs f:<id>...` before you correct a fact (it takes several ids): it lists every line on every blueprint that cites it with the section it sits in, and the briefs and pages a correction breaks. Fix each line the new fact makes wrong, then redraft the page with `drafter page <blueprint>`. The blueprint, the page, and the facts ride in the code PR. Fact-check the changed lines, settle the findings, and queue one change review for the PR (see [Review](#review)).
+3. **You notice a deficiency while reading.** Fix the blueprint, not the page. When the deficiency is a wrong fact, run `drafter refs f:<id>...` first (it takes several ids and also lists the briefs and pages the correction breaks) and fix each line the corrected fact makes wrong. Redraft with `drafter page <blueprint>`, open a PR carrying the blueprint and page edits, and take it through the same review as case 2.
 
 A change that adds or removes a section, or changes the reader's path through the page, gets its blueprint approved before the redraft, as a new page does.
 
@@ -23,7 +23,7 @@ Read the blueprint whole before you edit it. Each section is a heading with an i
 
 ## Check
 
-Run `drafter check <blueprint>` after every edit and fix each error before you commit. A run that names a blueprint skips the facts store, so its `store` warnings are not yours to chase.
+Run `drafter check <blueprint>` after every edit and fix each error before you commit. A run that names a blueprint skips the facts store, so its `store` warnings are not yours to chase. After you correct one fact, `drafter check --fact <id>` verifies just its pointers.
 
 ## Fact-check
 

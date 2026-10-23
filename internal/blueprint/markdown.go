@@ -23,13 +23,18 @@ const checkMarkdown = "markdown"
 // then the page's sections as headings. Text is the file as written, which is what a draft
 // request carries. The other fields are the parts the checks, refs, the lock, and section scoping
 // read; Go decodes no further than they need. ReaderLines holds the line of every :::reader
-// block's opening fence, Reader being the first.
+// block's opening fence, Reader being the first. Constraints and ConstraintLines are the same for
+// the :::constraints block. BareFences holds the line of every code fence that has no Code: bullet
+// directly above it.
 type Markdown struct {
-	Front       Front
-	Text        string
-	Reader      Reader
-	ReaderLines []int
-	Sections    []MDSection
+	Front           Front
+	Text            string
+	Reader          Reader
+	ReaderLines     []int
+	Constraints     Reader
+	ConstraintLines []int
+	BareFences      []int
+	Sections        []MDSection
 }
 
 // Front is the front matter. Page is the page's title, Type the outline's type name for it,
@@ -72,12 +77,16 @@ type MDSection struct {
 	Rows        []Row
 }
 
-// MDLine is one bullet or numbered step. Text omits the list marker and the :fact tags; Facts
-// lists the tags' ids in order.
+// MDLine is one bullet or numbered step. Text omits the list marker, the :fact and :source tags,
+// and the Code: or Figure: label; Facts lists the tags' ids in order. Kind is "code" for a Code:
+// bullet and "figure" for a Figure: bullet, empty otherwise, and Source is the bullet's :source
+// pointer.
 type MDLine struct {
-	Line  int
-	Text  string
-	Facts []string
+	Line   int
+	Kind   string
+	Text   string
+	Source string
+	Facts  []string
 }
 
 // Row is one :::row block of a symptom page: what the reader sees, why, and what to do. Line is
@@ -91,6 +100,8 @@ type Row struct {
 
 var (
 	factTag     = regexp.MustCompile(`\s*:fact\[([^\]\s]+)\]`)
+	sourceTag   = regexp.MustCompile(`\s*:source\[([^\]\s]+)\]`)
+	formLabel   = regexp.MustCompile(`^(Code|Figure):\s*`)
 	listMarker  = regexp.MustCompile(`^\s*(?:[-*+]|\d+[.)])\s+`)
 	headingLine = regexp.MustCompile(`^(#{1,6})\s+(.*?)\s*#*\s*$`)
 	rowPart     = regexp.MustCompile(`^\*\*(Symptom|Cause|Fix)\.\*\*\s*`)
@@ -105,9 +116,13 @@ var (
 //     the section above it. A section's ID is its heading's slug, taken in page order under the
 //     front matter's page title.
 //   - The first non-blank line under a heading, when it is one italic span, is the section's job.
-//   - A bullet or numbered line is an MDLine, with its :fact[id] tags lifted out of its text.
+//   - A bullet or numbered line is an MDLine, with its :fact[id] tags lifted out of its text. A
+//     bullet that opens "Code:" or "Figure:" records that kind, and its :source[path] tag becomes
+//     Source. A code fence below a Code: bullet, blank lines and a comment line allowed between,
+//     attaches to it; any other fence is recorded in BareFences.
 //   - A line that opens with ":::" opens a directive block that runs to the next line holding
-//     only ":::". :::reader fills Reader; a second one adds only its line to ReaderLines. :::row
+//     only ":::". :::reader fills Reader; a second one adds only its line to ReaderLines.
+//     :::constraints does the same for Constraints and ConstraintLines. :::row
 //     adds a Row to the section above it, reading its **Symptom.**, **Cause.**, and **Fix.**
 //     lines, each of which may wrap onto the lines after it.
 //
@@ -155,6 +170,9 @@ func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 	}
 	var open *block
 	fence := ""
+	// codeAt is the index in the current section's Lines of a Code: bullet that a fence may still
+	// attach to, or -1. Blank lines and a comment line leave it; any other line clears it.
+	codeAt := -1
 	for i := end + 1; i < len(lines); i++ {
 		line, n := lines[i], i+1
 		trimmed := strings.TrimSpace(line)
@@ -166,10 +184,19 @@ func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 		}
 		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
 			fence = trimmed[:3]
+			if open == nil {
+				if codeAt < 0 {
+					m.BareFences = append(m.BareFences, n)
+				}
+				codeAt = -1
+			}
 			continue
 		}
 		if open != nil {
 			if trimmed != ":::" {
+				if sourceTag.MatchString(line) && (open.name != "reader" || !isForm(line, "figure")) {
+					add(n, "this :source tag is not on a Code: or Figure: bullet, so drafter does not read it", "put the tag on a Code: bullet in a section, or on a Figure: bullet")
+				}
 				open.add(n, line)
 				continue
 			}
@@ -178,6 +205,11 @@ func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 				m.ReaderLines = append(m.ReaderLines, open.line)
 				if len(m.ReaderLines) == 1 {
 					m.Reader = open.reader()
+				}
+			case "constraints":
+				m.ConstraintLines = append(m.ConstraintLines, open.line)
+				if len(m.ConstraintLines) == 1 {
+					m.Constraints = open.reader()
 				}
 			case "row":
 				if cur < 0 {
@@ -199,15 +231,26 @@ func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 				continue
 			}
 		}
+		if sourceTag.MatchString(line) && (loc == nil || cur < 0 || heading != nil || !isForm(line, "")) {
+			add(n, "this :source tag is not on a Code: or Figure: bullet, so drafter does not read it", "put the tag at the end of a Code: or Figure: bullet's first line")
+			if heading == nil && !strings.HasPrefix(trimmed, ":::") {
+				continue
+			}
+		}
+		// A comment line and an indented continuation of the bullet leave the pending Code: bullet.
+		wrapped := loc == nil && heading == nil && !strings.HasPrefix(trimmed, ":::") && line != strings.TrimLeft(line, " \t")
+		if trimmed != "" && !strings.HasPrefix(trimmed, "<!--") && !wrapped {
+			codeAt = -1
+		}
 		if strings.HasPrefix(trimmed, ":::") {
 			name, _, _ := strings.Cut(strings.TrimSpace(trimmed[3:]), " ")
 			switch name {
 			case "":
 				add(n, "a ::: line closes no block", "delete the line, or open a block above it with :::reader or :::row")
 				continue
-			case "reader", "row":
+			case "reader", "row", "constraints":
 			default:
-				add(n, "the directive :::"+name+" is not one the format has", "use :::reader or :::row")
+				add(n, "the directive :::"+name+" is not one the format has", "use :::reader, :::constraints, or :::row")
 			}
 			open = &block{name: name, line: n}
 			continue
@@ -237,7 +280,19 @@ func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 			for _, t := range factTag.FindAllStringSubmatch(body, -1) {
 				ids = append(ids, t[1])
 			}
-			sec.Lines = append(sec.Lines, MDLine{Line: n, Text: strings.TrimSpace(factTag.ReplaceAllString(body, "")), Facts: ids})
+			ml := MDLine{Line: n, Facts: ids}
+			if lab := formLabel.FindStringSubmatch(body); lab != nil {
+				ml.Kind = strings.ToLower(lab[1])
+				body = body[len(lab[0]):]
+				if src := sourceTag.FindStringSubmatch(body); src != nil {
+					ml.Source = src[1]
+				}
+			}
+			ml.Text = strings.TrimSpace(sourceTag.ReplaceAllString(factTag.ReplaceAllString(body, ""), ""))
+			sec.Lines = append(sec.Lines, ml)
+			if ml.Kind == "code" {
+				codeAt = len(sec.Lines) - 1
+			}
 		}
 	}
 	closeSection(len(lines))
@@ -278,7 +333,7 @@ func (b *block) reader() Reader {
 	r.Facts, r.Cites = b.tags()
 	stripped := make([]string, len(b.text))
 	for i, l := range b.text {
-		stripped[i] = factTag.ReplaceAllString(l, "")
+		stripped[i] = sourceTag.ReplaceAllString(factTag.ReplaceAllString(l, ""), "")
 	}
 	r.Text = strings.TrimSpace(strings.Join(stripped, "\n"))
 	return r
@@ -306,6 +361,17 @@ func (b *block) row() Row {
 		}
 	}
 	return r
+}
+
+// isForm reports whether line is a list item that opens with the Code: or Figure: label of kind,
+// or with either label when kind is empty.
+func isForm(line, kind string) bool {
+	loc := listMarker.FindStringIndex(line)
+	if loc == nil {
+		return false
+	}
+	lab := formLabel.FindStringSubmatch(line[loc[1]:])
+	return lab != nil && (kind == "" || strings.ToLower(lab[1]) == kind)
 }
 
 // isItalicLine reports whether s is one emphasized span, *like this* or _like this_.
@@ -356,7 +422,7 @@ func (s *MDSection) FactIDs(facts *plan.Facts) []string {
 
 // FactIDs lists the sorted, distinct ids of every fact the blueprint cites, resolved against facts.
 func (m *Markdown) FactIDs(facts *plan.Facts) []string {
-	ids := resolveFacts(facts, m.Reader.Facts)
+	ids := resolveFacts(facts, slices.Concat(m.Reader.Facts, m.Constraints.Facts))
 	for i := range m.Sections {
 		ids = append(ids, m.Sections[i].FactIDs(facts)...)
 	}
@@ -432,15 +498,25 @@ func (b *Blueprint) CodeSources() []string {
 	return out
 }
 
-// CodeSources is empty: a markdown blueprint has no code items, and its facts' excerpts carry
-// the code a draft reads.
-func (m *Markdown) CodeSources() []string { return nil }
+// CodeSources lists the :source of each Code: bullet, in page order.
+func (m *Markdown) CodeSources() []string {
+	var out []string
+	for _, s := range m.Sections {
+		for _, l := range s.Lines {
+			if l.Kind == "code" && l.Source != "" {
+				out = append(out, l.Source)
+			}
+		}
+	}
+	return out
+}
 
 // View projects m onto a plan so the code that reads a YAML blueprint's view reads a markdown one.
 // The page's path, title, and type come from entry. The reader block is the introduction: its
 // text the covers, its tags the facts. Each bullet becomes an example item whose id is
 // <section id>.p<n>, the anchor form a review note uses, except a "See [text](target)." bullet,
-// which becomes a link item so the links check reads its target; each row becomes an example item
+// which becomes a link item so the links check reads its target, a Code: bullet a code item, and
+// a Figure: bullet a figure item, each carrying its :source; each row becomes an example item
 // holding its three parts, with id <section id>.row<n>. Every :fact tag resolves against facts,
 // so the plan checks look up the id the store holds; a nil facts leaves the tags as written.
 func (m *Markdown) View(entry Page, facts *plan.Facts) *plan.Plan {
@@ -460,7 +536,12 @@ func (m *Markdown) View(entry Page, facts *plan.Facts) *plan.Plan {
 				ID: fmt.Sprintf("%s.p%d", s.ID, i+1), Kind: "example", Text: l.Text, Facts: resolveFacts(facts, l.Facts), Line: l.Line,
 				Lines: map[string]int{"text": l.Line, "facts": l.Line},
 			}
-			if see := seeLink.FindStringSubmatch(l.Text); see != nil {
+			if l.Kind != "" {
+				it.Kind, it.Source = l.Kind, l.Source
+				if l.Source != "" {
+					it.Lines["source"] = l.Line
+				}
+			} else if see := seeLink.FindStringSubmatch(l.Text); see != nil {
 				it.Kind, it.Text, it.Target, it.Facts = "link", see[1], see[2], nil
 				it.Lines = map[string]int{"text": l.Line, "target": l.Line}
 			}

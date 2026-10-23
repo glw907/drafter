@@ -8,8 +8,9 @@ func newRootCmd() *cobra.Command {
 		Short:         "Plan checks and drafting for documentation pages",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		Version:       version(),
 	}
 	cmd.AddCommand(newCheckPlanCmd(), newAnchorsCmd(), newConfigCmd(), newSpendCmd(), newCheckPromptsCmd(), newPageCmd(),
-		newCheckCmd(), newRefsCmd(), newExcerptCmd(), newConvertCmd(), newReadCmd(), newSeedCmd(), newGateCmd(), newInitCmd())
+		newCheckCmd(), newRefsCmd(), newOutlineCmd(), newExcerptCmd(), newConvertCmd(), newReadCmd(), newSeedCmd(), newGateCmd(), newInitCmd())
 	return cmd
 }

@@ -47,6 +47,9 @@ type Fact struct {
 	// parentheses and brackets and name a path inside the facts store's repository. A span
 	// naming a command, a URL, or commentary, and an [external: ...] part, are left out.
 	Sources []string
+	// Commentary counts the path-shaped pointers of the Source: part that sit inside parentheses
+	// or brackets and so are read as commentary, not as sources.
+	Commentary int
 	// Raw is the whole bullet after its "- " marker, its lines joined and every whitespace run
 	// collapsed to one space. Unlike Text and Sources, it keeps the tag's qualifier and each
 	// pointer's anchor or line span.
@@ -172,7 +175,7 @@ func ParseFacts(files map[string]string, root string) *Facts {
 			}
 			f := Fact{ID: m[1], File: name, Line: b.line, Raw: strings.Join(strings.Fields(b.text), " ")}
 			f.Tag, f.Problem = checkTag(b.text)
-			f.Text, f.Sources = parseBody(b.text[len(m[0]):], root)
+			f.Text, f.Sources, f.Commentary = parseBody(b.text[len(m[0]):], root)
 			fs.byID[f.ID] = append(fs.byID[f.ID], f)
 		}
 	}
@@ -276,7 +279,7 @@ var (
 
 // parseBody splits a bullet's text after its id into the claim and the source pointers. The claim
 // ends at the Source: marker, or at the status tag when the bullet has no marker.
-func parseBody(rest, root string) (text string, sources []string) {
+func parseBody(rest, root string) (text string, sources []string, commentary int) {
 	masked := maskSpanRe.ReplaceAllStringFunc(rest, func(m string) string { return strings.Repeat("x", len(m)) })
 	if loc := tagRe.FindAllStringIndex(masked, -1); len(loc) > 0 {
 		cut := loc[len(loc)-1][0]
@@ -284,7 +287,7 @@ func parseBody(rest, root string) (text string, sources []string) {
 	}
 	loc := sourceMarkerRe.FindStringIndex(masked)
 	if loc == nil {
-		return strings.TrimSpace(rest), nil
+		return strings.TrimSpace(rest), nil, 0
 	}
 	text = strings.TrimSpace(rest[:loc[0]])
 	part := rest[loc[1]:]
@@ -298,16 +301,20 @@ func parseBody(rest, root string) (text string, sources []string) {
 		case '`':
 			end := strings.IndexByte(part[i+1:], '`')
 			if end < 0 {
-				return text, sources
+				return text, sources, commentary
 			}
 			span := part[i+1 : i+1+end]
 			i += end + 1
-			if depth == 0 && isSource(span, root) {
-				sources = append(sources, span)
+			if isSource(span, root) {
+				if depth == 0 {
+					sources = append(sources, span)
+				} else {
+					commentary++
+				}
 			}
 		}
 	}
-	return text, sources
+	return text, sources, commentary
 }
 
 // isSource reports whether a backticked span points at a file or directory of the repository. A
