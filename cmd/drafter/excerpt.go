@@ -66,6 +66,7 @@ var (
 // urlChecklist lists a bullet's URL sources as checklist lines, each with the date the bullet says
 // it was read, or a note that it names none.
 func urlChecklist(raw string) []string {
+	_, raw, _ = strings.Cut(raw, "Source:") // a URL in the claim is not a source
 	var out []string
 	locs := urlRe.FindAllStringIndex(raw, -1)
 	for i, loc := range locs {

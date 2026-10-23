@@ -148,8 +148,12 @@ func (p Project) briefHits(facts *plan.Facts, page, id string) []Hit {
 		if !cites {
 			continue
 		}
-		quoted, _ := json.Marshal(s.Text)
-		line := slices.IndexFunc(lines, func(l string) bool { return strings.Contains(l, string(quoted)) }) + 1
+		var quoted strings.Builder
+		enc := json.NewEncoder(&quoted)
+		enc.SetEscapeHTML(false) // the brief file holds < and > as written
+		_ = enc.Encode(s.Text)
+		needle := strings.TrimSuffix(quoted.String(), "\n")
+		line := slices.IndexFunc(lines, func(l string) bool { return strings.Contains(l, needle) }) + 1
 		hits = append(hits, Hit{Ref: Ref{rel, line, fmt.Sprintf("s%d", i+1), "brief"}, Brief: rel, Page: page, Sentence: s.Text})
 	}
 	return hits

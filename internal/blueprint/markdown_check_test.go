@@ -186,7 +186,7 @@ func TestCheckMarkdownExhaustive(t *testing.T) {
 		{"reader", "An operator who rotates keys.", "Every operator who rotates keys.", "Every operator", "every"},
 		{"constraints", "## Before you begin", ":::constraints\nSkip all setup.\n:::\n\n## Before you begin", "Skip all setup", "all"},
 		{"spelled count", bullet, "- Three roles can rotate a key.", "Three roles", "three roles"},
-		{"digit count", bullet, "- Keys have 4 steps.", "Keys have", "4 steps"},
+		{"a digit count is no claim", bullet, "- Keys have 4 steps.", "", ""},
 		{"none", bullet, "- None of the roles rotate a key.", "None of", "none"},
 		{"no", bullet, "- No role rotates a key.", "No role", "no"},
 		{"mixed case", bullet, "- ONLY an admin rotates.", "ONLY", "only"},

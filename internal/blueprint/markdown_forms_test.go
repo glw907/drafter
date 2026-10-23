@@ -45,6 +45,7 @@ func TestDecodeMarkdownFenceAttachment(t *testing.T) {
 		bare       []int // lines of fences with no Code: bullet; the head is 10 lines
 	}{
 		{"a fence right under the bullet", "- Code: a sample.\n```sh\nx\n```\n", nil},
+		{"a bullet wrapped onto a second line", "- Code: a sample that :source[/x.go]\n  runs long.\n\n```sh\nx\n```\n", nil},
 		{"blank lines between", "- Code: a sample.\n\n\n```sh\nx\n```\n", nil},
 		{"a comment line between", "- Code: a sample.\n<!-- snippet-check-skip: reason -->\n```sh\nx\n```\n", nil},
 		{"no bullet above", "```sh\nx\n```\n", []int{11}},

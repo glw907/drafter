@@ -14,7 +14,7 @@ func TestExhaustiveClaim(t *testing.T) {
 		{"spelled count", "The tool has three roles.", "three roles"},
 		{"lowest spelled count", "Two modes exist.", "two modes"},
 		{"highest spelled count", "Twelve flags exist.", "twelve flags"},
-		{"digit count", "It runs 4 steps.", "4 steps"},
+		{"a digit count is no claim", "It runs 4 steps in Svelte 5 snippets and 10,000 characters.", ""},
 		{"case folded", "ALWAYS retry.", "always"},
 		{"code span", "Run `rm --all` and `none`.", ""},
 		{"no claim", "The key expires after a day.", ""},

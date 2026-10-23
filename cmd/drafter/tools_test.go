@@ -119,6 +119,7 @@ func TestExcerptURLChecklist(t *testing.T) {
 		{"`f:a` A claim. Source: `https://example.com/a` read 2026-09-30, https://example.com/b. [vendor]",
 			[]string{"- [ ] https://example.com/a (read 2026-09-30)", "- [ ] https://example.com/b (no read date)"}},
 		{"`f:a` A claim. Source: `src/main.go`. [verified]", nil},
+		{"`f:a` Calls https://example.com/api. Source: `src/main.go`. [verified]", nil},
 	}
 	for _, tt := range tests {
 		got := urlChecklist(tt.raw)

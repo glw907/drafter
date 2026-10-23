@@ -20,9 +20,9 @@ var (
 )
 
 // ExhaustiveClaim returns the first phrase in text that claims a complete set, or "" when there is
-// none. It is one of the words only, every, all, no, none, never, and always, or a count before
-// a plural noun, spelled from two to twelve or written in digits. Words match whole and without case, and a
-// code span is skipped.
+// none. It is one of the words only, every, all, no, none, never, and always, or a count spelled
+// from two to twelve before a plural noun. A digit count is no claim of a complete set: it is as
+// often a version or a measurement. Words match whole and without case, and a code span is skipped.
 func ExhaustiveClaim(text string) string {
 	words := strings.FieldsFunc(codeSpan.ReplaceAllString(text, " "), func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '-' && r != '\''
@@ -32,7 +32,7 @@ func ExhaustiveClaim(text string) string {
 		if exhaustiveWord[w] {
 			return w
 		}
-		if i+1 == len(words) || (!countWord[w] && !isDigits(w)) {
+		if i+1 == len(words) || !countWord[w] {
 			continue
 		}
 		if next := strings.ToLower(words[i+1]); len(next) > 2 && strings.HasSuffix(next, "s") && !strings.HasSuffix(next, "ss") {
@@ -40,15 +40,6 @@ func ExhaustiveClaim(text string) string {
 		}
 	}
 	return ""
-}
-
-func isDigits(s string) bool {
-	for _, r := range s {
-		if !unicode.IsDigit(r) {
-			return false
-		}
-	}
-	return s != ""
 }
 
 // ExhaustiveFinding is the warning for a line whose text holds claim, a phrase ExhaustiveClaim

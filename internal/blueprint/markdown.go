@@ -237,7 +237,9 @@ func DecodeMarkdown(file string, data []byte) (*Markdown, []plan.Finding) {
 				continue
 			}
 		}
-		if trimmed != "" && !strings.HasPrefix(trimmed, "<!--") {
+		// A comment line and an indented continuation of the bullet leave the pending Code: bullet.
+		wrapped := loc == nil && heading == nil && !strings.HasPrefix(trimmed, ":::") && line != strings.TrimLeft(line, " \t")
+		if trimmed != "" && !strings.HasPrefix(trimmed, "<!--") && !wrapped {
 			codeAt = -1
 		}
 		if strings.HasPrefix(trimmed, ":::") {

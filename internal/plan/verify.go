@@ -170,9 +170,12 @@ func VerifyFacts(dir, root string, ids []string) (findings []Finding, checked, s
 		} else if len(places[b.id]) > 1 {
 			add(SeverityError, fmt.Sprintf("fact %q is on %d bullets (%s)", b.id, len(places[b.id]), strings.Join(places[b.id], ", ")), "keep one bullet per id")
 		}
-		claim, _, _ := strings.Cut(b.rest, "Source:")
-		if c := ExhaustiveClaim(claim); c != "" {
-			findings = append(findings, ExhaustiveFinding(b.file, b.line, c))
+		// A verified or rejected fact has had its claim checked against the source already.
+		if tag, _ := checkTag(b.text); tag != "verified" && tag != "rejected" {
+			claim, _, _ := strings.Cut(b.rest, "Source:")
+			if c := ExhaustiveClaim(claim); c != "" {
+				findings = append(findings, ExhaustiveFinding(b.file, b.line, c))
+			}
 		}
 		if !strings.Contains(b.text, "Source:") {
 			add(SeverityError, `the bullet has no "Source:"`, "name where the claim comes from after Source:")

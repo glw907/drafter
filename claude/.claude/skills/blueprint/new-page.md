@@ -23,7 +23,7 @@ When several authors share one facts store, an author who finds a shared fact wr
 
 ## 3. Write the blueprint
 
-Write `<page>.blueprint.md` in [the markdown format](format.md#markdown-blueprints): the front matter (`page`, `type`, `track`, and an optional `exemplar`), then the `:::reader` block, written from the questions in [introductions.md](introductions.md): who reads the page, why they arrive, what they already know, what the page does for them, and what it leaves to other pages. Take the reader from the outline entry's job and `covers`, never from a worked example in a plan; Geoff sent back the custom admin screen page (2026-10-22) because its reader shrank to the plan's example.
+Write `<page>.blueprint.md` in [the markdown format](format.md#markdown-blueprints): the front matter (`page`, `type`, `track` only when the outline declares tracks, and an optional `exemplar`), then the `:::reader` block, written from the questions in [introductions.md](introductions.md): who reads the page, why they arrive, what they already know, what the page does for them, and what it leaves to other pages. Take the reader from the outline entry's job and `covers`, never from a worked example in a plan; Geoff sent back the custom admin screen page (2026-10-22) because its reader shrank to the plan's example.
 
 Put instructions that bind the whole page in a [`:::constraints` block](format.md#the-constraints-block); the pilot's authors put them in a `**Background.**` paragraph inside the reader block.
 

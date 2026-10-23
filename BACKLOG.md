@@ -12,6 +12,13 @@
 
 ## Medium
 
+- [ ] **#48** Narrow the `exhaustive` lint's `no` and `never` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22)*
+  On cairn's 585-line custom admin screen blueprint the lint gives about 70 warnings, and `no` and `never` are most of them: plain negation ("has no default", "makes no network call"), not a claim of a complete set. The whole-branch review dropped the digit counts and the verified fact bullets; whether to drop `no` and `never` too is Geoff's call. `internal/plan/exhaustive.go`
+- [ ] **#49** Give a `repro` figure block a markdown form `#feature` `#drafter` `#initiative:docs-system` *(2026-10-22)*
+  A cairn page's figure is a `repro` fence, which names a story, alt text, and caption. In the markdown format a fence attaches only to a `Code:` bullet, so a `Figure:` bullet above a `repro` fence reads as a bare fence. The end-to-end check wrote the figure as a `Figure:` bullet with a `:source` and no fence. Decide whether a `Figure:` bullet takes a fence too. `internal/blueprint/markdown.go`
+- [ ] **#50** Warn on a second `:source` tag on one bullet `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22)*
+  `DecodeMarkdown` keeps the first `:source` of a `Code:` or `Figure:` bullet and drops any later one without a finding. `internal/blueprint/markdown.go`
+
 - [ ] **#43** Accept framing-heading variants in `convert plan` and write the seeded blob `#bug` `#drafter` `#initiative:docs-system` *(2026-10-22)*
   Two of three v1 framing records failed on exact heading matches, and the lock it seeds names a blob absent from the object store, so `convert markdown` calls the page stale with the wrong remedy. `internal/blueprint/convert.go:162` (record 1, 2).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`

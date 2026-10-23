@@ -66,7 +66,8 @@ const refsBrief = `{
   "sentences": [
     {"text": "Rotating a key needs the admin role.", "id": "f:bbbbbb"},
     {"text": "The check returns the id of the key that signed.", "id": ["f:cccccc", "f:aaaaaa"]},
-    {"text": "Here is how the rotation works.", "id": "no-claim"}
+    {"text": "Here is how the rotation works.", "id": "no-claim"},
+    {"text": "A preview lives at /preview/<token> & expires.", "id": "f:eeeeee"}
   ]
 }
 `
@@ -104,6 +105,7 @@ func TestRefHitsBriefs(t *testing.T) {
 		{"an array of ids", "", "blueprints/docs/guide.brief.json", "f:aaaaaa", []string{"s2 The check returns the id of the key that signed."}},
 		{"a non-default brief path", "notes/{dir}/{name}.json", "notes/docs/guide.json", "f:bbbbbb", []string{"s1 Rotating a key needs the admin role."}},
 		{"the default path is ignored under a template", "notes/{dir}/{name}.json", "blueprints/docs/guide.brief.json", "f:bbbbbb", nil},
+		{"a sentence with angle brackets", "", "blueprints/docs/guide.brief.json", "f:eeeeee", []string{"s4 A preview lives at /preview/<token> & expires."}},
 		{"no citing sentence", "", "blueprints/docs/guide.brief.json", "f:dddddd", nil},
 	}
 	for _, tt := range tests {
