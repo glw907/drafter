@@ -185,6 +185,18 @@ func (c *projectCheck) markdown(rel string, m *Markdown, entry Page) {
 		}
 	}
 
+	for i, line := range m.ConstraintLines {
+		switch {
+		case i > 0:
+			fault(line, fmt.Sprintf("the page has a second :::constraints block (the first is at line %d)", m.ConstraintLines[0]), "keep one :::constraints block and merge this one into it")
+		case len(m.ReaderLines) == 0 || line < m.ReaderLines[0] || (len(m.Sections) > 0 && line > m.Sections[0].Line):
+			fault(line, "the :::constraints block is not between the :::reader block and the first heading", "move the block under the :::reader block and above the first section")
+		}
+	}
+	for _, line := range m.BareFences {
+		fault(line, "this code fence has no Code: bullet directly above it", "put a Code: bullet above the fence that says what the block shows")
+	}
+
 	seen := map[string]int{}
 	for _, s := range m.Sections {
 		if s.Job == "" {

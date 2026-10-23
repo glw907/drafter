@@ -17,7 +17,8 @@ import (
 //
 // In a markdown blueprint the line is the one that carries the :fact tag. A bullet's item id is
 // <section id>.p<n>, a row's is <section id>.row<n>, both of kind example, and the :::reader
-// block's is reader with kind reader.
+// block's is reader with kind reader and the :::constraints block's is constraints with kind
+// constraints. A Code: bullet's kind is code and a Figure: bullet's is figure.
 type Ref struct {
 	File string
 	Line int
@@ -76,10 +77,15 @@ func markdownRefs(file string, m *Markdown, facts *plan.Facts, id string) []Ref 
 			refs = append(refs, Ref{file, c.Line, "reader", "reader"})
 		}
 	}
+	for _, c := range m.Constraints.Cites {
+		if cites(c.ID) {
+			refs = append(refs, Ref{file, c.Line, "constraints", "constraints"})
+		}
+	}
 	for _, s := range m.Sections {
 		for i, l := range s.Lines {
 			if slices.ContainsFunc(l.Facts, cites) {
-				refs = append(refs, Ref{file, l.Line, fmt.Sprintf("%s.p%d", s.ID, i+1), "example"})
+				refs = append(refs, Ref{file, l.Line, fmt.Sprintf("%s.p%d", s.ID, i+1), cmp.Or(l.Kind, "example")})
 			}
 		}
 		for i, r := range s.Rows {

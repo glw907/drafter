@@ -13,12 +13,17 @@ exemplar: guides/widget-troubleshooting
 - A widget stopped spinning. :fact[ab12cd]
 :::
 
+:::constraints
+- Name no widget model. :fact[ef34gh]
+:::
+
 ## Read the widget log
 
 *Shows the reader where the widget log lives.*
 
 - Every widget writes one log line per spin. :fact[ab12cd]
 - The log rotates daily, so yesterday's spins sit in a dated file. :fact[ef34gh] :fact[ab12cd]
+- Code: a sample of the log's lines. :source[/src/widget/log.sh#sample] :fact[ij56kl]
 
 ```sh
 - not a bullet :fact[zz99zz]
@@ -40,3 +45,4 @@ exemplar: guides/widget-troubleshooting
 ## See also
 
 - See [Widget reference](../reference/widget.md).
+- Figure: the spindle, drawn from above. :source[/docs/img/spindle.svg]

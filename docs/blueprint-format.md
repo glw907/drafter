@@ -1,8 +1,9 @@
 # Blueprint format
 
 A blueprint is the durable plan for one documentation page. It holds everything the page must say
-and why, as one YAML file, `<page>.blueprint.yaml`, kept apart from the page. Agents change the
-blueprint, never the page prose, and drafter turns the change into prose.
+and why, as one file, `<page>.blueprint.md` (or the older `<page>.blueprint.yaml`), kept apart from
+the page. Agents change the blueprint, never the page prose, and drafter turns the change into
+prose.
 
 Two formats exist. Markdown, `<page>.blueprint.md`, is the current one; YAML is the older one, and the
 sections below the markdown section describe it.
@@ -21,7 +22,7 @@ optional fields. It never removes a field or changes what one means.
 ## Layout
 
 All blueprints live under one root in the repository, `blueprints/` by default. A page's blueprint
-sits at the page's path under that root, with `.md` replaced by `.blueprint.yaml`.
+sits at the page's path under that root, with `.md` replaced by `.blueprint.md`.
 
 ```
 README.md
@@ -30,15 +31,15 @@ blueprints/
   outline.yaml
   facts/
   drafted.lock
-  README.blueprint.yaml
-  docs/extend/rotate-the-key.blueprint.yaml
+  README.blueprint.md
+  docs/extend/rotate-the-key.blueprint.md
 ```
 
 One rule takes a page to its blueprint and back, with no setting and no search: the blueprint of
-`docs/extend/rotate-the-key.md` is `blueprints/docs/extend/rotate-the-key.blueprint.yaml`, and the
-blueprint of the root `README.md` is `blueprints/README.blueprint.yaml`. The `.blueprint.yaml`
-suffix lets an editor attach the schema by glob and lets a tool tell a blueprint from
-`outline.yaml`. The facts store stays shared, in `blueprints/facts/` by convention, because many
+`docs/extend/rotate-the-key.md` is `blueprints/docs/extend/rotate-the-key.blueprint.md`, and the
+blueprint of the root `README.md` is `blueprints/README.blueprint.md`. A page kept in the older YAML
+format uses `.blueprint.yaml` in the same place. The suffix lets an editor attach the schema by
+glob and lets a tool tell a blueprint from `outline.yaml`. The facts store stays shared, in `blueprints/facts/` by convention, because many
 pages cite one fact.
 
 The settings `blueprints.root`, `blueprints.outline`, and `facts.dir` move these paths for a
@@ -53,8 +54,9 @@ YAML format described in the sections after this one is the older one, still rea
 files exist, `drafter check` reports the `.blueprint.yaml` as an error and every command reads the
 `.blueprint.md`.
 
-A markdown blueprint is a short front matter block, a title, one reader block, and the page's
-sections as headings. This example is for a made-up widget product:
+A markdown blueprint is a short front matter block, a title, one reader block, an optional
+constraints block, and the page's sections as headings. This example is for a made-up widget
+product:
 
 ```markdown
 ---
@@ -75,9 +77,13 @@ exemplar: guides/rotate-a-secret
 **What it leaves to other pages.** Creating the first key.
 :::
 
+:::constraints
+- State no version range. :fact[cccccc]
+:::
+
 ## Before you begin
 
-*Gets the reader ready, so no step fails for a missing role.*
+*Makes sure the reader has the role the steps need.*
 
 - Rotating a key needs the admin role. :fact[bbbbbb]
 
@@ -87,6 +93,14 @@ exemplar: guides/rotate-a-secret
 
 1. Generate a new key in the service settings.
 2. Add the new key to the service.
+
+- Code: the helper that adds a key. :source[/src/keys.ts#addKey] :fact[dddddd]
+
+```ts
+export function addKey(key: string) { /* ... */ }
+```
+
+- Figure: the key moving from the settings page to the service. :source[/docs/img/rotation.svg]
 
 :::row
 **Symptom.** The settings page refuses to generate a key.
@@ -112,7 +126,16 @@ The front matter is YAML between two `---` lines. It takes four keys, and only t
 
 A `:::reader` block, closed by a line holding only `:::`, says who reads the page and why. A page has
 exactly one. Write it as short labeled paragraphs and lists; drafter reads it as the page's
-introduction brief. A `:fact[id]` tag in it cites a fact.
+introduction brief. A `:fact[id]` tag in it cites a fact. A `Figure:` bullet in it is a reader line,
+for an introduction diagram, and adds no item to a section.
+
+### The constraints block
+
+A `:::constraints` block holds instructions that bind the whole page, one bullet each, such as
+"State no version range." It sits between the reader block and the first heading, and a page has at
+most one. A `:fact[id]` tag in it cites a fact. The reader block stays the introduction brief, so
+write a page-wide instruction here, never there. drafter sends the whole file to the draft seat,
+which reads the constraints as written.
 
 ### Sections
 
@@ -124,23 +147,37 @@ A bullet or numbered step states one thing the section must say. End it with a `
 each fact it places or cites. Leave off the `f:` prefix the facts store uses, so `:fact[bbbbbb]`
 cites `f:bbbbbb`. A bullet of the form `See [text](target).` is a link, and `drafter check` checks
 its target as it does a link item in YAML. A tag belongs on a bullet's or step's first line, a row
-line, or a reader line; `drafter check` reports a tag anywhere else as an error, since drafter
-reads no other line for tags.
+line, a reader line, or a constraints line; `drafter check` reports a tag anywhere else as an
+error, since drafter reads no other line for tags.
+
+A task section may open with one lead-in bullet before its numbered steps that ties the section to
+the task. The lead-in is not a step, so it carries no number.
 
 A `:::row` block is one row of a symptom page. It holds three lines, each opening with a bold label:
 `**Symptom.**` for what the reader sees, `**Cause.**` for why, and `**Fix.**` for what to do. A row
 missing any of the three is an error. A line may wrap onto the lines after it. Place `:fact[id]`
 tags on whichever of the three lines state the fact.
 
-Code fences are skipped, so a fence may hold any of the markup above as an example.
+A bullet that opens `Code:` names a code example, and a bullet that opens `Figure:` names a
+figure. Each says what the block or figure shows and may end with a `:source[path]` tag, as
+`:source[/src/keys.ts#addKey]`, for the model file or image behind it. The path resolves as a YAML
+`code` item's `source` does: from the page's directory, or from the repository root when it starts
+with `/`. A `#Symbol` suffix names the part of the file to show. `drafter check` requires a `Code:`
+source to exist, and reports a `:source` tag on any other line as an error.
+
+A code fence attaches to the `Code:` bullet directly above it, blank lines between allowed. A
+comment line between the two, such as a `<!-- snippet-check-skip: reason -->` marker, goes to the
+page with the fence. A fence with no `Code:` bullet above it is an error. A fence's contents are
+skipped when drafter reads tags and directives, so a fence may hold any of the markup above as an
+example.
 
 ### What the lock does with a markdown blueprint
 
 The lock keys a section by its heading's slug, and `_intro` holds the text above the first section.
 `drafter seed` and a draft write the same entry as for YAML. When it compares a markdown blueprint
 with the one the lock recorded, drafter calls a section changed when its slug is new, its text in
-the blueprint differs, or a fact it cites changed. A change to the front matter or the reader block
-scopes the page without naming a section.
+the blueprint differs, or a fact it cites changed. A change to the front matter, the reader block, or
+the constraints block scopes the page without naming a section.
 
 ### Convert a YAML blueprint
 
@@ -155,8 +192,9 @@ mapping dropped or could not decide: a section without a `why`, a failure withou
 ### Find where a fact is used in a markdown blueprint
 
 `drafter refs f:bbbbbb` lists each line of a markdown blueprint that carries a tag for the fact, as
-`file:line: item (kind)`. A bullet's item id is `<section id>.p<n>`, a row's is
-`<section id>.row<n>`, and the reader block's is `reader`.
+`file:line: item (kind)`. A bullet's item id is `<section id>.p<n>`, with the kind `code` for a
+`Code:` bullet and `figure` for a `Figure:` bullet. A row's is `<section id>.row<n>`, the reader
+block's is `reader`, and the constraints block's is `constraints`.
 
 ## Write prose fields as blocks
 
@@ -490,7 +528,7 @@ The command can't run, and exits 2, in these states:
 - `outline.yaml` doesn't exist or doesn't decode.
 - `drafted.lock` exists but doesn't parse. A missing lock is valid.
 - The facts directory is set but holds no facts file.
-- A file you name isn't a `.blueprint.yaml` file at its path-rule location.
+- A file you name isn't a `.blueprint.md` or `.blueprint.yaml` file at its path-rule location.
 
 The checks that run on each blueprint use the same logic as `drafter check-plan`, applied to the
 blueprint's view: the blueprint joined to its outline entry, with each framing citation counted
@@ -820,7 +858,8 @@ track must name the `google` standard. A project module is not checked.
 
 ### What the draft seat receives
 
-Each `code` item's `source` reaches the draft seat with the file's contents. drafter resolves
+Each `code` item's `source`, and each markdown `Code:` bullet's `:source`, reaches the draft seat
+with the file's contents. A `Figure:` bullet's source does not. drafter resolves
 `source` as `drafter check` does: from the page's directory, or from the repository root when it
 starts with `/`. It drops a `#Symbol` suffix, so the seat gets the whole file. A tracked file up
 to 256 KiB is inlined. An untracked file, a larger one, or a path outside the repository is named

@@ -114,3 +114,35 @@ func TestSnippetInputs(t *testing.T) {
 		}
 	})
 }
+
+// TestMarkdownCodeSourceIsInlined proves a Code: bullet's :source reaches the draft request as a
+// YAML code item's source does, and a Figure: bullet's does not.
+func TestMarkdownCodeSourceIsInlined(t *testing.T) {
+	h := newBlueprintHarness(t, withPages("a"), withDrafting)
+	writeFile(t, h.root, "snippets/wrap.go", "package snippets\n\n// SNIPPET-WRAP-HEAD\nfunc Wrap() {}\n")
+	writeFile(t, h.root, "snippets/diagram.svg", "<svg>SNIPPET-DIAGRAM</svg>\n")
+	gitIn(t, h.root, "add", "snippets")
+	gitIn(t, h.root, "commit", "-q", "-m", "snippets")
+	path, _ := h.markdownBlueprint()
+	h.commitBlueprint(path, func(s string) string {
+		return s + "\n- Code: the wrapper. :source[/snippets/wrap.go#Wrap]\n\n```go\nfunc Wrap() {}\n```\n\n- Figure: the flow. :source[/snippets/diagram.svg]\n"
+	})
+	mustAccept(t, h, h.mustDraft(drafting{narrow: true}))
+
+	draft := requestsFor(h, s2, "draft")
+	if len(draft) != 1 {
+		t.Fatalf("draft requests = %d, want 1", len(draft))
+	}
+	text := requestText(draft[0])
+	if want := "=== file: snippets/wrap.go ===\npackage snippets\n\n// SNIPPET-WRAP-HEAD\nfunc Wrap() {}\n=== end file: snippets/wrap.go ==="; !strings.Contains(text, want) {
+		t.Errorf("the draft request lacks the Code: bullet's source:\n%s", text)
+	}
+	if strings.Contains(text, "SNIPPET-DIAGRAM") {
+		t.Error("the draft request inlines a Figure: bullet's source")
+	}
+	for _, r := range requestsFor(h, s2e, "edit") {
+		if strings.Contains(requestText(r), "=== file: snippets/") {
+			t.Errorf("%s carries a snippet block", r.CustomID)
+		}
+	}
+}

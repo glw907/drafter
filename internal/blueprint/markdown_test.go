@@ -31,15 +31,17 @@ func TestDecodeMarkdown(t *testing.T) {
 		job         string
 		lines       []MDLine
 	}{
-		{"read-the-widget-log", "Read the widget log", 2, 16, "Shows the reader where the widget log lives.", []MDLine{
-			{Line: 20, Text: "Every widget writes one log line per spin.", Facts: []string{"ab12cd"}},
-			{Line: 21, Text: "The log rotates daily, so yesterday's spins sit in a dated file.", Facts: []string{"ef34gh", "ab12cd"}},
+		{"read-the-widget-log", "Read the widget log", 2, 20, "Shows the reader where the widget log lives.", []MDLine{
+			{Line: 24, Text: "Every widget writes one log line per spin.", Facts: []string{"ab12cd"}},
+			{Line: 25, Text: "The log rotates daily, so yesterday's spins sit in a dated file.", Facts: []string{"ef34gh", "ab12cd"}},
+			{Line: 26, Kind: "code", Text: "a sample of the log's lines.", Source: "/src/widget/log.sh#sample", Facts: []string{"ij56kl"}},
 		}},
-		{"widgetstalled", "`widget.stalled`", 3, 28, "Helps the reader whose widget stopped.", []MDLine{
-			{Line: 32, Text: "Restart the widget with `widgetctl restart`.", Facts: []string{"ij56kl"}},
+		{"widgetstalled", "`widget.stalled`", 3, 33, "Helps the reader whose widget stopped.", []MDLine{
+			{Line: 37, Text: "Restart the widget with `widgetctl restart`.", Facts: []string{"ij56kl"}},
 		}},
-		{"see-also", "See also", 2, 40, "", []MDLine{
-			{Line: 42, Text: "See [Widget reference](../reference/widget.md)."},
+		{"see-also", "See also", 2, 45, "", []MDLine{
+			{Line: 47, Text: "See [Widget reference](../reference/widget.md)."},
+			{Line: 48, Kind: "figure", Text: "the spindle, drawn from above.", Source: "/docs/img/spindle.svg"},
 		}},
 	}
 	if len(m.Sections) != len(tests) {
@@ -53,7 +55,7 @@ func TestDecodeMarkdown(t *testing.T) {
 					s.ID, s.Heading, s.Level, s.Line, s.Job, tt.id, tt.heading, tt.level, tt.line, tt.job)
 			}
 			if !slices.EqualFunc(s.Lines, tt.lines, func(a, b MDLine) bool {
-				return a.Line == b.Line && a.Text == b.Text && slices.Equal(a.Facts, b.Facts)
+				return a.Line == b.Line && a.Kind == b.Kind && a.Source == b.Source && a.Text == b.Text && slices.Equal(a.Facts, b.Facts)
 			}) {
 				t.Errorf("Lines = %+v, want %+v", s.Lines, tt.lines)
 			}

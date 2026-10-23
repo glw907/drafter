@@ -207,6 +207,12 @@ func compareMarkdown(file string, old, cur Revision) Scope {
 		addFacts(resolveFacts(cur.Facts, cm.Reader.Facts))
 	}
 
+	if om.Constraints.Text != cm.Constraints.Text || !slices.Equal(om.Constraints.Facts, cm.Constraints.Facts) {
+		differs = true
+		addFacts(resolveFacts(old.Facts, om.Constraints.Facts))
+		addFacts(resolveFacts(cur.Facts, cm.Constraints.Facts))
+	}
+
 	oldSec, curSec := map[string]*MDSection{}, map[string]*MDSection{}
 	var sharedOld, sharedCur []string
 	for i := range om.Sections {
