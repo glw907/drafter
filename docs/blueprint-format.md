@@ -728,7 +728,8 @@ the next bullet, or a `## ` heading.
 
 ### The `Source:` grammar
 
-The pointers are the path-shaped code spans between `Source:` and the status tag that aren't URLs.
+The pointers are the path-shaped code spans between `Source:` and the status tag that sit outside
+parentheses and brackets and aren't URLs.
 The `store` check also counts a span inside one level of parentheses, unless it is the anchor of
 the pointer before it. A span two levels deep or inside brackets is commentary. `drafter excerpt`,
 `no-excerpt`, and the source kinds still read every span in parentheses or brackets as

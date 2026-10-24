@@ -23,7 +23,7 @@ Read the blueprint whole before you edit it. Each section is a heading with an i
 
 ## Check
 
-Run `drafter check <blueprint>` after every edit and fix each error before you commit. Before the commit, run `drafter check` with no name too: only that run checks the facts store and the outline ([what a named run skips](format.md#what-drafter-check-checks)). After you correct one fact, `drafter check --fact <id>` verifies just its pointers.
+Run `drafter check <blueprint>` after every edit and fix each error before you commit. Before the commit, run `drafter check` with no name too: only that run runs the `store` check and the outline-wide checks ([what a named run skips](format.md#what-drafter-check-checks)). After you correct one fact, `drafter check --fact <id>` verifies just its pointers.
 
 ## Register edit
 

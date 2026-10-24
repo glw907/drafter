@@ -23,8 +23,8 @@ func newStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status <run-id> [flags]",
 		Short: "Print the status of each open batch of a run",
-		Long: `Print the status, age, and request counts of each batch the run has submitted and not yet
-read. The command reads the run's state without taking its lock, so it works while the run is
+		Long: `Print the status and age of each batch the run has submitted and not yet read, with the
+request counts once the batch ends. The command reads the run's state without taking its lock, so it works while the run is
 live, and it asks the API about each open batch. The API moves requests out of processing only
 when the whole batch ends, so a batch in progress shows its status and age. A run with no open
 batch prints "no open batch". With --json each batch prints as one object. The exit status is 0
