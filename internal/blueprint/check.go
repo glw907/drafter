@@ -193,7 +193,7 @@ func (c *projectCheck) markdown(rel string, m *Markdown, entry Page) {
 		}
 	}
 	for _, line := range m.BareFences {
-		fault(line, "this code fence has no Code: bullet directly above it", "put a Code: bullet above the fence that says what the block shows")
+		fault(line, "this code fence has no Code: or Figure: bullet directly above it", "put a Code: or Figure: bullet above the fence that says what the block shows")
 	}
 
 	seen := map[string]int{}

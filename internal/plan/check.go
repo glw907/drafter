@@ -207,7 +207,7 @@ func (c *checker) links() {
 		switch it.Kind {
 		case "link":
 			c.link(it.Lines["target"], it.Target, own)
-		case "code":
+		case "code", "figure":
 			if it.Source != "" && !isURL(it.Source) {
 				c.codeSource(it.Lines["source"], it.Source)
 			}
@@ -314,7 +314,7 @@ func (c *checker) repoPath(line int, file string) (string, bool) {
 	return rel, true
 }
 
-// codeSource checks that the path part of a code item's source exists. The #Symbol part is not
+// codeSource checks that the path part of a code or figure item's source exists. The #Symbol part is not
 // checked.
 func (c *checker) codeSource(line int, source string) {
 	file, _, _ := strings.Cut(source, "#")

@@ -43,8 +43,8 @@ func TestCheckMarkdownForms(t *testing.T) {
 		anch string
 		msg  string
 	}{
-		{"a fence with no code bullet", edit("1. Generate", "```go\nx\n```\n\n1. Generate"), "```go", "no Code: bullet directly above it"},
-		{"a fence under a plain bullet", edit("1. Generate", "- A note.\n\n```go\nx\n```\n\n1. Generate"), "```go", "no Code: bullet directly above it"},
+		{"a fence with no code bullet", edit("1. Generate", "```go\nx\n```\n\n1. Generate"), "```go", "no Code: or Figure: bullet directly above it"},
+		{"a fence under a plain bullet", edit("1. Generate", "- A note.\n\n```go\nx\n```\n\n1. Generate"), "```go", "no Code: or Figure: bullet directly above it"},
 		{"a second constraints block", edit("## Before you begin", constraints+constraints+"## Before you begin"), ":::constraints\n- State no version range. :fact[bbbbbb]\n:::\n\n## Before", "second :::constraints"},
 		{"a constraints block above the reader block", edit(":::reader", constraints+":::reader"), ":::constraints", "not between the :::reader block and the first heading"},
 		{"a constraints block under a heading", edit("1. Generate", constraints+"1. Generate"), ":::constraints", "not between the :::reader block and the first heading"},
