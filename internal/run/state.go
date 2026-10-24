@@ -86,7 +86,7 @@ type Intent struct {
 	// Created is the time the API reported for the batch, kept for adoption.
 	Created time.Time `json:"created,omitzero"`
 	// Poll is the last batch status a poll printed. A state written before the field existed has
-	// none, and a resume ignores it.
+	// none, and a resume prints the first status it sees.
 	Poll *Poll `json:"poll,omitempty"`
 }
 

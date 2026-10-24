@@ -18,7 +18,8 @@ import (
 
 // This file verifies a facts store against its repository. It ports the contract of cairn's
 // scripts/checks/check-facts.mjs, so a store that gate passes raises no error here: the anchor
-// window, the line count, and the basename fallback are the same. It walks each bullet's Source:
+// window, the line count, and the basename fallback are the same. A route path with brackets or
+// parentheses is checked here, though cairn's POINTER_RE skips it. It walks each bullet's Source:
 // part itself instead of reading Fact.Sources, because isSource drops a slashless span that does
 // not exist at the root, and the basename fallback could then never fire.
 

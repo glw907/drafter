@@ -10,7 +10,7 @@ import (
 // An outline that fails to parse names the line yaml.v3 reports, at each site that decodes it.
 func TestMalformedOutlineNamesItsLine(t *testing.T) {
 	const bad = "version: 1\ntypes: [\n"
-	atLine := regexp.MustCompile(`blueprints/outline\.yaml:\d+: `)
+	atLine := regexp.MustCompile(`blueprints/outline\.yaml:2: malformed YAML: line 2: `)
 
 	t.Run("drafter outline", func(t *testing.T) {
 		root := project(t, map[string]string{"blueprints/outline.yaml": bad})

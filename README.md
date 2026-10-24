@@ -201,8 +201,8 @@ own at their worst case.
 drafter status <run-id>
 ```
 
-The command prints the status, age, and request counts of each batch the run has submitted and
-not yet read. It reads the run's state without taking its lock, so it works while the run is
+The command prints the status and age of each batch the run has submitted and not yet read, with
+the request counts once the batch ends. It reads the run's state without taking its lock, so it works while the run is
 live. The API moves requests out of processing only when the whole batch ends, so a batch in
 progress shows its status and age. A run with no open batch prints `no open batch`. With `--json`,
 each batch prints as one object. The exit status is 2 when the run's state cannot be read or the

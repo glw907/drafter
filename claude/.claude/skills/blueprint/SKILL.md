@@ -19,15 +19,15 @@ A change that adds or removes a section, or changes the reader's path through th
 
 ## Edit
 
-Read the blueprint whole before you edit it. Each section is a heading with an italic job line under it, then the lines the page carries: bullets and numbered steps, each ending in the `:fact[id]` tags of the facts it rests on, and `:::row` blocks on a symptom page. [Markdown blueprints](format.md#markdown-blueprints) gives every rule. Edit fact bullets with the Edit tool, never a shell append. Never edit `drafted.lock`: drafter writes it, and a hand edit desyncs the page from its blueprint.
+Read the blueprint whole before you edit it. Each section is a heading with an italic job line under it, then the lines the page carries: bullets and numbered steps, each ending in the `:fact[id]` tags of the facts it rests on, and `:::row` blocks for a symptom, its cause, and its fix. [Markdown blueprints](format.md#markdown-blueprints) gives every rule. Edit fact bullets with the Edit tool, never a shell append. Never edit `drafted.lock`: drafter writes it, and a hand edit desyncs the page from its blueprint.
 
 ## Check
 
-Run `drafter check <blueprint>` after every edit and fix each error before you commit. A run that names a blueprint skips the facts store and the outline-wide checks, so its output holds only that blueprint's findings. Keep the `store` warnings for a run with no name. After you correct one fact, `drafter check --fact <id>` verifies just its pointers.
+Run `drafter check <blueprint>` after every edit and fix each error before you commit. Before the commit, run `drafter check` with no name too: only that run checks the facts store and the outline ([what a named run skips](format.md#what-drafter-check-checks)). After you correct one fact, `drafter check --fact <id>` verifies just its pointers.
 
 ## Register edit
 
-Before the fact-check, run the project's register editor on the blueprint (cairn's is `cairn-register-editor`) and apply its rewrites. A fact-check on prose the editor then rewrites has to run twice.
+When the project has a register editor (cairn's is `cairn-register-editor`), run it on the blueprint before the fact-check and apply its rewrites. A fact-check on prose the editor then rewrites has to run twice.
 
 ## Fact-check
 
@@ -37,10 +37,11 @@ Settle every finding that is not `holds`, as the author:
 
 - When the code agrees with the finding, fix it: rewrite the line, or the fact and then each line `drafter refs` names.
 - When you hold the line is right, dispute it. The dispute goes to Geoff as a decide note with both sides; never resolve one with another agent.
-- When the code cannot settle it, ask. The question goes to Geoff as a question note. Before you ask about what the engine intends, trace the question through the code, the specs, and the history; Geoff gets only product, taste, and scope questions.
+- When the code cannot settle it, ask. The question goes to Geoff as a question note. First trace what the code intends through the code, the specs, and the git history, and ask Geoff only product, taste, and scope questions.
 - Write each fix line so it passes the `exhaustive` check: a fix that says `only` or `every` draws the same warning it settles.
 
-Fact-check the fixed lines again with a fresh agent. After three rounds on one document, go on only while each round fixes a cause you have traced; a finding that returns after its fix gets one structural rewrite (the line or the fact rewritten from the code, not patched again), and if it returns again it goes to Geoff as a question note.
+Fact-check the fixed lines again with a fresh agent. After three rounds on one document, go on only while each round fixes a cause you have traced. A finding that returns after its fix gets one structural rewrite: the line or the fact rewritten from the code, not patched again. If it returns after that, send it to Geoff as a question note.
+
 ## Review
 
 Write the notes file the queue shows under each line: a JSON array, one object per note, with `id`, `kind` (`info`, `decide`, or `question`), `anchor`, `title`, and `body` (an array of paragraphs). The anchor names the line the note sits under: `<heading slug>.heading`, or `<heading slug>.p<n>` for the n-th bullet, step, or row under that heading counting from 0, with `.symptom`, `.cause`, or `.fix` for a row's part. Write an `info` note with `was` and `now` for each fix, a `decide` note with `sides` (`who`, `text`) and `choices` (`label`, `done`, and `text` for a wording the choice puts in) for each dispute, and a `question` note with `choices` for each question. The command refuses any other shape.
