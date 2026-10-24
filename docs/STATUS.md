@@ -5,7 +5,8 @@ initiative at `~/Projects/initiatives/docs-system/`.
 
 ## Current state
 
-- `main` is at the merge of PR #62 (`1ce0408`), the stage-advance pass, run by executor
+- `main` is at the merge of PR #64 (`f2ad05e`), which adds `--description` to the skill's
+  blueprint and page queue lines for glw907/approval-queue#7. Before it, PR #62 (`1ce0408`) was the stage-advance pass, run by executor
   `drafter-stage-advance` (`09a45069`) under `conductor-drafter`. In batch mode a page submits its
   next stage as soon as its batch is handled, while siblings' batches stay in flight (#82).
   The blueprint skill tells a session to name a findings path in the fact-checker dispatch. #42
@@ -15,16 +16,15 @@ initiative at `~/Projects/initiatives/docs-system/`.
   (`44a07fee`), landed backlog #48 to #81: the anchorless-pointer warning and wider store checks,
   the lint fixes and `check.sentence_words`, `refs --page` and source kinds, `drafter status`, the
   user-scope local config fallback, and the skill and format-doc fixes.
-- `~/.local/bin/drafter` is still the PR #58 build (`5680e8f`). Install waits on run
-  `20261024T080412Z-13b5d021`: both its batches were still `in_progress` at the #62 merge.
+- `~/.local/bin/drafter` on pavilion is the `f2ad05e` build, installed 2026-10-24 at Geoff's word
+  while run `20261024T080412Z-13b5d021`'s two batches were still `in_progress`. That run's
+  `drafter page` keeps the old code in memory; its state reads with the new build.
 - cairn-cms backlog #56 carries the follow-up settings for cairn (`check.sentence_words = 26` and
   two `managed: false` outline entries), and cairn #38 notes drafter's tag-note rule.
 
 ## Next action
 
-Once run `20261024T080412Z-13b5d021` has no open batch (`drafter status` with a build of `main`),
-run `make install` on pavilion from the main checkout and check `drafter --version`. thinkpad-x1
-picks the build up at its next pull and `make install`.
+thinkpad-x1 picks up the `f2ad05e` build at its next pull and `make install`.
 
 The next cairn docs pass's first multi-page `drafter page` is #82's live check. Read that run's
 `state.json`: each page's `intents[].time` (submit) and `created`, and `poll.seen`. A page whose
