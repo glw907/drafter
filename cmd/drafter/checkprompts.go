@@ -103,7 +103,7 @@ func runCheckPrompts(cmd *cobra.Command, f *checkPromptsFlags) error {
 			return exitError{code: exitCannotRun, msg: err.Error()}
 		}
 		if c.Prompts == "" && c.RequirePrompts {
-			return cannot("%s", config.RefusedStock)
+			return cannot("%s", c.StockRefusal())
 		}
 		if modulePath, src, err = c.Module(); err != nil {
 			return cannot("%v", err)

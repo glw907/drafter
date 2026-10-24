@@ -162,9 +162,9 @@ func checkStockTracks(c *config.Config, root, head string, handoffs []handoff.Ha
 	if err != nil {
 		return fmt.Errorf("read the outline at %s: %w", head, err)
 	}
-	o, _ := blueprint.DecodeOutline(c.Blueprints.Outline, data)
+	o, fs := blueprint.DecodeOutline(c.Blueprints.Outline, data)
 	if o == nil {
-		return fmt.Errorf("the outline at %s is malformed; run drafter check", c.Blueprints.Outline)
+		return fmt.Errorf("the outline at %s is malformed%s; run drafter check", c.Blueprints.Outline, outlineFault(fs))
 	}
 	var reasons []string
 	for _, h := range handoffs {

@@ -31,6 +31,7 @@ type Config struct {
 	Register       map[string][]string
 	InlineFiles    []string
 	Root           string // the project root, empty outside a project
+	LocalFallback  string // the user-scope local config path read when the project has no drafter.local.toml
 
 	src     map[string]origin
 	capSets map[string][]string

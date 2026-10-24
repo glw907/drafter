@@ -22,6 +22,15 @@ const (
 // RefusedStock is the refusal for a project that sets require_prompts and names no prompts module.
 const RefusedStock = "prompts is not set, and require_prompts in drafter.toml refuses the stock module"
 
+// StockRefusal is RefusedStock followed by the two files that can set prompts besides the user
+// config: drafter.local.toml, and the user-scope copy a worktree reads in its place.
+func (c *Config) StockRefusal() string {
+	if c.LocalFallback == "" {
+		return RefusedStock + "; set prompts in drafter.toml or drafter.local.toml"
+	}
+	return RefusedStock + "; set prompts in drafter.toml, drafter.local.toml, or " + c.LocalFallback
+}
+
 // Validate returns one error naming every problem in s, or nil. The consistency seat runs, and
 // so is required, only when facts.dir is set.
 func (c *Config) Validate(s Scope) error {
@@ -43,7 +52,7 @@ func (c *Config) Validate(s Scope) error {
 			missing("gate.command")
 		}
 		if c.Prompts == "" && c.RequirePrompts {
-			problems = append(problems, errors.New(RefusedStock))
+			problems = append(problems, errors.New(c.StockRefusal()))
 		}
 		if p := c.Editing.Preferences; p != "" && c.Root != "" {
 			if _, err := os.Stat(filepath.Join(c.Root, filepath.FromSlash(p))); err != nil {

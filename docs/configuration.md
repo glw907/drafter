@@ -20,6 +20,13 @@ root holds a `drafter.toml`. Outside a project, only the user layer applies.
 The user config lives under `$XDG_CONFIG_HOME` when that variable is set. The path above is the
 usual default.
 
+A project with no `drafter.local.toml` in its root reads `~/.config/drafter/<repo>.local.toml` in
+its place, with the same keys and the same rank. `<repo>` is the directory name of the repository's
+main checkout, so every worktree of one repository shares the file, and a fresh worktree needs no
+copy. The file is outside the repository, so git's ignore check doesn't apply to it. A root
+outside git reads no such file. `drafter config` shows the file's full path as the source of each
+value it sets.
+
 ## Precedence
 
 A setting resolves from the first source that sets it, in this order:
@@ -47,7 +54,8 @@ Only two settings have flags. `--sync` sets `mode` to `sync`, and `--json` sets 
 
 ### Paths
 
-A relative path in a file resolves from the directory that holds the file. A relative path in an
+A relative path in a file resolves from the directory that holds the file, so one in
+`~/.config/drafter/<repo>.local.toml` resolves from `~/.config/drafter`. A relative path in an
 environment variable resolves from the working directory. A leading `~` expands to the home
 directory in the user config, `drafter.local.toml`, and the environment, and doesn't expand in
 `drafter.toml`.

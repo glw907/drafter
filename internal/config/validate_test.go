@@ -43,7 +43,7 @@ func TestValidate(t *testing.T) {
 		{
 			"run refuses the stock module under require_prompts", ScopeRun,
 			func(c *Config) { c.Prompts, c.RequirePrompts = "", true },
-			"prompts is not set, and require_prompts in drafter.toml refuses the stock module",
+			"prompts is not set, and require_prompts in drafter.toml refuses the stock module; set prompts in drafter.toml or drafter.local.toml",
 		},
 		{"require_prompts passes with prompts set", ScopeRun, func(c *Config) { c.RequirePrompts = true }, ""},
 		{"money ignores require_prompts", ScopeMoney, func(c *Config) { c.Prompts, c.RequirePrompts = "", true }, ""},

@@ -420,7 +420,7 @@ func blueprintHandoffs(c *config.Config, root, head string, args []string) ([]ha
 	}
 	o, fs := blueprint.DecodeOutline(c.Blueprints.Outline, outlineBytes)
 	if o == nil || plan.HasError(fs) {
-		return nil, fmt.Errorf("the outline at %s is malformed; run drafter check", c.Blueprints.Outline)
+		return nil, fmt.Errorf("the outline at %s is malformed%s; run drafter check", c.Blueprints.Outline, outlineFault(fs))
 	}
 	var out []handoff.Handoff
 	for _, a := range args {
