@@ -145,8 +145,11 @@ one italic span: what the section does for the reader. A section without one is 
 
 A bullet or numbered step states one thing the section must say. End it with a `:fact[id]` tag for
 each fact it places or cites. Leave off the `f:` prefix the facts store uses, so `:fact[bbbbbb]`
-cites `f:bbbbbb`. A bullet of the form `See [text](target).` is a link, and `drafter check` checks
-its target as it does a link item in YAML. A tag belongs on a bullet's or step's first line, a row
+cites `f:bbbbbb`. A bullet of the form `See [text](https://example.com/page).` is a link, and `drafter check` checks
+its target as it does a link item in YAML. Text may follow the closing parenthesis, as in
+`See [text](https://example.com/page#anchor) for the upgrade case.`, and the bullet is still a link. An anchor on a
+link to another page is checked against that page's blueprint headings when the page has a
+blueprint, and against the published page when it has none. A tag belongs on a bullet's or step's first line, a row
 line, a reader line, or a constraints line; `drafter check` reports a tag anywhere else as an
 error, since drafter reads no other line for tags.
 
@@ -160,16 +163,31 @@ tags on whichever of the three lines state the fact.
 
 A bullet that opens `Code:` names a code example, and a bullet that opens `Figure:` names a
 figure. Each says what the block or figure shows and may end with a `:source[path]` tag, as
-`:source[/src/keys.ts#addKey]`, for the model file or image behind it. The path resolves as a YAML
+`:source[/src/keys.ts#addKey]`, for the model file or image behind it. A `:fact[id]` tag on a
+`Code:` bullet counts as a citation like one on any other bullet. The path resolves as a YAML
 `code` item's `source` does: from the page's directory, or from the repository root when it starts
 with `/`. A `#Symbol` suffix names the part of the file to show. `drafter check` requires a `Code:`
-source to exist, and reports a `:source` tag on any other line as an error.
+or `Figure:` source to exist, and reports a `:source` tag on any other line as an error.
 
-A code fence attaches to the `Code:` bullet directly above it, blank lines between allowed. A
-comment line between the two, such as a `<!-- snippet-check-skip: reason -->` marker, goes to the
-page with the fence. A fence with no `Code:` bullet above it is an error. A fence's contents are
-skipped when drafter reads tags and directives, so a fence may hold any of the markup above as an
-example.
+A path may hold one level of square brackets, as a SvelteKit route does:
+`:source[/src/routes/[id]/+page.ts#load]` and `:source[/src/routes/[...rest]/+page.ts]` both read.
+Brackets nested two deep, such as `[[opt]]`, don't. A bullet holds one `:source` tag. A second tag
+is a warning that names the path it drops, and drafter reads the first. Put the second path on its
+own `Code:` or `Figure:` bullet. A `Code:` bullet may leave its `:source` off when no file shows
+the example, such as a command and the output it prints, which are two `Code:` bullets.
+
+A code fence attaches to the `Code:` or `Figure:` bullet directly above it, blank lines between
+allowed. A comment line between the two, such as a `<!-- snippet-check-skip: reason -->` marker,
+goes to the page with the fence. A fence under a `Figure:` bullet is the figure's body, such as the
+reproduction a `repro` figure carries, and the draft request carries it as part of the figure. A
+fence with neither bullet above it is an error. A fence's contents are skipped when drafter reads
+tags and directives, so a fence may hold any of the markup above as an example.
+
+A table is a GFM pipe table under a lead-in bullet. Put the table's `:fact[id]` tags on the lead-in
+bullet: drafter reads tags only on a bullet, step, row, reader, or constraints line, and reports
+one on a table line as an error. The draft request carries the table as written. A `:::row` block
+fits any page type, since `drafter check` ties no type to rows, so a task guide may use one for a
+failure inside a step. Bullets that explain the section may sit above its lead-in bullet.
 
 ### What the lock does with a markdown blueprint
 
@@ -193,7 +211,8 @@ mapping dropped or could not decide: a section without a `why`, a failure withou
 
 `drafter refs f:bbbbbb` lists each line of a markdown blueprint that carries a tag for the fact, as
 `file:line: item (kind) in section`. A bullet's item id is `<section id>.p<n>`, with the kind
-`code` for a `Code:` bullet and `figure` for a `Figure:` bullet. A row's is `<section id>.row<n>`,
+`code` for a `Code:` bullet, `figure` for a `Figure:` bullet, and `bullet` for any other bullet or
+row. A row's is `<section id>.row<n>`,
 the reader block's is `reader`, and the constraints block's is `constraints`. The section is the
 one a correction redrafts; the reader and constraints blocks sit in none, so their lines carry
 no section. The command takes several ids, as the next section describes.
@@ -540,27 +559,31 @@ The checks that run on each blueprint use the same logic as `drafter check-plan`
 blueprint's view: the blueprint joined to its outline entry, with each framing citation counted
 as an example item.
 
-| Check | What it requires | Severity |
-|---|---|---|
-| `decode` | The file decodes against the schema, and the ids are well formed and unique. | error |
-| `ids` | Every `from` and `handledBy` names an item, and no fact is both placed and disposed. | error |
-| `reader-state` | A step requires only state that an earlier step or `preconditions` produces. | error, or warning for state only optional steps produce |
-| `recovery` | Every step marked `canFail` has a `failure` item that names it in `from`. | error, or warning for a failure after a step that can't fail |
-| `links` | Link targets and code sources exist, anchors match a heading, and each cross-link in `outline.yaml` has a `link` item. | error, or warning for a page that's planned but not written |
-| `facts` | Every fact a blueprint places or cites is in exactly one facts file and is tagged `verified`, `external`, or `vendor`. Framing citations count. | error, or warning when no facts directory is set |
-| `blueprints` | Every managed page in `outline.yaml` has one blueprint, and every blueprint is at a path-rule location and names a managed page the outline lists. | error, or warning for a managed page with no blueprint until `blueprints.required` is `true` |
-| `refs` | Every `[[id]]` in a prose field names a section id. | error |
-| `why` | Every section has a non-empty `why`. | error |
-| `use` | A `use` that's present starts with `Only` or `Omit`. | error |
-| `types` | The page's `type` is one `types` declares, and the type's `anatomy` isn't empty. Each declared type's `anatomy` is a stock name or an entry in its track's register. | error, or warning when the outline declares no `tracks` |
-| `tracks` | Each managed page matches exactly one track, and each track names a known `standard`, an existing `register`, and well-formed globs. | error, or warning for a track that matches no managed page |
-| `framing` | The blueprint has a `framing` with an `introPlan`. | error |
-| `lock` | An entry with a `page` id names a page on disk, and an entry with only an `accepted` id names a page the outline lists. | error |
-| `convention` | `blueprints.root` is `blueprints`, and `facts.dir` is `<root>/facts`. | warning |
-| `handler` | A `failure`'s handler gives the reader a next action. A `handledBy` that names only a `fact` item, a `sentence` with `mode: verbatim`, or a `link` or `handoff` that sends the reader back to the section holding the failure's `from` step warns. The message carries the fix: hand off to the step or section that gives the reader a next action. | warning |
-| `exhaustive` | A bullet, step, row, reader line, or constraints line of a Markdown blueprint, and a fact bullet in the facts store, holds no word that claims a complete set: `only`, `every`, `all`, `no`, `none`, `never`, `always`, or a count before a plural noun, spelled from two to twelve (`three roles`). A digit count is no claim, since it is as often a version or a measurement. Words in code spans don't count, and a `verified` or `rejected` fact bullet is not checked, since its claim has been read against the source. A draft may repeat the claim as fact, so check that the source says the set is complete, or give examples instead. | warning |
-| `no-excerpt` | A `verified` fact that a checked blueprint cites has a pointer that yields an excerpt, so a read can check the claim against source lines. Each fact is reported once, at its bullet, and the fix names `drafter excerpt`. | warning |
-| `store` | Every fact bullet in the facts store has an id no other bullet has, a `Source:`, and one valid tag, and each source pointer names something that exists. See [The facts store](#the-facts-store). | error, or warning for a bare path that doesn't exist |
+The Applies to column says which blueprint format a check reads. A check marked YAML reads fields
+a markdown blueprint doesn't have, so it never fires on one.
+
+| Check | What it requires | Severity | Applies to |
+|---|---|---|---|
+| `decode` | The file decodes against the schema, and the ids are well formed and unique. | error | Both |
+| `ids` | Every `from` and `handledBy` names an item, and no fact is both placed and disposed. | error | YAML |
+| `reader-state` | A step requires only state that an earlier step or `preconditions` produces. | error, or warning for state only optional steps produce | YAML |
+| `recovery` | Every step marked `canFail` has a `failure` item that names it in `from`. | error, or warning for a failure after a step that can't fail | YAML |
+| `links` | Link targets and code and figure sources exist, anchors match a heading, and each cross-link in `outline.yaml` has a `link` item. | error, or warning for a page that's planned but not written | Both |
+| `facts` | Every fact a blueprint places or cites is in exactly one facts file and is tagged `verified`, `external`, or `vendor`. Framing citations count. | error, or warning when no facts directory is set | Both |
+| `blueprints` | Every managed page in `outline.yaml` has one blueprint, and every blueprint is at a path-rule location and names a managed page the outline lists. | error, or warning for a managed page with no blueprint until `blueprints.required` is `true` | Both |
+| `refs` | Every `[[id]]` in a prose field names a section id. | error | YAML |
+| `why` | Every section has a non-empty `why`. | error | YAML |
+| `use` | A `use` that's present starts with `Only` or `Omit`. | error | YAML |
+| `types` | The page's `type` is one `types` declares, and the type's `anatomy` isn't empty. Each declared type's `anatomy` is a stock name or an entry in its track's register. | error, or warning when the outline declares no `tracks` | Both |
+| `tracks` | Each managed page matches exactly one track, and each track names a known `standard`, an existing `register`, and well-formed globs. | error, or warning for a track that matches no managed page | Both |
+| `framing` | The blueprint has a `framing` with an `introPlan`. | error | YAML |
+| `lock` | An entry with a `page` id names a page on disk, and an entry with only an `accepted` id names a page the outline lists. | error | Both |
+| `convention` | `blueprints.root` is `blueprints`, and `facts.dir` is `<root>/facts`. | warning | Both |
+| `handler` | A `failure`'s handler gives the reader a next action. A `handledBy` that names only a `fact` item, a `sentence` with `mode: verbatim`, or a `link` or `handoff` that sends the reader back to the section holding the failure's `from` step warns. The message carries the fix: hand off to the step or section that gives the reader a next action. | warning | YAML |
+| `exhaustive` | A bullet, step, row line, or reader line of a Markdown blueprint, and a fact bullet in the facts store, holds no word that claims a complete set: `only`, `every`, `all`, `none`, `always`, or a count before a plural noun, spelled from two to twelve (`three roles`). `no` and `never` negate one thing and are no claim. A `:::constraints` block is not scanned, since its lines are instructions to the draft seat. A digit count is no claim, since it is as often a version or a measurement. Words in code spans don't count, and a `verified` or `rejected` fact bullet is not checked, since its claim has been read against the source. Every claim on a line is its own warning, at its own line, including each part of a row. A draft may repeat the claim as fact, so check that the source says the set is complete, or give examples instead. | warning | Markdown, and the facts store |
+| `sentence-length` | No sentence in a bullet, step, row line, or reader or constraints line is longer than `check.sentence_words` words. A code span counts as one word. The setting is off by default, and fact bullets are never checked. See [Configuration](configuration.md). | warning | Markdown |
+| `no-excerpt` | A `verified` fact that a checked blueprint cites has a pointer that yields an excerpt, so a read can check the claim against source lines. Each fact is reported once, at its bullet, and the fix names `drafter excerpt`. | warning | Both |
+| `store` | Every fact bullet in the facts store has an id no other bullet has, a `Source:`, and one valid tag, and each source pointer names something that exists. A line pointer with no anchor warns, since drift can't be detected without one. See [The facts store](#the-facts-store). | error, or warning for a bare path that doesn't exist or a line pointer with no anchor | Both |
 
 A prose field that carries a `[[id]]` is `argument`, `orderReason`, the `introduction` parts, the
 `framing` parts, a section's `why` and `opens`, an item's `text`, `use`, `symptom`, and `cause`,
@@ -568,8 +591,10 @@ and `constraints`. A finding on a framing citation points at the framing field's
 reports "in no facts file", and an id on two bullets reports "on 2 bullets".
 
 When you name blueprints, `drafter check` checks only those files and the lock entries for their
-pages. The pairing of pages with blueprints, the `convention` warnings, and the `store` check come
-from a run without names.
+pages. The outline-wide checks come from a run without names: the pairing of pages with
+blueprints, the `convention` warnings, the `store` check, and the `tracks` findings. A named run
+reports a `types` finding only for the type of a page it names, so a fault in a type no named page
+uses stays out of its output.
 
 ### Find where a fact is used
 
@@ -586,11 +611,25 @@ of the section that holds the item, the one a correction redrafts. It covers `fa
 - The introduction, framing citations, and dispositions sit in no section, so their lines end
   after the kind.
 
-After the blueprint lines, the command reads the brief of each page the blueprints cover, from
-the path [`blueprints.brief_path`](configuration.md) names, and lists each sentence that cites the
-fact as `brief-file:line: s<n>: sentence [page]`. The page is the one the brief belongs to, which
-a correction to the fact leaves out of date. A page with no brief adds nothing. With more than one
-id, the lines for each id sit under that id.
+After the blueprint lines, the command reads the brief of every page in the outline that has a
+brief file, and of each page a blueprint covers, from the path
+[`blueprints.brief_path`](configuration.md) names. A page with no blueprint yet is read too, so a
+published page's brief citations count before its blueprint exists. It lists each sentence that
+cites the fact as `brief-file:line: s<n>: sentence [page]`. The page is the one the brief belongs
+to, which a correction to the fact leaves out of date. A page with no brief adds nothing. With more
+than one id, the lines for each id sit under that id.
+
+Each id's header line carries the fact's source kinds in parentheses, as `f:bbbbbb (code, url)`.
+`code` is a `Source:` pointer that is a repository path, `url` is a URL, and `prose` is a pointer
+to a `.md` file or under `facts.prose_sources`. A fact with several kinds prints all of them, in
+that order. `--json` adds `source_kinds` to each object.
+
+`drafter refs --page <path|slug> [--root dir] [--json]` lists the links into one page, for a page
+you are about to retire or move: each blueprint `See` or link item whose target resolves to the
+page, and each `crossLinks` entry in the outline whose `to` is the page, as `file:line: kind`. An
+anchor on the target is ignored, and an outside URL never matches. It takes no ids, and giving it
+both is a usage error with exit status 2. The status is 0 when it lists the links or none, and 1
+when the outline lists no such page. `--json` prints an array of `file`, `line`, and `kind`.
 
 `--json` prints one array. Each object holds `file`, `line`, `item`, `kind`, and `id` (the id as
 you typed it). A blueprint line adds `section` when it has one. A brief sentence has the kind
@@ -639,7 +678,9 @@ What a pointer yields depends on its form.
 | `path` | The whole file. |
 
 A pointer into a tracked code file of 150 lines or fewer shows the whole file, once per fact,
-whatever its form. A pointer that doesn't resolve keeps its `no excerpt:` reason instead.
+whatever its form. A pointer that doesn't resolve keeps its `no excerpt:` reason instead. A pointer
+under `node_modules` is untracked, so it is read from disk when the file exists, and its block
+label ends `(read from disk: untracked)`; the `no-excerpt` warning counts it as an excerpt.
 
 Prose files give no excerpt, because a document shows what the project says and not what the code
 does. The exception is a file that `facts.prose_sources` lists in `drafter.toml`: a `path:N` or
@@ -678,14 +719,17 @@ the next bullet, or a `## ` heading.
 ### The `Source:` grammar
 
 The pointers are the code spans between `Source:` and the status tag that sit outside
-parentheses and brackets and aren't URLs. A span in parentheses is commentary, and so is a span
-that isn't path-shaped. A slashless span counts as a path when the file exists at the project
+parentheses and brackets and aren't URLs. A path-shaped span inside one level of parentheses is a
+pointer too, unless it is the anchor of the pointer before it. Two levels deep, or inside
+brackets, a span is commentary. A code span inside a status tag's note, such as the command a
+`[verified: ran ...]` note names, is commentary and never a pointer. A span that isn't path-shaped
+is commentary too. A slashless span counts as a path when the file exists at the project
 root, or when it carries a `:lines` or `#name` and has a dot.
 
 | Form | Verified as | Fails, as an error, when |
 |---|---|---|
-| `path:lines` | The path from the project root. A path with no slash that isn't at the root resolves to the one file with that name in the repository. | No file or more than one file matches, the target is a directory, a cited line is outside the file, or an anchor word is absent from the cited lines plus 10 on each side |
-| `path#name`, with a path ending `.go`, `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, or `.cjs` and a `name` of one identifier | The path and the declaration of `name` in it | The file is missing, no declaration matches, or an anchor word is absent from the declaration |
+| `path:lines` | The path from the project root. A path with no slash that isn't at the root resolves to the one file with that name in the repository. A pointer with no anchor warns, since nothing then shows the lines have drifted. | No file or more than one file matches, the target is a directory, a cited line is outside the file, or an anchor word is absent from the cited lines plus 10 on each side |
+| `path#name` or `path#outer.inner`, with a path ending `.go`, `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, or `.cjs` and each part of the name one identifier | The path and the declaration of `name` in it, from its leading doc comment, or of `inner` inside `outer` | The file is missing, no declaration matches, or an anchor word is absent from the declaration |
 | `path`, with a slash, or a name that exists at the root | The path exists | Never. A path that doesn't exist is a warning, and its anchor isn't checked |
 
 `lines` is a list such as `12`, `12-20`, or `3,12-20`. A line is in range when it is at most
@@ -714,15 +758,14 @@ end of the file.
 
 A pointer is skipped, and counted as skipped, rather than checked in these cases.
 
-- A `#name` with a dot, such as `Class.method`.
 - A `#name` on any file that isn't one of the extensions above, such as `.md`, `.json`, or `.svelte`.
-- A pointer whose path has a character outside letters, digits, `_`, `.`, `/`, and `-`. Route
-  paths such as `src/routes/(site)/[id]/+page.svelte` and `@scope` package paths fall here.
 
-A pointer in parentheses is commentary and isn't checked, but it is counted. When a fact shows no
-source lines, `drafter excerpt` and the `no-excerpt` warning say how many pointers of its
-`Source:` part were read as commentary, since a pointer that sits in parentheses is the usual
-reason. An anchor that is inside the 10-line window but off the cited lines is a warning, not an
+A route path such as `src/routes/(site)/[id]/+page.ts`, with brackets, parentheses, or a `+`, is
+checked like any other path.
+
+A span read as commentary isn't checked, but it is counted. When a fact shows no source lines,
+`drafter excerpt` and the `no-excerpt` warning say how many pointers of its `Source:` part were
+read as commentary, since a pointer inside brackets or two parentheses deep is the usual reason. An anchor that is inside the 10-line window but off the cited lines is a warning, not an
 error. The message names the line the anchor is on now, and the fix is to update the pointer to
 that line. An anchor outside the window stays an error.
 
@@ -845,6 +888,12 @@ error and the command that resumes the run. The resume submits no request and wr
 (`blueprints/docs/x.blueprint.yaml`). An argument that ends in `.blueprint.yaml` is a blueprint,
 one that ends in `.md` is a page, and anything else is a [handoff file](handoff.md). Give one kind
 of argument, not a mix, and don't combine blueprints with `--workflow-run`.
+
+While a run waits on a batch, it prints one line the first time it polls and another each time the
+batch's status changes, as `batch <id> (<page>): <status>, waiting since <time>`, with the request
+counts once the batch ends. The first line names `--sync` as the way to run attended without a
+batch wait. `drafter status <run-id>` reports each open batch of a run, from another terminal,
+without taking the run's lock. See the [README](../README.md).
 
 A run starts on a clean worktree and reads every input from the commit it starts at: the blueprint,
 the outline, the facts, the page, and its brief. For each page it first decides what to run, by

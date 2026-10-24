@@ -4,9 +4,13 @@ Use this procedure when a docs page does not exist yet. You write the page's ent
 
 ## 1. Settle the page's job and type
 
+Test the premise first: who has work that the scaffold, the tutorial, and the reference pages don't
+already cover? When the case is weak, write a recommendation to fold the page into a neighbor, file
+it, and stop.
+
 Write down the job: what the reader accomplishes with the page. Pick its page type from the types `outline.yaml` declares. Read the anatomy the type names in [anatomies.md](anatomies.md) for its introduction and ending, or, when the page's track names a register with an entry for the anatomy, that entry. The outline entry's fields and what each requires are in [outline.yaml](format.md#outlineyaml).
 
-Set `covers` and `outOfScope` from the neighbors: read the outline whole, so you know each page's job and what another page owns. Keep out of this page whatever a neighbor owns.
+Set `covers` and `outOfScope` from the neighbors: read the outline whole, so you know each page's job and what another page owns. Keep out of this page whatever a neighbor owns. When this page's `covers` narrows, reword each neighbor's `outOfScope` line that routes a topic here. When a section folds into a page that has no blueprint, write that page a whole-page blueprint and queue it with notes that point at the section.
 
 ## 2. File or re-verify each fact from the code
 
@@ -17,7 +21,9 @@ Every command, step, warning, success signal, and assertion the page makes is a 
 - A claim whose only source is another docs page is retraced to code, config, or a vendor document, or it is not filed.
 - A claim another page owns is not filed here; the blueprint links that page.
 
-Never file a fact tagged `candidate` or `docs-drift`. Edit fact bullets with the Edit tool, never a shell append.
+Never file a fact tagged `candidate` or `docs-drift`. Edit fact bullets with the Edit tool, never a shell append. A correction to a fact is an exact in-place substitution of the wrong text, never a second bullet or a line appended below it.
+
+When an example on the page comes from a script or command you ran, name that script or command in a `Code:` bullet with a `:source` on it, so the fact-checker can run it again.
 
 When several authors share one facts store, an author who finds a shared fact wrong fixes the bullet and names the fix in the hand-back report. An author who sees another author's fix re-verifies it against the code and never reverts it; the pilot's parallel authors reverted each other's fixes. Before you commit, install the project's dependencies and run its facts check. Cairn's `check:facts`, for one, needs `npm ci` first.
 
@@ -25,7 +31,9 @@ When several authors share one facts store, an author who finds a shared fact wr
 
 Write `<page>.blueprint.md` in [the markdown format](format.md#markdown-blueprints): the front matter (`page`, `type`, `track` only when the outline declares tracks, and an optional `exemplar`), then the `:::reader` block, written from the questions in [introductions.md](introductions.md): who reads the page, why they arrive, what they already know, what the page does for them, and what it leaves to other pages. Take the reader from the outline entry's job and `covers`, never from a worked example in a plan; Geoff sent back the custom admin screen page (2026-10-22) because its reader shrank to the plan's example.
 
-Put instructions that bind the whole page in a [`:::constraints` block](format.md#the-constraints-block); the pilot's authors put them in a `**Background.**` paragraph inside the reader block.
+Put instructions that bind the whole page in a [`:::constraints` block](format.md#the-constraints-block); the pilot's authors put them in a `**Background.**` paragraph inside the reader block. The reader block's background frames the page for its reader; the constraints block instructs the draft seat.
+
+The `exemplar` names a page the local config's `inline_files` resolve (see [Configuration](https://github.com/glw907/drafter/blob/main/docs/configuration.md)); a worktree with no `drafter.local.toml` reads `~/.config/drafter/<repo>.local.toml` instead. Mint each new fact id with the project's mint command, never by hand. To find which facts a plan cites, grep for each id the plan names.
 
 Then the sections. Order them by when the reader needs each one; Google's outline guidance is the source. Don't copy the order of `covers`: it is an inventory.
 

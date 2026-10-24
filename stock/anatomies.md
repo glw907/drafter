@@ -17,7 +17,7 @@ write; the names below describe each section's job, not its heading.
 
 In a blueprint, a figure is a `Figure:` bullet in the reader block or the section it supports, and a
 code sample is a `Code:` bullet in the section it supports, as [the blueprint
-format](../docs/blueprint-format.md#markdown-blueprints) describes.
+format](https://github.com/glw907/drafter/blob/main/docs/blueprint-format.md#markdown-blueprints) describes.
 
 ## Concept page
 
