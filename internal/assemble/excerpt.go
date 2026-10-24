@@ -106,7 +106,12 @@ func (r *repo) excerpt(id, source string, whole map[string]bool) []string {
 	if id != "" {
 		factTag = " (fact " + id + ")"
 	}
-	label := source + factTag
+	// A dependency under node_modules is not tracked, yet a pointer into it is read from disk.
+	note := ""
+	if !r.tracked[filepath.ToSlash(filepath.Clean(file))] && slices.Contains(strings.Split(filepath.ToSlash(file), "/"), "node_modules") {
+		note = " (read from disk: untracked)"
+	}
+	label := source + factTag + note
 	none := func(form string) []string { return []string{block("excerpt", label, "no excerpt: "+form)} }
 
 	rel := filepath.ToSlash(filepath.Clean(file))
@@ -125,14 +130,14 @@ func (r *repo) excerpt(id, source string, whole map[string]bool) []string {
 		return none("missing")
 	case info.IsDir():
 		return none("directory")
-	case !r.tracked[rel]:
+	case !r.tracked[rel] && note == "":
 		return none("untracked")
 	case prose && (!r.prose[rel] || !strings.HasPrefix(suffix, ":")):
 		return none("prose")
 	}
 
 	if suffix == "" {
-		b, ok := fileBlock(target{rel, real})
+		b, ok := fileBlock(target{rel + note, real})
 		if !ok {
 			return none("not a regular file")
 		}
@@ -173,7 +178,7 @@ func (r *repo) excerpt(id, source string, whole map[string]bool) []string {
 		return nil
 	}
 	whole[rel] = true
-	return []string{window(rel+factTag, lines, 1, len(lines))}
+	return []string{window(rel+factTag+note, lines, 1, len(lines))}
 }
 
 // declBlock returns the block for the 0-based lines lo through hi, cut to declMaxLines with a

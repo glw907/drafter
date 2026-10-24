@@ -32,9 +32,7 @@ var (
 	// pointerAnchorRe matches the anchor that follows a pointer: a code span in parentheses.
 	pointerAnchorRe = regexp.MustCompile("^\\s*\\(`([^`]*)`\\)")
 	anchorWordRe    = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]{2,}`)
-	// strictPathRe is the path alphabet verification checks; a pointer outside it is skipped.
-	strictPathRe = regexp.MustCompile(`^[A-Za-z0-9_./-]+$`)
-	identifierRe = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*$`)
+	identifierRe    = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*$`)
 
 	goColumn0Re = regexp.MustCompile(`^(func|type|var|const)\b`)
 	tsColumn0Re = regexp.MustCompile(tsPrefix + `[A-Za-z_$]|^declare\s+global\b`)
@@ -99,11 +97,11 @@ type verifier struct {
 //
 // A bullet outside a Harvest record or Provenance section needs a leading id, a Source:, and one
 // valid tag, and its id must be unique in the store. Each pointer in its Source: part is
-// checked: path:lines for the file, the lines, and an anchor within 10 lines of them (a warning when
-// it sits off the cited lines); path#name
+// checked: path:lines for the file, the lines, and an anchor within 10 lines of them (a warning
+// when it sits off the cited lines or is missing); path#name or path#Outer.inner
 // for the declaration of a Go or TypeScript name; a bare path for existence, as a warning when
-// missing. A pointer with a dotted symbol, a symbol in another kind of file, or a character
-// outside [A-Za-z0-9_./-] is skipped and counted.
+// missing. A route path with brackets or parentheses is checked like any other. A pointer with a
+// symbol in another kind of file is skipped and counted.
 func VerifyFacts(dir, root string, ids []string) (findings []Finding, checked, skipped int, err error) {
 	if dir, err = filepath.Abs(dir); err != nil {
 		return nil, 0, 0, err
@@ -193,12 +191,8 @@ func VerifyFacts(dir, root string, ids []string) (findings []Finding, checked, s
 			case p.kind != pointerBare && !strings.Contains(p.path, "/") && !strings.Contains(p.path, "."):
 				continue
 			}
-			if !strictPathRe.MatchString(p.path) {
-				skipped++
-				continue
-			}
 			if p.kind == pointerSymbol {
-				if _, ok := symbolLangs[strings.ToLower(path.Ext(p.path))]; !ok || !identifierRe.MatchString(p.name) {
+				if _, ok := symbolLangs[strings.ToLower(path.Ext(p.path))]; !ok || !validSymbol(p.name) {
 					skipped++
 					continue
 				}
@@ -216,6 +210,11 @@ func VerifyFacts(dir, root string, ids []string) (findings []Finding, checked, s
 	return findings, checked, skipped, nil
 }
 
+// validSymbol reports whether name is an identifier or a dotted chain of them.
+func validSymbol(name string) bool {
+	return !slices.ContainsFunc(strings.Split(name, "."), func(part string) bool { return !identifierRe.MatchString(part) })
+}
+
 // sharedIDPrefix returns the prefix, through the first colon, that every id in the store shares,
 // or "" when some id has no colon or two prefixes differ.
 func sharedIDPrefix(ids map[string][]string) string {
@@ -230,8 +229,8 @@ func sharedIDPrefix(ids map[string][]string) string {
 	return prefix
 }
 
-// sourcePointers returns the pointers of a bullet's Source: part: the backticked spans at
-// bracket depth 0, between the Source: marker and the status tag, that have a pointer's shape.
+// sourcePointers returns the pointers of a bullet's Source: part: the backticked spans outside
+// brackets and at most one level of parentheses deep, between the Source: marker and the status tag, that have a pointer's shape.
 // The anchor is the code span in parentheses right after a pointer.
 func sourcePointers(rest string) []pointer {
 	masked := maskSpanRe.ReplaceAllStringFunc(rest, func(m string) string { return strings.Repeat("x", len(m)) })
@@ -248,13 +247,17 @@ func sourcePointers(rest string) []pointer {
 		return nil
 	}
 	var out []pointer
-	depth := 0
+	parens, brackets := 0, 0
 	for i := 0; i < len(part); i++ {
 		switch part[i] {
-		case '(', '[':
-			depth++
-		case ')', ']':
-			depth = max(depth-1, 0)
+		case '(':
+			parens++
+		case '[':
+			brackets++
+		case ')':
+			parens = max(parens-1, 0)
+		case ']':
+			brackets = max(brackets-1, 0)
 		case '`':
 			end := strings.IndexByte(part[i+1:], '`')
 			if end < 0 {
@@ -262,7 +265,7 @@ func sourcePointers(rest string) []pointer {
 			}
 			span := part[i+1 : i+1+end]
 			i += end + 1
-			if depth != 0 {
+			if brackets != 0 || parens > 1 {
 				continue
 			}
 			p, ok := parsePointer(span)
@@ -384,7 +387,8 @@ func (v *verifier) verify(p pointer) (severity, message, fix string, err error) 
 			"update the cited lines to where the code is now", nil
 	}
 	if p.anchor == "" {
-		return "", "", "", nil
+		return SeverityWarning, fmt.Sprintf("pointer %q has no anchor, so drift can't be detected", p.span),
+			"add the symbol on those lines in backticks and parentheses after the pointer", nil
 	}
 	start, end := max(1, p.lo-anchorWindow), min(n, p.hi+anchorWindow)
 	if missing := absentWords(p.anchor, strings.Join(src.lines[start-1:end], "\n")); len(missing) > 0 {
@@ -408,10 +412,10 @@ func (v *verifier) verify(p pointer) (severity, message, fix string, err error) 
 }
 
 // verifySymbol checks a path#name pointer: the declaration of name exists, and the anchor's
-// words are inside its span.
+// words are inside its span, which starts at the doc comment above the declaration.
 func (v *verifier) verifySymbol(p pointer, lines []string) (severity, message, fix string, err error) {
 	lang := symbolLangs[strings.ToLower(path.Ext(p.path))]
-	start, end, ok := declarationSpan(lines, lang, p.name)
+	start, end, ok := nestedSpan(lines, lang, p.name)
 	if !ok {
 		return SeverityError, fmt.Sprintf("pointer %q: no declaration of %s in %s", p.span, p.name, p.path), "correct the name, or cite the lines instead", nil
 	}
@@ -584,4 +588,104 @@ scan:
 		}
 	}
 	return found, end, true
+}
+
+// nestedSpan resolves name, which may be dotted, to the 0-based first line and the line after the
+// last of its innermost declaration, starting at the doc comment above it. Each link after the
+// first is searched inside the one before. Go also finds a method of the receiver type that the
+// first link names.
+func nestedSpan(lines []string, lang, name string) (start, end int, ok bool) {
+	chain := strings.Split(name, ".")
+	start, end, ok = declarationSpan(lines, lang, chain[0])
+	if !ok {
+		return 0, 0, false
+	}
+	for _, inner := range chain[1:] {
+		last := declEnd(lines, start)
+		next := innerDeclaration(lines, lang, chain[0], inner, start, last)
+		if next < 0 {
+			return 0, 0, false
+		}
+		start, end = next, declEnd(lines, next)+1
+	}
+	return docStart(lines, start), end, true
+}
+
+var (
+	indentRe = regexp.MustCompile(`^[ \t]*`)
+	closerRe = regexp.MustCompile(`^[ \t]*[})\]]`)
+	opensRe  = regexp.MustCompile(`[{(\[]\s*$|=>\s*$`)
+)
+
+func indent(line string) int { return len(indentRe.FindString(line)) }
+
+// declEnd returns the 0-based last line of the declaration starting at line at: the line closing
+// it at its own indentation, or else the last line before the next one at that indentation or
+// less. A closing line that opens again, such as ") {" or "} else {", continues the declaration.
+// It is the assembler's rule, which stays in internal/assemble for its own anchors.
+func declEnd(lines []string, at int) int {
+	base := indent(lines[at])
+	end := at
+	for i := at + 1; i < len(lines); i++ {
+		l := lines[i]
+		if strings.TrimSpace(l) == "" {
+			continue
+		}
+		ind := indent(l)
+		switch {
+		case ind > base:
+			end = i
+		case ind == base && closerRe.MatchString(l) && opensRe.MatchString(l):
+			end = i
+		case ind == base && closerRe.MatchString(l):
+			return i
+		default:
+			return end
+		}
+	}
+	return end
+}
+
+// docStart returns the first line of the comment and decorator lines directly above line at.
+func docStart(lines []string, at int) int {
+	for at > 0 {
+		t := strings.TrimSpace(lines[at-1])
+		if !strings.HasPrefix(t, "//") && !strings.HasPrefix(t, "/*") && !strings.HasPrefix(t, "*") && !strings.HasPrefix(t, "@") {
+			break
+		}
+		at--
+	}
+	return at
+}
+
+// innerDeclaration returns the 0-based line, within lines first through last, that declares
+// inner: a member, property, or method, or a const, let, var, or function declared inside. The
+// match at the shallowest indentation wins, so a call of the same name deeper in a body does not.
+func innerDeclaration(lines []string, lang, outer, inner string, first, last int) int {
+	q := regexp.QuoteMeta(inner)
+	var res []*regexp.Regexp
+	switch lang {
+	case "go":
+		method := regexp.MustCompile(`^func\s+\(\s*\w*\s*\*?` + regexp.QuoteMeta(outer) + `(?:\[[^\]]*\])?\s*\)\s*` + q + `\b`)
+		for i, l := range lines {
+			if method.MatchString(l) {
+				return i
+			}
+		}
+		res = []*regexp.Regexp{regexp.MustCompile(`^\s+` + q + `\b`)}
+	case "ts":
+		res = []*regexp.Regexp{
+			regexp.MustCompile(`^\s*(?:(?:export|public|private|protected|static|readonly|abstract|override|async|get|set|declare)\s+)*\*?\s*["']?` + q + `["']?\s*[(:=<?!]`),
+			regexp.MustCompile(`^\s*(?:export\s+|return\s+)?(?:async\s+)?(?:function\s*\*?|const|let|var|class)\s+` + q + `\b`),
+		}
+	}
+	best, bestIndent := -1, 0
+	for i := first + 1; i <= last && i < len(lines); i++ {
+		for _, re := range res {
+			if re.MatchString(lines[i]) && (best < 0 || indent(lines[i]) < bestIndent) {
+				best, bestIndent = i, indent(lines[i])
+			}
+		}
+	}
+	return best
 }

@@ -12,14 +12,14 @@ func TestVerifyFactsExhaustive(t *testing.T) {
 		name, bullet string
 		want         string
 	}{
-		{"an exhaustive word in the claim", "- `f:ex0001` Only admins rotate keys. Source: `src/long.go:3`. [candidate]", "only"},
-		{"a count in the claim", "- `f:ex0001` The tool has three roles. Source: `src/long.go:3`. [external: Example]", "three roles"},
-		{"a verified fact is not warned", "- `f:ex0001` Only admins rotate keys. Source: `src/long.go:3`. [verified]", ""},
-		{"a verified fact with a note is not warned", "- `f:ex0001` Only admins rotate keys. Source: `src/long.go:3`. [verified: read by hand]", ""},
-		{"a rejected fact is not warned", "- `f:ex0001` Only admins rotate keys. Source: `src/long.go:3`. [rejected: wrong]", ""},
-		{"a word in a code span", "- `f:ex0001` Run `rotate --all` to start. Source: `src/long.go:3`. [verified]", ""},
-		{"a word only in the source part", "- `f:ex0001` Admins rotate keys. Source: `src/long.go:3`, all of it. [verified]", ""},
-		{"a claim with none", "- `f:ex0001` Admins rotate keys. Source: `src/long.go:3`. [verified]", ""},
+		{"an exhaustive word in the claim", "- `f:ex0001` Only admins rotate keys. Source: `src/long.go:3` (`Widget`). [candidate]", "only"},
+		{"a count in the claim", "- `f:ex0001` The tool has three roles. Source: `src/long.go:3` (`Widget`). [external: Example]", "three roles"},
+		{"a verified fact is not warned", "- `f:ex0001` Only admins rotate keys. Source: `src/long.go:3` (`Widget`). [verified]", ""},
+		{"a verified fact with a note is not warned", "- `f:ex0001` Only admins rotate keys. Source: `src/long.go:3` (`Widget`). [verified: read by hand]", ""},
+		{"a rejected fact is not warned", "- `f:ex0001` Only admins rotate keys. Source: `src/long.go:3` (`Widget`). [rejected: wrong]", ""},
+		{"a word in a code span", "- `f:ex0001` Run `rotate --all` to start. Source: `src/long.go:3` (`Widget`). [verified]", ""},
+		{"a word only in the source part", "- `f:ex0001` Admins rotate keys. Source: `src/long.go:3` (`Widget`), all of it. [verified]", ""},
+		{"a claim with none", "- `f:ex0001` Admins rotate keys. Source: `src/long.go:3` (`Widget`). [verified]", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

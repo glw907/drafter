@@ -16,3 +16,13 @@ declare global {
     appState: string;
   }
 }
+
+/** Rounds toward zero (truncWord). */
+export function documented(): void {}
+
+/** Holds a label. */
+export class Holder {
+  /** The label. */
+  label = 'x';
+  run(): void {}
+}
