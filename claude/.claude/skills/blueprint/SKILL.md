@@ -31,7 +31,7 @@ When the project has a register editor (cairn's is `cairn-register-editor`), run
 
 ## Fact-check
 
-Commit, then dispatch the `fact-checker` agent on the file at that commit. It must be a fresh agent, never the session that wrote the file. It returns one JSON array of claims, each with a verdict (`holds`, `wrong`, `imprecise`, or `unsupported`), the `file:line` that settles it, and a proposed fix. Save the array verbatim to `${XDG_STATE_HOME:-$HOME/.local/state}/approval-queue/findings/<repo>/<file path with / as __>/<commit>.json`.
+Commit, then dispatch the `fact-checker` agent on the file at that commit. It must be a fresh agent, never the session that wrote the file. It returns one JSON array of claims, each with a verdict (`holds`, `wrong`, `imprecise`, or `unsupported`), the `file:line` that settles it, and a proposed fix. Name `${XDG_STATE_HOME:-$HOME/.local/state}/approval-queue/findings/<repo>/<file path with / as __>/<commit>.json` in the dispatch, and the agent writes the array there verbatim and checks that the file parses.
 
 Settle every finding that is not `holds`, as the author:
 

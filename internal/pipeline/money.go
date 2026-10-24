@@ -480,7 +480,9 @@ func (r *runner) pollLine(b batch.Batch, label string) {
 	}
 }
 
-// await polls every in-flight batch until each has ended and been read, or the run stops.
+// await polls every in-flight batch until a pass has read at least one ended batch, or the run
+// stops. Batches still running stay in flight, so the caller can advance the page that is ready
+// while its siblings wait.
 func (r *runner) await(ctx context.Context) error {
 	for len(r.inflight) > 0 && r.stop == "" {
 		ended := false
@@ -522,10 +524,11 @@ func (r *runner) await(ctx context.Context) error {
 				return nil
 			}
 		}
-		if !ended && len(r.inflight) > 0 {
-			if err := r.sleep(ctx); err != nil {
-				return err
-			}
+		if ended {
+			return nil
+		}
+		if err := r.sleep(ctx); err != nil {
+			return err
 		}
 	}
 	return nil

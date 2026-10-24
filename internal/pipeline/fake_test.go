@@ -59,6 +59,9 @@ type fakeAPI struct {
 	answer func(batch.Request) string
 	// pollsToEnd is how many Get calls report a batch as not ended.
 	pollsToEnd int
+	// pollsFor, when set, gives the poll count for the batch holding those custom_ids in place of
+	// pollsToEnd, so one page's batch can end early and another's late.
+	pollsFor func(ids []string) int
 	// onSubmit runs at the start of every Create and Send, so a test can check what came before.
 	onSubmit func(ids []string)
 	// crash is asked at each call that can end a run: "create", "send", "results". It returns
@@ -265,11 +268,19 @@ func (f *fakeAPI) List(ctx context.Context, since time.Time) ([]batch.Batch, err
 	return out, nil
 }
 
-// batchOf reports b as the API would: in progress until pollsToEnd polls have passed, then ended
+// pollsOf is how many polls report b as not ended.
+func (f *fakeAPI) pollsOf(b *fakeBatch) int {
+	if f.pollsFor != nil {
+		return f.pollsFor(ids(b.reqs))
+	}
+	return f.pollsToEnd
+}
+
+// batchOf reports b as the API would: in progress until pollsOf(b) polls have passed, then ended
 // with every request succeeded.
 func (f *fakeAPI) batchOf(b *fakeBatch) batch.Batch {
 	out := batch.Batch{ID: b.id, CreatedAt: b.created, Status: "in_progress", Counts: batch.Counts{Processing: len(b.reqs)}}
-	if b.polls > f.pollsToEnd {
+	if b.polls > f.pollsOf(b) {
 		out.Ended, out.Status = true, "ended"
 		out.Counts = batch.Counts{Succeeded: len(b.reqs)}
 	}

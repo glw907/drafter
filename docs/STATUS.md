@@ -23,14 +23,20 @@ initiative at `~/Projects/initiatives/docs-system/`.
   `20261024T080412Z-13b5d021`: both its batches were `in_progress` at the merge.
 - cairn-cms backlog #56 carries the follow-up settings for cairn (`check.sentence_words = 26` and
   two `managed: false` outline entries), and cairn #38 notes drafter's tag-note rule.
-- #42 (`convert markdown` writes skeletons) and #43 (`convert plan` heading matches and the
-  seeded lock blob) sit in Medium, deferred by Geoff on 2026-10-22.
+- The stage-advance pass (#82) is at PR-ready on `worktree-stage-advance`, run by executor
+  `drafter-stage-advance` under `conductor-drafter`. In batch mode a page submits its next stage as
+  soon as its own batch is handled, while siblings' batches stay in flight. The blueprint skill
+  tells a session to name a findings path in the fact-checker dispatch. #42 and #43 are closed as
+  won't do: every new page starts from a prose plan, and legacy YAML blueprints convert by hand.
 
 ## Next action
 
-The stage-advance pass (#82, each page advances on its own through its stages) runs under
-`conductor-drafter`. Its plan is
-`~/Projects/initiatives/docs-system/plans/2026-10-24-drafter-stage-advance-plan.md`.
+Merge the stage-advance PR on Geoff's approval, after the workstation pass's `~/.dotfiles` PR.
+The plan is `~/Projects/initiatives/docs-system/plans/2026-10-24-drafter-stage-advance-plan.md`.
+
+The next cairn docs pass's first multi-page `drafter page` is #82's live check. Read that run's
+`state.json`: each page's `intents[].time` (submit) and `created`, and `poll.seen`. A page whose
+next submit waited for a sibling's batch to end is an escape.
 
 Once run `20261024T080412Z-13b5d021` has no open batch (`drafter status` with a build of `main`),
 run `make install` on pavilion from the main checkout and check `drafter --version`. thinkpad-x1

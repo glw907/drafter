@@ -6,7 +6,7 @@
 
 - [x] **#81** Show a running batch's status: print it while polling, and add `drafter status <run-id>` `#feature` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   On 2026-10-24, run `20261024T080412Z-13b5d021` sat six hours with two redraft batches "in progress", and nothing on the workstation could tell a queued batch from a wedged process or a missed result. The run directory doesn't change while polling, and `drafter page` prints only at the end. Finding out took Geoff reading the Console's Batches view for the drafter workspace. Record each poll's `processing_status` and `request_counts` in the run state, print a line when a status changes, and add `drafter status <run-id>`. That command should query the API with the configured key and report each open batch's status, age, and request counts, plus any billing or rate-limit error. A session can then check a run without handling the key.
-- [ ] **#82** Don't make a fast page wait for the slowest page at each stage `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#82** Don't make a fast page wait for the slowest page at each stage `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #62)*
   In the same run, Content model's first draft returned in 10 minutes and failed its gate, but its redraft waited 79 minutes, until Arrange the admin sidebar's first batch returned, because both redrafts went out together at 01:33. Advance each page through its stages on its own, or submit a page's next request as soon as its own result is handled.
 - [x] **#71** Make the two fact parsers agree on a tag note's code spans `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   A code span inside a `[verified: ...]` note passed `drafter check --fact` but failed cairn-cms `check:facts` as an unresolved path. The grammar should say whether a tag note's code spans count as pointers; cairn-cms #38 is the other half. Record B3-13.
@@ -19,6 +19,8 @@
 
 ## Medium
 
+- [ ] **#83** Don't let one untracked batch hold every page after a create with an unknown outcome `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  After a create whose outcome is unknown, `recover` → `findBatch` → `waitEnded` polls each untracked candidate batch until it ends, and no page advances meanwhile. A candidate that never ends, or ends late, holds the whole run. `internal/pipeline/money.go`. Found in the stage-advance pass (PR #62).
 - [x] **#80** Blueprint skill: mark which `drafter check` rows apply to markdown, and allow an in-place fact edit `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   format.md's "What `drafter check` checks" table is mostly YAML-era rows (`why`, `use`, `framing`, `recovery`, `reader-state`); say which apply to a markdown blueprint. The fact-edit rule should allow an exact in-place substitution with the Edit tool, never an append. Record B3-29 in `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`.
 - [x] **#79** Drift-check line pointers that carry no anchor span `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
@@ -136,15 +138,6 @@
 - [x] **#50** Warn on a second `:source` tag on one bullet `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-24, PR #60)*
   `DecodeMarkdown` keeps the first `:source` of a `Code:` or `Figure:` bullet and drops any later one without a finding. `internal/blueprint/markdown.go`
 
-- [ ] **#43** Accept framing-heading variants in `convert plan` and write the seeded blob `#bug` `#drafter` `#initiative:docs-system` *(2026-10-22)*
-  Two of three v1 framing records failed on exact heading matches, and the lock it seeds names a blob absent from the object store, so `convert markdown` calls the page stale with the wrong remedy. `internal/blueprint/convert.go:162` (record 1, 2).
-  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
-  Deferred to Medium by Geoff on 2026-10-22: the next fifteen cairn pages have prose plans only, so neither converter runs on them.
-- [ ] **#42** Make `convert markdown` emit a reviewable blueprint `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22)*
-  Three of three pilot pages came out as skeletons (44 check errors, no job lines, duplicated fact text, glued reader block, lost code sources) and needed a full author rewrite (record 3).
-  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
-  Deferred to Medium by Geoff on 2026-10-22: the next fifteen cairn pages have prose plans only, so neither converter runs on them.
-
 - [ ] **#35** Read a code fence inside an open `:::row` or `:::reader` block as block text `#bug` `#drafter` `#initiative:docs-system` *(2026-10-21)*
   `DecodeMarkdown` checks for a fence before it checks for an open block, so a fence line inside a row or the reader block starts a fence, and the block's closing `:::` inside that fence is swallowed. The block can then be misread or never close. Found by the reviewed-pages CT1 recheck. `internal/blueprint/markdown.go:161-170`
 
@@ -225,6 +218,16 @@
 
 
 ## Done
+
+- [x] **#43** Accept framing-heading variants in `convert plan` and write the seeded blob `#bug` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-24, won't do)*
+  Two of three v1 framing records failed on exact heading matches, and the lock it seeds names a blob absent from the object store, so `convert markdown` calls the page stale with the wrong remedy. `internal/blueprint/convert.go:162` (record 1, 2).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
+  Closed as won't do by Geoff on 2026-10-24: every new page starts from a prose plan, and the legacy YAML blueprints convert by hand when next touched.
+
+- [x] **#42** Make `convert markdown` emit a reviewable blueprint `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-24, won't do)*
+  Three of three pilot pages came out as skeletons (44 check errors, no job lines, duplicated fact text, glued reader block, lost code sources) and needed a full author rewrite (record 3).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`
+  Closed as won't do by Geoff on 2026-10-24: every new page starts from a prose plan, and the legacy YAML blueprints convert by hand when next touched.
 
 - [x] **#36** Add a single-fact check, an outline query, and `--version` `#feature` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-22)*
   No subcommand checks one fact's pointers, so its output mixes in the whole store's findings; there is no `drafter outline <slug>` and no `--version` (record 11, 12).

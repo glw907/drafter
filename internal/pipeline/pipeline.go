@@ -361,7 +361,9 @@ func (r *runner) activate() {
 	}
 }
 
-// loop runs waves until every page has ended or the run stops.
+// loop advances every page with no open intent, submits what they stage, and awaits until one
+// batch is handled, so a page moves on without waiting for its siblings' batches. It runs until
+// every page has ended or the run stops.
 func (r *runner) loop(ctx context.Context) error {
 	for r.stop == "" {
 		r.activate()
@@ -433,7 +435,7 @@ func (r *runner) finish() error {
 }
 
 // releaseHeld gates every held page again once nothing else is running. It reports whether
-// another wave can make progress. A held page whose gate is still red with nothing of its own,
+// the loop can make progress. A held page whose gate is still red with nothing of its own,
 // with no other page left to change the tree, stops the run.
 func (r *runner) releaseHeld(ctx context.Context) (bool, error) {
 	var held []*page
