@@ -45,8 +45,8 @@ Run `drafter check`. Fix every error: [What `drafter check` checks](format.md#wh
 
 ## 5. Fact-check, settle, and queue
 
-Fact-check the blueprint with a fresh `fact-checker` agent, settle every finding, write the notes, and queue it with `approval-queue blueprint`, as [Fact-check](SKILL.md#fact-check) and [Review](SKILL.md#review) say.
+Fact-check the blueprint with a fresh `fact-checker` agent, settle every finding, write the notes, and queue it with `approval-queue blueprint <worktree> <title> <file> --description <description.md> --notes <notes.json>`, as [Fact-check](SKILL.md#fact-check) and [Review](SKILL.md#review) say.
 
 ## 6. Draft, fact-check, and queue the page
 
-When `approval-queue approved <file> <blob>` exits 0 for the blueprint, run `drafter page <blueprint>`. Fact-check the drafted page, settle the findings with hand edits to the page (and to the blueprint or the fact where a claim was wrong at its source), run the project's docs gate, and queue the page with `approval-queue page`. The PR merges after Geoff approves the page.
+When `approval-queue approved <file> <blob>` exits 0 for the blueprint, run `drafter page <blueprint>`. Fact-check the drafted page, settle the findings with hand edits to the page (and to the blueprint or the fact where a claim was wrong at its source), run the project's docs gate, and queue the page with `approval-queue page <worktree> <title> <file> --description <description.md> --pr <owner/repo#n> --notes <notes.json>`. The PR merges after Geoff approves the page.
