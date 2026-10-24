@@ -181,14 +181,22 @@ func TestCheckTracks(t *testing.T) {
 	}
 }
 
+// TestCheckTracksNamedFiles pins that the outline's track checks belong to the whole-project run.
 func TestCheckTracksNamedFiles(t *testing.T) {
 	p := catalogProject(t, map[string]string{"blueprints/outline.yaml": tracksOutline(t, "Task guide", strings.Replace(tracksAdmin, "docs/**", "guides/**", 1))})
 	got, err := p.Check([]string{guideBlueprint})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(findingsFor(got, "tracks")) == 0 {
-		t.Error("a check of a named blueprint skipped the outline's track checks")
+	if hits := findingsFor(got, "tracks"); len(hits) != 0 {
+		t.Errorf("a check of a named blueprint reported the outline's track findings: %+v", hits)
+	}
+	all, err := p.Check(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findingsFor(all, "tracks")) == 0 {
+		t.Error("a check of the whole project skipped the outline's track checks")
 	}
 }
 

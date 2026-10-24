@@ -42,6 +42,7 @@ var allowedIn = map[string]uint8{
 	"seat":              inProject | inLocal,
 	"facts":             inProject | inLocal,
 	"blueprints":        inProject | inLocal,
+	"check":             inProject | inLocal,
 	"editing":           inProject,
 	"register":          inProject | inLocal,
 }

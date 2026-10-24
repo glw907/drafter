@@ -106,7 +106,7 @@ var (
 	listMarker  = regexp.MustCompile(`^\s*(?:[-*+]|\d+[.)])\s+`)
 	headingLine = regexp.MustCompile(`^(#{1,6})\s+(.*?)\s*#*\s*$`)
 	rowPart     = regexp.MustCompile(`^\*\*(Symptom|Cause|Fix)\.\*\*\s*`)
-	seeLink     = regexp.MustCompile(`^See \[(.+)\]\(([^()\s]+)\)\.$`)
+	seeLink     = regexp.MustCompile(`^See \[(.+?)\]\(([^()\s]+)\)(?:\.|\s.*)$`)
 )
 
 // DecodeMarkdown parses data as a markdown blueprint. The front matter is YAML between two ---
