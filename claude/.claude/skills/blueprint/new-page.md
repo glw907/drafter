@@ -45,7 +45,7 @@ Run `drafter check`. Fix every error: [What `drafter check` checks](format.md#wh
 
 ## 5. Fact-check, settle, and queue
 
-Fact-check the blueprint with a fresh `fact-checker` agent, settle every finding, write the notes, and queue it with `approval-queue blueprint <worktree> <title> <file> --description <description.md> --notes <notes.json>`, as [Fact-check](SKILL.md#fact-check) and [Review](SKILL.md#review) say. Anchor each note with the quote form (Review gives both shapes), and run `approval-queue anchors <file>` for the heading anchors. A `defer` decision is recorded in your STATUS and collected later with `approval-queue collect <id>`; `approval-queue withdraw <id>` takes a queued blueprint back.
+Fact-check the blueprint with a fresh `fact-checker` agent, settle every finding, write the notes, and queue it with `approval-queue blueprint <worktree> <title> <file> --description <description.md> --notes <notes.json>`, as [Fact-check](SKILL.md#fact-check) and [Review](SKILL.md#review) say. Anchor each note below a heading with the quote form, and a heading note with `<slug>.heading` (Review gives both shapes), and run `approval-queue anchors <file>` for the heading anchors. A `defer` decision is recorded in your STATUS and collected later with `approval-queue collect <id>`; `approval-queue withdraw <id>` takes a queued blueprint back.
 
 ## 6. Draft, fact-check, and queue the page
 
