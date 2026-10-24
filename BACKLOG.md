@@ -19,6 +19,8 @@
 
 ## Medium
 
+- [ ] **#83** Don't let one untracked batch hold every page after a create with an unknown outcome `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  After a create whose outcome is unknown, `recover` → `findBatch` → `waitEnded` polls each untracked candidate batch until it ends, and no page advances meanwhile. A candidate that never ends, or ends late, holds the whole run. `internal/pipeline/money.go`. Found in the stage-advance pass (PR #62).
 - [x] **#80** Blueprint skill: mark which `drafter check` rows apply to markdown, and allow an in-place fact edit `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   format.md's "What `drafter check` checks" table is mostly YAML-era rows (`why`, `use`, `framing`, `recovery`, `reader-state`); say which apply to a markdown blueprint. The fact-edit rule should allow an exact in-place substitution with the Edit tool, never an append. Record B3-29 in `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`.
 - [x] **#79** Drift-check line pointers that carry no anchor span `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
