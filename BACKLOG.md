@@ -4,11 +4,11 @@
 
 ## High
 
-- [ ] **#81** Show a running batch's status: print it while polling, and add `drafter status <run-id>` `#feature` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#81** Show a running batch's status: print it while polling, and add `drafter status <run-id>` `#feature` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   On 2026-10-24, run `20261024T080412Z-13b5d021` sat six hours with two redraft batches "in progress", and nothing on the workstation could tell a queued batch from a wedged process or a missed result. The run directory doesn't change while polling, and `drafter page` prints only at the end. Finding out took Geoff reading the Console's Batches view for the drafter workspace. Record each poll's `processing_status` and `request_counts` in the run state, print a line when a status changes, and add `drafter status <run-id>`. That command should query the API with the configured key and report each open batch's status, age, and request counts, plus any billing or rate-limit error. A session can then check a run without handling the key.
 - [ ] **#82** Don't make a fast page wait for the slowest page at each stage `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
   In the same run, Content model's first draft returned in 10 minutes and failed its gate, but its redraft waited 79 minutes, until Arrange the admin sidebar's first batch returned, because both redrafts went out together at 01:33. Advance each page through its stages on its own, or submit a page's next request as soon as its own result is handled.
-- [ ] **#71** Make the two fact parsers agree on a tag note's code spans `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#71** Make the two fact parsers agree on a tag note's code spans `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   A code span inside a `[verified: ...]` note passed `drafter check --fact` but failed cairn-cms `check:facts` as an unresolved path. The grammar should say whether a tag note's code spans count as pointers; cairn-cms #38 is the other half. Record B3-13.
 
 - [ ] **#1** Scope the blueprint read by item, or drop findings already present at the base `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-18)*
@@ -19,121 +19,121 @@
 
 ## Medium
 
-- [ ] **#80** Blueprint skill: mark which `drafter check` rows apply to markdown, and allow an in-place fact edit `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#80** Blueprint skill: mark which `drafter check` rows apply to markdown, and allow an in-place fact edit `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   format.md's "What `drafter check` checks" table is mostly YAML-era rows (`why`, `use`, `framing`, `recovery`, `reader-state`); say which apply to a markdown blueprint. The fact-edit rule should allow an exact in-place substitution with the Edit tool, never an append. Record B3-29 in `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`.
-- [ ] **#79** Drift-check line pointers that carry no anchor span `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#79** Drift-check line pointers that carry no anchor span `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   A `path:lines` pointer with no anchor is never drift-checked: cairn-cms facts f:ivhuyc, f:gh4ckg, f:2p519o, and f:qd7iat had drifted 1 to 30 lines and still passed. Require an anchor on line pointers, or check the span's text. Facts about a dependency's behavior (gray-matter, js-yaml) have no excerptable source and rest on dated runs; a `run` or vendor tag would tell a checker why. Record B3-28.
-- [ ] **#78** `drafter refs`: count a published page's brief citations before the page has a blueprint `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#78** `drafter refs`: count a published page's brief citations before the page has a blueprint `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   Before a page has a blueprint, `drafter refs <fact>` says "no blueprint places or cites it", so a fact correction looks free while the page's brief cites the fact five or more times. It also labels ordinary bullets `(example)`, a kind format.md never names. Record B3-27.
-- [ ] **#77** Blueprint skill: say what to do with neighbors' `outOfScope` lines when a page's `covers` narrows `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#77** Blueprint skill: say what to do with neighbors' `outOfScope` lines when a page's `covers` narrows `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   Narrowing a page's `covers` leaves neighbors' `outOfScope` lines routing to it (outline.yaml 105, 127, 393); the brief should say whether to reword them. `claude/.claude/skills/blueprint/new-page.md`. Record B3-9.
 
-- [ ] **#76** Blueprint skill: add a recipe for a generated example `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#76** Blueprint skill: add a recipe for a generated example `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   An example that is a render's HTML output has no recipe: the author ran `createRenderer` by hand, and a fact-checker has no `:source` to re-verify it from. `claude/.claude/skills/blueprint/`. Record B3-6.
 
-- [ ] **#75** Blueprint skill: fix two broken links and say whether a `:fact` tag on a `Code:` bullet counts `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#75** Blueprint skill: fix two broken links and say whether a `:fact` tag on a `Code:` bullet counts `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   `introductions.md` links drafter's GitHub `blueprint-format.md`, not the local `format.md`; `anatomies.md` links `../docs/blueprint-format.md`, which doesn't exist from the skill directory; and `format.md` doesn't say whether a `:fact` tag on a `Code:` bullet counts. `claude/.claude/skills/blueprint/`. Record B3-5, B3-15.
 
-- [ ] **#74** Count a `See` link bullet that has trailing text or an `#anchor` `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#74** Count a `See` link bullet that has trailing text or an `#anchor` `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   A `See [text](target)` bullet with trailing text, or with a `#anchor` link and trailing text, is not counted as a link item, so the cross-link check warns; `format.md` never says trailing text disqualifies the bullet. Say so or count it. Seen on configure-media. Record B3-19.
 
-- [ ] **#73** Show a `drafter page` run's wait on a batch, and offer a non-batch mode `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#73** Show a `drafter page` run's wait on a batch, and offer a non-batch mode `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, superseded by #81, PR #60)*
   `drafter page` sends its seats through the Message Batches API. The sidebar's draft batch, reserved 08:04Z, was still pending an hour later, and the state file and log showed nothing, so the session read a healthy wait as a stall. Print "waiting on batch <id> since <time>" and offer an attended, non-batch mode. Record B3-17.
 
-- [ ] **#72** Excerpt a fact pointer into `node_modules` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#72** Excerpt a fact pointer into `node_modules` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   A pointer into `node_modules` gives "no excerpt: untracked", so a vendor's thrown string can't be shown to a reader of the fact. Record B3-14.
 
-- [ ] **#70** Report the line and column of a YAML error in `outline.yaml` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#70** Report the line and column of a YAML error in `outline.yaml` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   A YAML error in `outline.yaml` reports only "malformed", with no line or column. Record B3-4.
 
-- [ ] **#69** Load `~/.config/drafter/<repo>.local.toml` as the fallback config layer `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#69** Load `~/.config/drafter/<repo>.local.toml` as the fallback config layer `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   A fresh worktree has no `drafter.local.toml`, so `drafter page` exits 2 with "prompts is not set, and require_prompts in drafter.toml refuses the stock module", though the template sits in `~/.config/drafter`. Load it as a fallback layer, or name the template in the error. `internal/config/load.go:85` (record 60).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
 
-- [ ] **#68** List the plan's charter- and doc-sourced fact ids for the D1 audit `#feature` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#68** List the plan's charter- and doc-sourced fact ids for the D1 audit `#feature` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   No tool says which ids a plan cites are charter- or doc-sourced, so the D1 audit (drop charter-sourced claims) runs by hand on every page; two authors did it (record 35).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
 
-- [ ] **#67** Read the briefs of pages with no blueprint in `drafter refs` `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#67** Read the briefs of pages with no blueprint in `drafter refs` `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   `drafter refs` reports "no blueprint places or cites" `f:ld6xam` though the page's existing brief cites it, because it reads briefs only for pages that have a blueprint. Pilot items 10 and 30 are half fixed (record 34).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
 
-- [ ] **#66** List inbound blueprint links when an outline removal retires a page `#feature` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#66** List inbound blueprint links when an outline removal retires a page `#feature` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   Retiring a page leaves inbound blueprint links (the add-cairn tutorial, replace-magic-links' See also), and no tool lists them on an outline removal; `drafter refs` is fact-based (record 33).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
 
-- [ ] **#65** Fix two links-check misreads: a `managed: false` crossLink and a cross-page anchor `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#65** Fix two links-check misreads: a `managed: false` crossLink and a cross-page anchor `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   The links warning flags an outline `crossLink` to a `managed: false` page as "names no page", and a cross-page anchor resolves against the published page, not the target's blueprint, so a link to a section a blueprint adds errors until the page is redrafted (record 31, 32).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
 
-- [ ] **#64** Check sentence length and hinges on blueprint lines `#feature` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#64** Check sentence length and hinges on blueprint lines `#feature` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   `drafter check` has no sentence-length or hinge check on blueprint lines. The register editor found 11 task sentences over 26 words in the sidebar blueprint, and the fold author wrote a throwaway script for it (record 30).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
 
-- [ ] **#63** Keep outline warnings out of a check run by blueprint name `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#63** Keep outline warnings out of a check run by blueprint name `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   A check by name still prints `outline.yaml` `types` warnings (the tutorial milestone, the symptom row) that belong to no named blueprint; two authors hit it (record 29).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
   Seen again in batch 3: a named `drafter check` still prints the outline's unrelated `types` warnings, and outline-wide warnings (anatomy names, a crossLink to `docs/reference/sveltekit.md` "names no page the outline lists"). Record B3-3, B3-21.
 
-- [ ] **#62** Report each exhaustive-word match at the word's line, and every match on a line `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#62** Report each exhaustive-word match at the word's line, and every match on a line `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   A warning inside `:::row` points at the `:::row` opening line, not the word's line, and the lint reports one match per line, which forces a fix, rerun, fix loop (record 27, 28).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
 
-- [ ] **#61** Let `:source[...]` hold a path with brackets `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#61** Let `:source[...]` hold a path with brackets `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   The parse stops at the first `]` and escaping doesn't help, so `preview/[token]` and `[...path]` can't be a source. Two authors dropped `:source` from their `Code:` bullets (record 23). `internal/blueprint/markdown.go`
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
   Seen again in batch 3: configure-rendering's author hit it on a SvelteKit route path. Record B3-1.
 
-- [ ] **#60** Close the store check's gaps: doc-comment anchors, dotted pointers, route paths, figure sources `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#60** Close the store check's gaps: doc-comment anchors, dotted pointers, route paths, figure sources `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   The `#name` check reads the anchor against the declaration without its doc comment, though `format.md` says the excerpt includes it; it skips dotted `#a.b` pointers (`f:8zdux6` is unverified) and bracket or parenthesis route paths that `drafter excerpt` resolves; and a figure's `:source` gets no existence check (record 21, 22, 24, 25).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
   Seen again in batch 3: `#Outer.inner` pointers are still skipped by verification. Record B3-22.
 
-- [ ] **#59** Require an anchor or content hash on every line pointer `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#59** Require an anchor or content hash on every line pointer `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   An anchorless `path:N` or `path:A-B` pointer never detects drift: `f:ys1iq1` cited `types.ts:418` for a symbol at 430 and the preview blueprint had 11 stale ranges of which the check warned on 1. The excerpt's window also hides drift (`f:hdrzxd` moved 181 to 189 and passed), and an anchor in parentheses still isn't read (record 19, 20). Pilot 5 stays open.
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
   Seen again in batch 3: define-an-adapter's author found six facts whose `path:N-M` pointers had drifted off their lines and still passed `drafter check --fact` (`f:aj5c4z`, `f:sz71ur`, `f:7ak73t`, `f:9ro4u5`, `f:n07oiu`, `f:hkh101`), and the +-10-line window still passes `f:c8c9ji` (78-84 against 80-88). An anchorless line range should warn. Record B3-12, B3-22.
 
-- [ ] **#58** Blueprint skill: tell the author how to resolve an exemplar, mint ids, edit in place, and find facts `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#58** Blueprint skill: tell the author how to resolve an exemplar, mint ids, edit in place, and find facts `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   The skill never says how an exemplar name resolves (`~/.config/drafter/cairn-cms.local.toml`, `inline_files`), names the mint command (one author hand-picked ids instead of `check-facts.mjs --mint`), says whether `sed` pointer swaps break "Edit tool only", or says to find facts by grepping each id the plan cites, not by heading. `claude/.claude/skills/blueprint/new-page.md` (record 10, 15, 16, 17).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
 
-- [ ] **#57** Blueprint skill: pick `**Background.**` or `:::constraints` for the introduction `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#57** Blueprint skill: pick `**Background.**` or `:::constraints` for the introduction `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   `introductions.md` still describes a `**Background.**` paragraph while `new-page.md` says to use `:::constraints`. `claude/.claude/skills/blueprint/introductions.md` (record 9).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
   Seen again in batch 3: introductions.md calls the reader block's Background paragraph a planning note, while new-page.md says page-wide instructions go in `:::constraints`; one sentence should say how they differ. Record B3-23.
 
-- [ ] **#56** Blueprint skill: close format.md's gaps on tables, code examples, `:::row`, and explanation bullets `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#56** Blueprint skill: close format.md's gaps on tables, code examples, `:::row`, and explanation bullets `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   `format.md` has no table form; shows `Code:` with a fence yet says "bare fence" (one fence per bullet, so a command and its output need two); doesn't say when `Code:` may omit `:source`; and is silent on `:::row` outside symptom pages and explanation bullets before the lead-in (`drafter check` accepts both). Add a sentence and an example for each. `claude/.claude/skills/blueprint/format.md` (record 8, 11, 12, 13, 14).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
   Seen again in batch 3: no table form in format.md, and no guidance for a table in a markdown blueprint. Record B3-23.
 
-- [ ] **#55** Blueprint skill: hold the settle step's fix lines to the exhaustive-word rule `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#55** Blueprint skill: hold the settle step's fix lines to the exhaustive-word rule `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   Both round-2 regressions in batch 2 were the session's fix lines, still too wide. Say a fix line meets the rule the authors follow, and that a finding that returns twice calls for a structural rewrite. `claude/.claude/skills/blueprint/review.md` (record 5).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
 
-- [ ] **#54** Blueprint skill: trace an engine question through code and design history before asking Geoff `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#54** Blueprint skill: trace an engine question through code and design history before asking Geoff `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   Four question notes on engine intent (address collision against the resolver throw, `inFeeds`, D1's reach over design specs, an unset `PUBLIC_ORIGIN`) went to Geoff and were all answerable from specs, history, or code. Add to the Review section: send Geoff only product, taste, and scope. `claude/.claude/skills/blueprint/` (record 4).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
 
-- [ ] **#53** Blueprint skill: run the register editor before the fact-check and queueing `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#53** Blueprint skill: run the register editor before the fact-check and queueing `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   `docs-register.md` already lists the empty "own", yet it got through 10 times on the sidebar and 6 on the content model; only a fresh `cairn-register-editor` caught it, along with 11 task sentences over 26 words. Run it and apply its rewrites first. `claude/.claude/skills/blueprint/new-page.md` (record 3).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
 
-- [ ] **#52** Blueprint skill: say what to do when a folded section's target page has no blueprint `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#52** Blueprint skill: say what to do when a folded section's target page has no blueprint `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   "Adds a section, approve the blueprint first" has no path for a target with none: folding one section into build-the-public-routes became a whole-page blueprint with 13 covers. `claude/.claude/skills/blueprint/new-page.md` (record 2).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
 
-- [ ] **#51** Blueprint skill: add a premise step before authoring a page `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+- [x] **#51** Blueprint skill: add a premise step before authoring a page `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24 → 2026-10-24, PR #60)*
   Nobody asked whether share-a-draft-preview earned a page until Geoff did, after the full flow ran on it. Add a step before step 1: who has work here that the scaffold, tutorial, or a reference page doesn't cover? An inherited outline entry is no evidence; when the case is weak, write a fold recommendation. `claude/.claude/skills/blueprint/new-page.md` (record 1).
   Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
-- [ ] **#48** Narrow the `exhaustive` lint's `no` and `never` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22)*
+- [x] **#48** Narrow the `exhaustive` lint's `no` and `never` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-24, PR #60)*
   On cairn's 585-line custom admin screen blueprint the lint gives about 70 warnings, and `no` and `never` are most of them: plain negation ("has no default", "makes no network call"), not a claim of a complete set. The whole-branch review dropped the digit counts and the verified fact bullets; whether to drop `no` and `never` too is Geoff's call. `internal/plan/exhaustive.go`
   Batch 2: the lint gave 33 to 39 warnings per page, nearly all false: "no" before a code span or as a determiner, counts, "never" in `:::constraints`, and bold UI labels. Exempt those forms and add a per-line settled marker (record 26).
   Seen again in batch 3: the lint gave 27 warnings on configure-rendering and 37 on configure-media, nearly all `:::constraints` lines (instructions, not claims), absence wording ("no `registry`"), and "no" as a determiner ("no manifest row"). Exempt the constraints block and tell absence phrasing from an exhaustive claim. Record B3-2, B3-20.
-- [ ] **#49** Give a `repro` figure block a markdown form `#feature` `#drafter` `#initiative:docs-system` *(2026-10-22)*
+- [x] **#49** Give a `repro` figure block a markdown form `#feature` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-24, PR #60)*
   A cairn page's figure is a `repro` fence, which names a story, alt text, and caption. In the markdown format a fence attaches only to a `Code:` bullet, so a `Figure:` bullet above a `repro` fence reads as a bare fence. The end-to-end check wrote the figure as a `Figure:` bullet with a `:source` and no fence. Decide whether a `Figure:` bullet takes a fence too. `internal/blueprint/markdown.go`
-- [ ] **#50** Warn on a second `:source` tag on one bullet `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22)*
+- [x] **#50** Warn on a second `:source` tag on one bullet `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22 → 2026-10-24, PR #60)*
   `DecodeMarkdown` keeps the first `:source` of a `Code:` or `Figure:` bullet and drops any later one without a finding. `internal/blueprint/markdown.go`
 
 - [ ] **#43** Accept framing-heading variants in `convert plan` and write the seeded blob `#bug` `#drafter` `#initiative:docs-system` *(2026-10-22)*
