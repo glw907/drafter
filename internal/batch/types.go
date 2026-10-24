@@ -80,11 +80,25 @@ type Result struct {
 	Usage      Usage
 }
 
-// Batch is the state of one message batch.
+// Batch is the state of one message batch. Status is the API's processing_status. The API moves
+// requests out of Counts.Processing only when the whole batch ends, so mid-batch the status and
+// the age are the facts worth reporting.
 type Batch struct {
 	ID        string
 	Ended     bool
+	Status    string
+	Counts    Counts
 	CreatedAt time.Time
+}
+
+// Counts is a batch's request counts by state.
+type Counts struct {
+	Processing, Succeeded, Errored, Canceled, Expired int
+}
+
+// String lists the counts, for a status line.
+func (c Counts) String() string {
+	return fmt.Sprintf("%d succeeded, %d errored, %d canceled, %d expired", c.Succeeded, c.Errored, c.Canceled, c.Expired)
 }
 
 // Errors a Client returns, matched with errors.Is.

@@ -227,6 +227,8 @@ type runner struct {
 	locks []*run.Lock
 	// inflight holds the batches submitted and not yet read, in submission order.
 	inflight []*flight
+	// hinted is true once a poll line has named --sync.
+	hinted bool
 }
 
 // Run takes every handoff's page through the pipeline.
