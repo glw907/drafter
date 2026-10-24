@@ -34,6 +34,7 @@ type file struct {
 	Facts           *factsFile           `toml:"facts"`
 	Register        map[string][]string  `toml:"register"`
 	Blueprints      *blueprintsFile      `toml:"blueprints"`
+	Check           *checkFile           `toml:"check"`
 	Editing         *editingFile         `toml:"editing"`
 	InlineFiles     *[]string            `toml:"inline_files"`
 }
@@ -90,6 +91,10 @@ type blueprintsFile struct {
 	Required  *bool   `toml:"required"`
 	Outline   *string `toml:"outline"`
 	BriefPath *string `toml:"brief_path"`
+}
+
+type checkFile struct {
+	SentenceWords *int `toml:"sentence_words"`
 }
 
 type editingFile struct {

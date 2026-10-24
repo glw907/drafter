@@ -158,6 +158,9 @@ func (c *Config) apply(l *layer) {
 		put(c, l, "blueprints.outline", &c.Blueprints.Outline, b.Outline)
 		put(c, l, "blueprints.brief_path", &c.Blueprints.BriefPath, b.BriefPath)
 	}
+	if k := f.Check; k != nil {
+		put(c, l, "check.sentence_words", &c.Check.SentenceWords, k.SentenceWords)
+	}
 	if e := f.Editing; e != nil {
 		put(c, l, "editing.preferences", &c.Editing.Preferences, e.Preferences)
 	}

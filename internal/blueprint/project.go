@@ -24,6 +24,7 @@ type Project struct {
 	FactsDir      string
 	Required      bool
 	BriefPath     string
+	SentenceWords int // the longest sentence a markdown blueprint's prose may hold; 0 is off
 }
 
 // loaded is what a command reads before it looks at any blueprint: the outline, the lock, and the

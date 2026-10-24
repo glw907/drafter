@@ -398,6 +398,18 @@ pages in one directory never share a brief, and it must stay inside the project.
 project's own tooling already reads briefs from another place, until the project moves to the
 convention.
 
+### Check
+
+| Setting | Layers | Default | Environment variable |
+|---|---|---|---|
+| `check.sentence_words` | project, local | `0`, which turns the warning off. | None. |
+
+`check.sentence_words` is the longest sentence, in words, that a markdown blueprint's prose may
+hold. When it is set, `drafter check` warns on each sentence over the limit in a bullet, a step, a
+row line, or a line of the `:::reader` or `:::constraints` block, and the warning names the word
+count. A code span counts as one word. A fact bullet is never checked. The setting is a whole
+number of at least 0.
+
 ### Editing
 
 | Setting | Layers | Default | Environment variable |
