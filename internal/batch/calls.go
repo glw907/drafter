@@ -223,7 +223,15 @@ func erroredResult(customID string, f failure) Result {
 }
 
 func batchOf(b anthropic.MessageBatch) Batch {
-	return Batch{ID: b.ID, Ended: b.ProcessingStatus == anthropic.MessageBatchProcessingStatusEnded, CreatedAt: b.CreatedAt}
+	c := b.RequestCounts
+	return Batch{
+		ID: b.ID, Ended: b.ProcessingStatus == anthropic.MessageBatchProcessingStatusEnded,
+		Status: string(b.ProcessingStatus), CreatedAt: b.CreatedAt,
+		Counts: Counts{
+			Processing: int(c.Processing), Succeeded: int(c.Succeeded), Errored: int(c.Errored),
+			Canceled: int(c.Canceled), Expired: int(c.Expired),
+		},
+	}
 }
 
 func batchResult(r anthropic.MessageBatchIndividualResponse) Result {

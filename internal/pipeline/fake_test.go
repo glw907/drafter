@@ -236,7 +236,7 @@ func (f *fakeAPI) Get(ctx context.Context, id string) (batch.Batch, error) {
 		return batch.Batch{}, &batch.CallError{Status: 404, Type: "not_found_error", Message: "no batch " + id}
 	}
 	b.polls++
-	return batch.Batch{ID: id, Ended: b.polls > f.pollsToEnd, CreatedAt: b.created}, nil
+	return f.batchOf(b), nil
 }
 
 func (f *fakeAPI) Results(ctx context.Context, id string) ([]batch.Result, error) {
@@ -260,9 +260,20 @@ func (f *fakeAPI) List(ctx context.Context, since time.Time) ([]batch.Batch, err
 	var out []batch.Batch
 	for _, id := range slices.Backward(f.order) {
 		b := f.batches[id]
-		out = append(out, batch.Batch{ID: b.id, Ended: b.polls > f.pollsToEnd, CreatedAt: b.created})
+		out = append(out, f.batchOf(b))
 	}
 	return out, nil
+}
+
+// batchOf reports b as the API would: in progress until pollsToEnd polls have passed, then ended
+// with every request succeeded.
+func (f *fakeAPI) batchOf(b *fakeBatch) batch.Batch {
+	out := batch.Batch{ID: b.id, CreatedAt: b.created, Status: "in_progress", Counts: batch.Counts{Processing: len(b.reqs)}}
+	if b.polls > f.pollsToEnd {
+		out.Ended, out.Status = true, "ended"
+		out.Counts = batch.Counts{Succeeded: len(b.reqs)}
+	}
+	return out
 }
 
 // addDecoy adds an ended batch of another run, which List returns beside the run's own.

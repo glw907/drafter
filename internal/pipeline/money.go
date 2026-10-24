@@ -283,11 +283,18 @@ func (r *runner) findBatch(ctx context.Context, in *run.Intent) (batch.Batch, bo
 	return batch.Batch{}, false, nil
 }
 
+// waitEnded polls candidate batch id until it ends. The batch may belong to another run, so
+// nothing it learns is written to state.
 func (r *runner) waitEnded(ctx context.Context, id string) error {
+	last := ""
 	for {
 		b, err := r.api.Get(ctx, id)
 		if err != nil {
 			return err
+		}
+		if b.Status != last {
+			r.pollLine(b, "adoption search")
+			last = b.Status
 		}
 		if b.Ended {
 			return nil
@@ -459,6 +466,20 @@ func (r *runner) settleResults(p *page, idx int, results []batch.Result) error {
 	return r.save()
 }
 
+// pollLine prints a batch's status, with its counts once it has ended. The first line of a
+// process names --sync, the way to run attended without a batch wait.
+func (r *runner) pollLine(b batch.Batch, label string) {
+	line := fmt.Sprintf("batch %s (%s): %s, waiting since %s", b.ID, label, b.Status, b.CreatedAt.UTC().Format(time.RFC3339))
+	if b.Ended {
+		line = fmt.Sprintf("batch %s (%s): %s, %s", b.ID, label, b.Status, b.Counts)
+	}
+	r.warnf("%s", line)
+	if !r.hinted {
+		r.hinted = true
+		r.warnf("a batch can take hours; --sync runs attended without a batch wait")
+	}
+}
+
 // await polls every in-flight batch until each has ended and been read, or the run stops.
 func (r *runner) await(ctx context.Context) error {
 	for len(r.inflight) > 0 && r.stop == "" {
@@ -469,6 +490,17 @@ func (r *runner) await(ctx context.Context) error {
 			b, err := r.api.Get(ctx, in.BatchID)
 			if err != nil {
 				return r.pollFailed(err)
+			}
+			if in.Poll == nil || in.Poll.Status != b.Status {
+				r.pollLine(b, fl.page.h.Page.Path)
+				c := b.Counts
+				in.Poll = &run.Poll{
+					Status: b.Status, Processing: c.Processing, Succeeded: c.Succeeded, Errored: c.Errored,
+					Canceled: c.Canceled, Expired: c.Expired, Seen: r.now(),
+				}
+				if err := r.save(); err != nil {
+					return err
+				}
 			}
 			if !b.Ended {
 				continue

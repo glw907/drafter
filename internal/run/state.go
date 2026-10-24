@@ -85,6 +85,20 @@ type Intent struct {
 	Settlement string `json:"settlement,omitempty"`
 	// Created is the time the API reported for the batch, kept for adoption.
 	Created time.Time `json:"created,omitzero"`
+	// Poll is the last batch status a poll printed. A state written before the field existed has
+	// none, and a resume ignores it.
+	Poll *Poll `json:"poll,omitempty"`
+}
+
+// Poll is a batch's status and request counts as the last poll that printed saw them.
+type Poll struct {
+	Status     string    `json:"status"`
+	Processing int       `json:"processing"`
+	Succeeded  int       `json:"succeeded"`
+	Errored    int       `json:"errored"`
+	Canceled   int       `json:"canceled"`
+	Expired    int       `json:"expired"`
+	Seen       time.Time `json:"seen"`
 }
 
 // IntentRequest maps one custom_id to the seat it asks.
