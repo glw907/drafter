@@ -89,11 +89,20 @@ format](docs/blueprint-format.md) describes the format and each check.
 
 ```sh
 drafter refs [--root <dir>] [--json] <fact-id>...
+drafter refs [--root <dir>] [--json] --page <path | slug>
 ```
 
 The command lists every blueprint item, on every page, that places or cites each fact, with the
-section it sits in, and the brief entries and drafted pages that cite it. It exits 1 when a named
-id is not in the facts store, or, for a single id, when nothing cites it.
+section it sits in, and the brief entries and drafted pages that cite it. A brief counts for every
+page the outline lists, whether or not the page has a blueprint yet. Each fact's line names its
+source kinds: `code` for a repository path, `url` for a URL, and `prose` for a `.md` file or a
+file under `facts.prose_sources`; `--json` adds them as `source_kinds`. It exits 1 when a named id
+is not in the facts store, or, for a single id, when nothing cites it.
+
+With `--page` and no fact ids, the command lists each blueprint `See` or link item and each
+outline `crossLinks` entry whose target is that page, as `file:line: kind`, or as an array of
+`{file, line, kind}` with `--json`. It exits 0 when nothing links to the page, 1 when the outline
+lists no such page, and 2 when `--page` comes with fact ids.
 
 ### outline
 

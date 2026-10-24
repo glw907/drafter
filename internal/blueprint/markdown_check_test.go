@@ -234,8 +234,8 @@ func TestRefsMarkdown(t *testing.T) {
 			t.Fatalf("Refs(%s) = %v, held %v, %v", id, refs, held, err)
 		}
 		want := []Ref{
-			{guideMD, lineOf(t, goodMD, "You need the admin role."), "before-you-begin.p1", "example"},
-			{guideMD, lineOf(t, goodMD, "**Fix.**"), "rotate-the-key.row1", "example"},
+			{guideMD, lineOf(t, goodMD, "You need the admin role."), "before-you-begin.p1", "bullet"},
+			{guideMD, lineOf(t, goodMD, "**Fix.**"), "rotate-the-key.row1", "bullet"},
 		}
 		if !slices.Equal(refs, want) {
 			t.Errorf("Refs(%s) = %+v, want %+v", id, refs, want)
