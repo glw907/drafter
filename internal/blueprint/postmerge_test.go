@@ -83,7 +83,7 @@ func TestConvertedFixtureFindings(t *testing.T) {
 		t.Fatal(err)
 	}
 	conv, _ := convertedFixture(t)
-	p := project(t, string(outline), convertPage, conv.Data, "", "docs/reference/keys.md", "docs/guides/examples/check.sh")
+	p := project(t, string(outline), convertPage, conv.Data, "", "docs/reference/keys.md", "docs/guides/examples/check.sh", "docs/guides/figures/switch.svg")
 	findings, err := p.Check(nil)
 	if err != nil {
 		t.Fatal(err)

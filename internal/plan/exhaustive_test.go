@@ -1,15 +1,36 @@
 package plan
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
+
+func TestExhaustiveClaims(t *testing.T) {
+	tests := []struct {
+		name, text string
+		want       []string
+	}{
+		{"four matches", "Only admins rotate all keys, and three roles always agree.", []string{"only", "all", "three roles", "always"}},
+		{"one match", "Every key expires.", []string{"every"}},
+		{"negations are no claim", "It never retries and has no limit.", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ExhaustiveClaims(tt.text); !slices.Equal(got, tt.want) {
+				t.Errorf("ExhaustiveClaims(%q) = %q, want %q", tt.text, got, tt.want)
+			}
+		})
+	}
+}
 
 func TestExhaustiveClaim(t *testing.T) {
 	tests := []struct{ name, text, want string }{
 		{"only", "Only admins rotate keys.", "only"},
 		{"every", "Every key expires.", "every"},
 		{"all", "It reads all the files.", "all"},
-		{"no", "There is no limit.", "no"},
+		{"no is no claim", "There is no limit.", ""},
 		{"none", "None expire.", "none"},
-		{"never", "It never retries.", "never"},
+		{"never is no claim", "It never retries.", ""},
 		{"always", "It always retries.", "always"},
 		{"spelled count", "The tool has three roles.", "three roles"},
 		{"lowest spelled count", "Two modes exist.", "two modes"},

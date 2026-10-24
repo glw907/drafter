@@ -39,6 +39,11 @@ func (l *layer) checkValues() error {
 	); err != nil {
 		return err
 	}
+	if k := f.Check; k != nil {
+		if err := l.atLeast("check.sentence_words", k.SentenceWords, 0); err != nil {
+			return err
+		}
+	}
 	if r := f.Retries; r != nil {
 		if err := firstErr(
 			l.atLeast("retries.gate_fix", r.GateFix, 0),

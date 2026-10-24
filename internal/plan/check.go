@@ -22,10 +22,15 @@ const (
 // CheckOptions says where the checks look. Root is the repository root that link targets and
 // the page path resolve against. FactsDir is the facts directory, empty when the project has no
 // facts store; callers confirm a set directory with CheckFactsDir first. Outline is optional.
+// Anchors is optional too: given the repo-relative path of a link's target page, it returns the
+// anchors of the page's blueprint and true, or false when the page has none. A link's anchor is
+// checked against those anchors when the target has a blueprint, and against the published page
+// only when it has none.
 type CheckOptions struct {
 	Root     string
 	FactsDir string
 	Outline  *Outline
+	Anchors  func(rel string) (map[string]bool, bool)
 }
 
 type checker struct {
@@ -207,7 +212,7 @@ func (c *checker) links() {
 		switch it.Kind {
 		case "link":
 			c.link(it.Lines["target"], it.Target, own)
-		case "code":
+		case "code", "figure":
 			if it.Source != "" && !isURL(it.Source) {
 				c.codeSource(it.Lines["source"], it.Source)
 			}
@@ -314,7 +319,7 @@ func (c *checker) repoPath(line int, file string) (string, bool) {
 	return rel, true
 }
 
-// codeSource checks that the path part of a code item's source exists. The #Symbol part is not
+// codeSource checks that the path part of a code or figure item's source exists. The #Symbol part is not
 // checked.
 func (c *checker) codeSource(line int, source string) {
 	file, _, _ := strings.Cut(source, "#")
@@ -349,6 +354,16 @@ func (c *checker) link(line int, target string, own map[string]bool) {
 	rel, ok := c.repoPath(line, file)
 	if !ok {
 		return
+	}
+	if anchor != "" && c.opts.Anchors != nil {
+		if planned, ok := c.opts.Anchors(rel); ok {
+			if !planned[anchor] {
+				c.add(line, SeverityError, checkLinks,
+					fmt.Sprintf("anchor #%s matches no heading in the blueprint for %s", anchor, rel),
+					"use the slug of a heading in that page's blueprint, or add the heading there")
+			}
+			return
+		}
 	}
 	info, err := os.Stat(filepath.Join(c.opts.Root, filepath.FromSlash(rel)))
 	switch {

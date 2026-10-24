@@ -6,33 +6,34 @@ initiative at `~/Projects/initiatives/docs-system/`.
 ## Current state
 
 - `main` is at the merge of PR #58 (`5680e8f`), the pilot-friction pass, and
-  `~/.local/bin/drafter` is that build (`drafter --version` answers). The executor was
-  `drafter-pilot-friction` (`89811a02`), under `conductor-drafter` (`0aeb475d`).
-- The pass landed backlog #36 to #41 and #44 to #47, the drafter-owned friction from the extend
-  blueprints pilot. Its record is
-  `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-pilot-friction.md`.
-  - Markdown blueprints have a `Code:` bullet with `:source[...]` and its fence, a `Figure:`
-    bullet, and a `:::constraints` block. A `Code:` source reaches the draft seat.
-  - The `blueprint` skill frames the reader from the outline's job and has a rule for parallel
-    authors who share one facts store.
-  - `drafter check` warns on unqualified exhaustive words and on a pointer whose anchor has
-    drifted off its cited lines, and requires `track` only when the outline declares tracks.
-    `check --fact <id>` verifies one fact's pointers.
-  - `drafter refs` takes several ids and lists the section, brief entry, and drafted page of
-    each hit. `drafter outline` and `drafter --version` exist, and `drafter excerpt` serves
-    URL-sourced, prose-sourced, and very long sources.
+  `~/.local/bin/drafter` is that build. The batch-friction pass is at PR-ready on branch
+  `worktree-batch-friction`; `conductor-drafter` sends its packet and merges on Geoff's approval.
+- The pass lands backlog #48 to #81, less #42, #43, and #82, the drafter-owned friction from
+  extend blueprints batches 2 and 3. Its plan is
+  `~/Projects/initiatives/docs-system/plans/2026-10-24-drafter-batch-friction-plan.md`.
+  - `drafter check` warns on an anchorless line pointer, checks doc-comment anchors, dotted
+    pointers, route paths, and figure sources, and drops `no` and `never` from the exhaustive
+    lint. A named check prints only that blueprint's findings. `check.sentence_words` turns on a
+    sentence-length warning.
+  - `:source[...]` takes one level of brackets, and a `Figure:` bullet takes a fence.
+  - `drafter refs` reads every brief, lists links into a page with `--page`, and names each
+    fact's source kind.
+  - `drafter page` prints a line when a batch's status changes, and `drafter status <run-id>`
+    reports open batches.
+  - A worktree with no `drafter.local.toml` reads `~/.config/drafter/<repo>.local.toml`.
+  - The `blueprint` skill and `docs/blueprint-format.md` carry the batches' fixes.
 - #42 (`convert markdown` writes skeletons) and #43 (`convert plan` heading matches and the
-  seeded lock blob) sit in Medium, deferred by Geoff on 2026-10-22: the next fifteen cairn pages
-  have prose plans only.
-- The exhaustive-word lint keeps `no` and `never` on its list (Geoff, 2026-10-22, packet for
-  PR #58). #48 revisits them once authors have used the lint on the next pages.
-- cairn-cms backlog #30 moves the three pilot blueprints to the markdown forms and drops their
-  `track: extend`, which `drafter check` now flags.
+  seeded lock blob) sit in Medium, deferred by Geoff on 2026-10-22.
 
 ## Next action
 
-The other fifteen cairn extend blueprints start from the merged skill, each written from its
-prose plan. That work runs in cairn-cms; no drafter pass is waiting.
+After the merge, `conductor-drafter` checks run `20261024T080412Z-13b5d021` with the merged
+build's `drafter status`. While a batch is open, the install waits: STATUS then reads "install
+waits on run 20261024T080412Z-13b5d021". Once none is open, `make install` runs on pavilion, and
+thinkpad-x1 picks the build up at its next pull and `make install`.
+
+The last nine cairn extend blueprints then start from the merged skill. #82 (each page advances
+on its own through its stages) is the next drafter pass, and needs a live run to prove it.
 
 ## Open decisions
 

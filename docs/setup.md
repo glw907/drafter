@@ -95,6 +95,14 @@ its page. A stage that would cross the ceiling stops the run, and you can resume
 Set `billing_cycle_day` to the day your credit cycle starts. The ceiling resets at 00:00 UTC on
 that day. See [Configuration reference](configuration.md) for how the caps combine across layers.
 
+## Work in a git worktree
+
+`drafter.local.toml` is ignored by git, so a new worktree starts without one. To share your local
+settings across every worktree of a repository, save them as
+`~/.config/drafter/<repo>.local.toml`, where `<repo>` is the directory name of the main checkout.
+drafter reads that file in any worktree that has no `drafter.local.toml` of its own. See
+[Configuration reference](configuration.md) for the rank it takes.
+
 ## Set a spend limit in the Console
 
 A workspace spend limit is a server-side backstop. It works even if drafter has a bug, and you

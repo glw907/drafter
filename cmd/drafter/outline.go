@@ -35,6 +35,17 @@ listed, 1 when it is not, and 2 when the command could not run.`,
 	return cmd
 }
 
+// outlineFault is ": file:line: message" for the first error among a malformed outline's findings,
+// and empty when there is none.
+func outlineFault(findings []plan.Finding) string {
+	for _, f := range findings {
+		if f.Severity == plan.SeverityError {
+			return fmt.Sprintf(": %s:%d: %s", f.File, f.Line, f.Message)
+		}
+	}
+	return ""
+}
+
 func runOutline(cmd *cobra.Command, arg string, f *checkFlags) error {
 	p, err := projectFor(f.root)
 	if err != nil {
@@ -46,7 +57,7 @@ func runOutline(cmd *cobra.Command, arg string, f *checkFlags) error {
 	}
 	o, findings := blueprint.DecodeOutline(p.Outline, data)
 	if o == nil || plan.HasError(findings) {
-		return exitError{code: exitCannotRun, msg: fmt.Sprintf("outline %s is malformed", p.Outline)}
+		return exitError{code: exitCannotRun, msg: fmt.Sprintf("outline %s is malformed%s", p.Outline, outlineFault(findings))}
 	}
 	for _, pg := range o.Pages {
 		if pg.Slug != arg && path.Clean(pg.Path) != path.Clean(arg) {

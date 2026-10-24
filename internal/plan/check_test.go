@@ -193,6 +193,10 @@ func TestCheckLinks(t *testing.T) {
 		{"code source that is missing", handoff, codeItem("../reference/gone.go#Symbol") + handoff, nil, []want{
 			{72, SeverityError, "links", "source docs/reference/gone.go does not exist"},
 		}},
+		{"figure source that exists", handoff, strings.Replace(codeItem("../reference/keys.md"), "kind: code", "kind: figure", 1) + handoff, nil, nil},
+		{"figure source that is missing", handoff, strings.Replace(codeItem("../reference/gone.svg"), "kind: code", "kind: figure", 1) + handoff, nil, []want{
+			{72, SeverityError, "links", "source docs/reference/gone.svg does not exist"},
+		}},
 		{"code source outside the repository", handoff, codeItem("../../../x.go") + handoff, nil, []want{
 			{72, SeverityError, "links", "target ../../../x.go leaves the repository"},
 		}},

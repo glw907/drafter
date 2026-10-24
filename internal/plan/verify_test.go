@@ -100,6 +100,11 @@ func TestVerifyFactsStore(t *testing.T) {
 		{"A claim without an id", "error", "no leading fact id"},
 		{"`f:prov01`", "error", "Provenance bullet carries the fact id"},
 		{"`f:barewn`", "warning", `source "src/gone/" does not exist`},
+		{"`f:parens2`", "error", "no file at src/gone.go"},
+		{"`f:dotbad`", "error", "no declaration of Holder.nothing in src/ts/lib.ts"},
+		{"`f:noanch`", "warning", `pointer "src/long.go:3" has no anchor, so drift can't be detected`},
+		{"`f:rngnoa`", "warning", `pointer "src/long.go:3-5" has no anchor`},
+		{"`f:colon01`", "warning", `pointer "src/long.go:3-5" has no anchor`},
 
 		{"`f:edge01`", "", ""},
 		{"`f:substr`", "", ""},
@@ -113,6 +118,8 @@ func TestVerifyFactsStore(t *testing.T) {
 		{"`f:multi1`", "", ""},
 		{"`f:parens1`", "", ""},
 		{"`f:dotted`", "", ""},
+		{"`f:docanc`", "", ""},
+		{"`f:rngok1`", "", ""},
 		{"`f:mdhead`", "", ""},
 		{"`f:route1`", "", ""},
 		{"`harvested-page.md`", "", ""},
@@ -140,8 +147,8 @@ func TestVerifyFactsStore(t *testing.T) {
 	if len(findings) != failing {
 		t.Errorf("%d findings, want %d: %+v", len(findings), failing, findings)
 	}
-	if checked != 29 || skipped != 3 {
-		t.Errorf("checked %d, skipped %d, want 29 and 3", checked, skipped)
+	if checked != 41 || skipped != 1 {
+		t.Errorf("checked %d, skipped %d, want 41 and 1", checked, skipped)
 	}
 }
 
@@ -156,7 +163,7 @@ func TestVerifyFactsIDs(t *testing.T) {
 	}{
 		{"a repeated id selects both bullets", []string{"f:dupe01"}, 2, 2, 0},
 		{"a clean fact", []string{"f:substr"}, 0, 1, 0},
-		{"a skipped pointer", []string{"f:dotted", "f:mdhead"}, 0, 0, 2},
+		{"a skipped pointer", []string{"f:dotted", "f:mdhead"}, 0, 2, 1},
 		{"an id in no bullet", []string{"f:absent"}, 0, 0, 0},
 		{"no ids selects nothing", []string{}, 0, 0, 0},
 	}
@@ -263,6 +270,58 @@ func TestDeclarationSpan(t *testing.T) {
 			start, end, ok := declarationSpan(tt.lines, tt.lang, tt.symbol)
 			if ok != tt.ok || (ok && (start != tt.start || end != tt.end)) {
 				t.Errorf("declarationSpan = (%d, %d, %v), want (%d, %d, %v)", start, end, ok, tt.start, tt.end, tt.ok)
+			}
+		})
+	}
+}
+
+func TestSourcePointers(t *testing.T) {
+	tests := []struct {
+		name, rest string
+		want       []string
+	}{
+		{"depth 0", "Source: `a/b.go:1` (`Name`). [verified]", []string{"a/b.go:1"}},
+		{"one parenthesis deep", "Source: `a/b.go:1` (`Name`) (see `c/d.go:2`). [verified]", []string{"a/b.go:1", "c/d.go:2"}},
+		{"two parentheses deep", "Source: `a/b.go:1` (see (also `c/d.go:2`)). [verified]", []string{"a/b.go:1"}},
+		{"inside brackets", "Source: `a/b.go:1` [see `c/d.go:2`]. [verified]", []string{"a/b.go:1"}},
+		{"a tag note is commentary", "Source: `a/b.go:1`. [verified: ran `c/d.go:2` by hand]", []string{"a/b.go:1"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got []string
+			for _, p := range sourcePointers(tt.rest) {
+				got = append(got, p.span)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("sourcePointers(%q) = %q, want %q", tt.rest, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNestedSpan(t *testing.T) {
+	ts := []string{
+		"/** Doc. */", "export class C {", "  /** Member. */", "  m(): void {", "    x();", "  }", "}", "export const D = 1;",
+	}
+	goSrc := []string{"// T is a type.", "type T struct {", "\tField int", "}", "", "// M runs.", "func (t *T) M() {}"}
+	tests := []struct {
+		name, lang, symbol string
+		lines              []string
+		start, end         int
+		ok                 bool
+	}{
+		{"doc comment above a plain name", "ts", "C", ts, 0, 7, true},
+		{"doc comment above a member", "ts", "C.m", ts, 2, 6, true},
+		{"missing inner name", "ts", "C.nope", ts, 0, 0, false},
+		{"missing outer name", "ts", "Nope.m", ts, 0, 0, false},
+		{"go method of the receiver", "go", "T.M", goSrc, 5, 7, true},
+		{"go struct field", "go", "T.Field", goSrc, 2, 3, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			start, end, ok := nestedSpan(tt.lines, tt.lang, tt.symbol)
+			if ok != tt.ok || (ok && (start != tt.start || end != tt.end)) {
+				t.Errorf("nestedSpan = (%d, %d, %v), want (%d, %d, %v)", start, end, ok, tt.start, tt.end, tt.ok)
 			}
 		})
 	}

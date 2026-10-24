@@ -89,11 +89,20 @@ format](docs/blueprint-format.md) describes the format and each check.
 
 ```sh
 drafter refs [--root <dir>] [--json] <fact-id>...
+drafter refs [--root <dir>] [--json] --page <path | slug>
 ```
 
 The command lists every blueprint item, on every page, that places or cites each fact, with the
-section it sits in, and the brief entries and drafted pages that cite it. It exits 1 when a named
-id is not in the facts store, or, for a single id, when nothing cites it.
+section it sits in, and the brief entries and drafted pages that cite it. A brief counts for every
+page the outline lists, whether or not the page has a blueprint yet. Each fact's line names its
+source kinds: `code` for a repository path, `url` for a URL, and `prose` for a `.md` file or a
+file under `facts.prose_sources`; `--json` adds them as `source_kinds`. It exits 1 when a named id
+is not in the facts store, or, for a single id, when nothing cites it.
+
+With `--page` and no fact ids, the command lists each blueprint `See` or link item and each
+outline `crossLinks` entry whose target is that page, as `file:line: kind`, or as an array of
+`{file, line, kind}` with `--json`. It exits 0 when nothing links to the page, 1 when the outline
+lists no such page, and 2 when `--page` comes with fact ids.
 
 ### outline
 
@@ -185,6 +194,20 @@ The command prints the cost recorded in the ledger, by repo and seat, with a tot
 `--since` and `--until`, it covers the current billing cycle. Both dates are UTC, and `--until` is
 inclusive. A line settled at an estimate is marked, and open reservations print on a line of their
 own at their worst case.
+
+### status
+
+```sh
+drafter status <run-id>
+```
+
+The command prints the status and age of each batch the run has submitted and not yet read, with
+the request counts once the batch ends. It reads the run's state without taking its lock, so it works while the run is
+live. The API moves requests out of processing only when the whole batch ends, so a batch in
+progress shows its status and age. A run with no open batch prints `no open batch`. With `--json`,
+each batch prints as one object. The exit status is 2 when the run's state cannot be read or the
+API cannot answer. A polling `drafter page` or `drafter read` prints the same facts as it waits,
+and `--sync` runs attended without a batch wait.
 
 ### config
 

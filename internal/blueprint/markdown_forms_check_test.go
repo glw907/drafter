@@ -43,8 +43,8 @@ func TestCheckMarkdownForms(t *testing.T) {
 		anch string
 		msg  string
 	}{
-		{"a fence with no code bullet", edit("1. Generate", "```go\nx\n```\n\n1. Generate"), "```go", "no Code: bullet directly above it"},
-		{"a fence under a plain bullet", edit("1. Generate", "- A note.\n\n```go\nx\n```\n\n1. Generate"), "```go", "no Code: bullet directly above it"},
+		{"a fence with no code bullet", edit("1. Generate", "```go\nx\n```\n\n1. Generate"), "```go", "no Code: or Figure: bullet directly above it"},
+		{"a fence under a plain bullet", edit("1. Generate", "- A note.\n\n```go\nx\n```\n\n1. Generate"), "```go", "no Code: or Figure: bullet directly above it"},
 		{"a second constraints block", edit("## Before you begin", constraints+constraints+"## Before you begin"), ":::constraints\n- State no version range. :fact[bbbbbb]\n:::\n\n## Before", "second :::constraints"},
 		{"a constraints block above the reader block", edit(":::reader", constraints+":::reader"), ":::constraints", "not between the :::reader block and the first heading"},
 		{"a constraints block under a heading", edit("1. Generate", constraints+"1. Generate"), ":::constraints", "not between the :::reader block and the first heading"},
@@ -79,9 +79,9 @@ func TestRefsMarkdownForms(t *testing.T) {
 	}
 	want := []Ref{
 		{guideMD, lineOf(t, md, "State no version range."), "constraints", "constraints"},
-		{guideMD, lineOf(t, md, "You need the admin role."), "before-you-begin.p1", "example"},
+		{guideMD, lineOf(t, md, "You need the admin role."), "before-you-begin.p1", "bullet"},
 		{guideMD, lineOf(t, md, "Code: the key helper."), "rotate-the-key.p1", "code"},
-		{guideMD, lineOf(t, md, "**Fix.**"), "rotate-the-key.row1", "example"},
+		{guideMD, lineOf(t, md, "**Fix.**"), "rotate-the-key.row1", "bullet"},
 	}
 	if !slices.Equal(refs, want) {
 		t.Errorf("Refs = %+v, want %+v", refs, want)

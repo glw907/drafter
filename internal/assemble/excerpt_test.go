@@ -371,3 +371,32 @@ func TestExcerptPointer(t *testing.T) {
 		t.Error("Pointer(src) reports a real excerpt for a directory")
 	}
 }
+
+func TestExcerptNodeModules(t *testing.T) {
+	f := newFixture(t)
+	f.write(t, filepath.Join(f.root, "node_modules/pkg/index.js"), "export function pick(a) {\n  return a;\n}\n")
+	f.write(t, filepath.Join(f.root, "build/out.js"), "export function pick(a) {\n  return a;\n}\n")
+	e, err := NewExcerpter(context.Background(), f.config())
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name, source string
+		real         bool
+		in           string
+	}{
+		{"line pointer", "node_modules/pkg/index.js:2", true, "=== excerpt: node_modules/pkg/index.js (read from disk: untracked) lines 1-3 ==="},
+		{"declaration pointer", "node_modules/pkg/index.js#pick", true, "return a;"},
+		{"bare file", "node_modules/pkg/index.js", true, "=== file: node_modules/pkg/index.js (read from disk: untracked) ==="},
+		{"missing file", "node_modules/pkg/gone.js:1", false, "no excerpt: missing"},
+		{"other untracked file", "build/out.js:1", false, "no excerpt: untracked"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			blocks, real := e.Pointer(tt.source)
+			if real != tt.real || !strings.Contains(strings.Join(blocks, "\n"), tt.in) {
+				t.Errorf("Pointer(%q) = %q, real %v; want real %v with %q", tt.source, blocks, real, tt.real, tt.in)
+			}
+		})
+	}
+}

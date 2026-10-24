@@ -109,8 +109,8 @@ func TestBlueprintCommands(t *testing.T) {
 
 	t.Run("refs lists placements and exits 1 for a fact nothing places", func(t *testing.T) {
 		r := runEnv(t, p.dir, p.env, "refs", "f:aaaaaa")
-		if r.code != 0 || strings.Count(strings.TrimSpace(r.stdout), "\n") != 1 {
-			t.Errorf("exit %d, stdout %q, want two lines (the introduction and the fact item)", r.code, r.stdout)
+		if r.code != 0 || strings.Count(strings.TrimSpace(r.stdout), "\n") != 2 {
+			t.Errorf("exit %d, stdout %q, want a kinds line, then the introduction and the fact item", r.code, r.stdout)
 		}
 		if r := runEnv(t, p.dir, p.env, "refs", "f:nothing"); r.code != 1 {
 			t.Errorf("exit %d for an unknown fact, want 1", r.code)

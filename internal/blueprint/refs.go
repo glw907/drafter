@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -17,7 +19,7 @@ import (
 // and kind introduction, and a disposition has the id dispositions and kind disposition.
 //
 // In a markdown blueprint the line is the one that carries the :fact tag. A bullet's item id is
-// <section id>.p<n>, a row's is <section id>.row<n>, both of kind example, and the :::reader
+// <section id>.p<n>, a row's is <section id>.row<n>, both of kind bullet, and the :::reader
 // block's is reader with kind reader and the :::constraints block's is constraints with kind
 // constraints. A Code: bullet's kind is code and a Figure: bullet's is figure.
 type Ref struct {
@@ -64,8 +66,9 @@ func (p Project) Refs(id string) (refs []Ref, held bool, err error) {
 }
 
 // RefHits is Refs with each place's section, followed by every brief sentence that cites the fact.
-// The briefs read are those of the pages the blueprints cover, found through the project's brief
-// path; a page with no brief contributes nothing, and a brief that does not parse is skipped.
+// The briefs read are those of every page the outline lists and of every page a blueprint covers,
+// found through the project's brief path, so a published page's brief counts before its blueprint
+// exists; a page with no brief contributes nothing, and a brief that does not parse is skipped.
 func (p Project) RefHits(id string) (hits []Hit, held bool, err error) {
 	l, err := p.load()
 	if err != nil {
@@ -76,16 +79,136 @@ func (p Project) RefHits(id string) (hits []Hit, held bool, err error) {
 		return nil, false, err
 	}
 	id = resolveFact(l.facts, id)
-	var seen []string
+	var pages []string
+	for _, pg := range l.outline.Pages {
+		pages = append(pages, path.Clean(pg.Path))
+	}
 	for _, rel := range l.files {
-		page, ok := PagePath(p.BlueprintRoot, rel)
-		if !ok || slices.Contains(seen, page) {
+		if page, ok := PagePath(p.BlueprintRoot, rel); ok {
+			pages = append(pages, page)
+		}
+	}
+	var seen []string
+	for _, page := range pages {
+		if slices.Contains(seen, page) {
 			continue
 		}
 		seen = append(seen, page)
 		hits = append(hits, p.briefHits(l.facts, page, id)...)
 	}
 	return hits, held, nil
+}
+
+// PageRefs lists each link item of every blueprint, and each outline crossLinks entry, whose
+// target is the page that ref names by slug or path. A blueprint link is a See or link item whose
+// target, resolved from the blueprint's page, is that page; a crossLinks entry is one whose to
+// names it, and sits in the outline file. The kind is link or crossLink, the item of a link is
+// its item id, and results are sorted by file, then line. Listed is false when the outline lists
+// no such page.
+func (p Project) PageRefs(ref string) (refs []Ref, listed bool, err error) {
+	l, err := p.load()
+	if err != nil {
+		return nil, false, err
+	}
+	target, ok := l.resolvePage(ref)
+	if !ok {
+		return nil, false, nil
+	}
+	for _, rel := range l.files {
+		data, err := os.ReadFile(p.abs(rel))
+		if err != nil {
+			return nil, false, err
+		}
+		src, _ := Load(rel, data)
+		if src == nil {
+			continue
+		}
+		from, _ := PagePath(p.BlueprintRoot, rel)
+		pg, ok := l.pages[from]
+		if !ok {
+			pg = Page{Path: from}
+		}
+		for _, s := range src.View(pg, l.facts).Sections {
+			for _, it := range s.Items {
+				file, _, _ := strings.Cut(it.Target, "#")
+				if it.Kind != "link" || file == "" || strings.Contains(file, "://") {
+					continue
+				}
+				dest := path.Join(path.Dir(from), file)
+				if rest, ok := strings.CutPrefix(file, "/"); ok {
+					dest = path.Clean(rest)
+				}
+				if dest == target {
+					refs = append(refs, Ref{rel, it.Lines["target"], it.ID, "link"})
+				}
+			}
+		}
+	}
+	for _, c := range l.outline.CrossLinks {
+		if to, ok := l.resolvePage(c.To); ok && to == target {
+			refs = append(refs, Ref{p.Outline, c.Line, "crossLinks", "crossLink"})
+		}
+	}
+	slices.SortStableFunc(refs, func(a, b Ref) int {
+		return cmp.Or(cmp.Compare(a.File, b.File), cmp.Compare(a.Line, b.Line))
+	})
+	return refs, true, nil
+}
+
+// resolvePage returns the path of the outline page that ref names, by path or by slug.
+func (l *loaded) resolvePage(ref string) (string, bool) {
+	if pg, ok := l.pages[path.Clean(ref)]; ok {
+		return pg.Path, true
+	}
+	for _, pg := range l.pages {
+		if pg.Slug != "" && pg.Slug == ref {
+			return pg.Path, true
+		}
+	}
+	return "", false
+}
+
+var sourceURL = regexp.MustCompile("https?://[^\\s`)\\]>]+")
+
+// SourceKinds names the kinds of source the fact's Source: part holds, in the order code, url,
+// prose: code for a pointer that is a repository path, url for a URL, and prose for a pointer to
+// a .md file or under the project's facts.prose_sources. A fact the store does not hold, or a
+// project with no facts store, has none.
+func (p Project) SourceKinds(id string) ([]string, error) {
+	if p.FactsDir == "" {
+		return nil, nil
+	}
+	facts, err := plan.LoadFacts(p.FactsDir)
+	if err != nil {
+		return nil, err
+	}
+	fact, ok := facts.Get(resolveFact(facts, id))
+	if !ok {
+		return nil, nil
+	}
+	var code, prose bool
+	for _, src := range fact.Sources {
+		file, _, _ := strings.Cut(src, ":")
+		file, _, _ = strings.Cut(file, "#")
+		file = path.Clean(file)
+		if strings.HasSuffix(file, ".md") || slices.ContainsFunc(p.ProseSources, func(ps string) bool { return path.Clean(ps) == file }) {
+			prose = true
+		} else {
+			code = true
+		}
+	}
+	_, afterSource, _ := strings.Cut(fact.Raw, "Source:")
+	var kinds []string
+	if code {
+		kinds = append(kinds, "code")
+	}
+	if sourceURL.MatchString(afterSource) {
+		kinds = append(kinds, "url")
+	}
+	if prose {
+		kinds = append(kinds, "prose")
+	}
+	return kinds, nil
 }
 
 func (p Project) blueprintHits(l *loaded, id string) (hits []Hit, held bool, err error) {
@@ -178,7 +301,7 @@ func markdownRefs(file string, m *Markdown, facts *plan.Facts, id string) []Hit 
 	for _, s := range m.Sections {
 		for i, l := range s.Lines {
 			if slices.ContainsFunc(l.Facts, cites) {
-				hits = append(hits, Hit{Ref: Ref{file, l.Line, fmt.Sprintf("%s.p%d", s.ID, i+1), cmp.Or(l.Kind, "example")}, Section: s.ID})
+				hits = append(hits, Hit{Ref: Ref{file, l.Line, fmt.Sprintf("%s.p%d", s.ID, i+1), cmp.Or(l.Kind, "bullet")}, Section: s.ID})
 			}
 		}
 		for i, r := range s.Rows {
@@ -186,7 +309,7 @@ func markdownRefs(file string, m *Markdown, facts *plan.Facts, id string) []Hit 
 			for _, c := range r.Cites {
 				if cites(c.ID) && !slices.Contains(seen, c.Line) {
 					seen = append(seen, c.Line)
-					hits = append(hits, Hit{Ref: Ref{file, c.Line, fmt.Sprintf("%s.row%d", s.ID, i+1), "example"}, Section: s.ID})
+					hits = append(hits, Hit{Ref: Ref{file, c.Line, fmt.Sprintf("%s.row%d", s.ID, i+1), "bullet"}, Section: s.ID})
 				}
 			}
 		}

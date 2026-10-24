@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/glw907/drafter/internal/run"
 )
 
 // Load applies the built-in defaults, then reads the user layer, then, when root holds a drafter.toml, it and drafter.local.toml
@@ -37,12 +39,13 @@ func Load(root string, flags Flags) (*Config, error) {
 	}
 	layers = append(layers, user)
 	if root != "" {
-		project, local, err := readProject(root, home)
+		project, local, fallback, err := readProject(root, home, userDir)
 		if err != nil {
 			return nil, err
 		}
 		if project != nil {
 			c.Root = filepath.Clean(root)
+			c.LocalFallback = fallback
 		}
 		layers = append(layers, project, local)
 	}
@@ -80,34 +83,45 @@ func Load(root string, flags Flags) (*Config, error) {
 
 // readProject reads drafter.toml and drafter.local.toml under root. Either result is nil when
 // its file is absent. A drafter.local.toml without a drafter.toml, or one git does not ignore,
-// is refused.
-func readProject(root, home string) (project, local *layer, err error) {
+// is refused. When the project has a drafter.toml and no drafter.local.toml, the local layer is
+// <userDir>/drafter/<repo>.local.toml, which every worktree of one repo shares; fallback is that
+// path, empty when root is outside git.
+func readProject(root, home, userDir string) (project, local *layer, fallback string, err error) {
 	localPath := filepath.Join(root, "drafter.local.toml")
 	_, statErr := os.Stat(localPath)
 	hasLocal := statErr == nil
 
 	project, err = readLayer("drafter.toml", inProject, filepath.Join(root, "drafter.toml"), home)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	if project == nil {
 		if hasLocal {
-			return nil, nil, fmt.Errorf("%s: drafter.local.toml needs a drafter.toml beside it; "+
+			return nil, nil, "", fmt.Errorf("%s: drafter.local.toml needs a drafter.toml beside it; "+
 				"%s is not a drafter project", localPath, root)
 		}
-		return nil, nil, nil
+		return nil, nil, "", nil
 	}
 	if !hasLocal {
-		return project, nil, nil
+		repo, repoErr := run.Repo(root)
+		if repoErr != nil {
+			return project, nil, "", nil
+		}
+		fallback = filepath.Join(userDir, "drafter", repo+".local.toml")
+		local, err = readLayer(fallback, inLocal, fallback, home)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		return project, local, fallback, nil
 	}
 	if err := checkIgnored(root, localPath); err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	local, err = readLayer("drafter.local.toml", inLocal, localPath, home)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
-	return project, local, nil
+	return project, local, "", nil
 }
 
 // checkIgnored refuses a drafter.local.toml that git does not report as ignored, because the

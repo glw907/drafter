@@ -75,6 +75,8 @@ func projectFor(rootFlag string) (blueprint.Project, error) {
 		FactsDir:      cfg.Facts.Dir,
 		Required:      cfg.Blueprints.Required,
 		BriefPath:     cfg.Blueprints.BriefPath,
+		ProseSources:  cfg.Facts.ProseSources,
+		SentenceWords: cfg.Check.SentenceWords,
 	}, nil
 }
 

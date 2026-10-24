@@ -12,8 +12,9 @@ import (
 
 func newRefsCmd() *cobra.Command {
 	var f checkFlags
+	var page string
 	cmd := &cobra.Command{
-		Use:   "refs [flags] <fact-id>...",
+		Use:   "refs [flags] <fact-id>...\n  drafter refs [flags] --page <path | slug>",
 		Short: "List every blueprint item and brief sentence that places or cites a fact",
 		Long: `List each place in the project's blueprints that places or cites each fact: fact items, facts
 lists, the introduction's facts, dispositions, and framing citations. Each prints as
@@ -25,32 +26,49 @@ brief belongs to. With more than one id, the lines are grouped under each id.
 An id matches with or without its f: prefix. The exit status with one id is 0 when there is at
 least one place, 1 when there is none, and 2 when the command could not run. With several ids it is
 1 only when a named id is not in the facts store; an id the store holds that nothing cites is
-reported on standard error and does not fail the run.`,
+reported on standard error and does not fail the run.
+
+Each fact's line names its source kinds after the id: code for a repository path, url for a URL,
+and prose for a .md file or a file under facts.prose_sources.
+
+With --page and no fact ids, it lists the links into one page, given by path or slug: each
+blueprint See or link item and each outline crossLinks entry whose target is that page, as
+file:line: kind. It exits 0 with no links and 1 when the outline lists no such page.`,
 		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return usageError(cmd, "refs needs at least one fact id")
+			switch {
+			case page != "" && len(args) > 0:
+				return usageError(cmd, "refs takes fact ids or --page, not both")
+			case page == "" && len(args) == 0:
+				return usageError(cmd, "refs needs at least one fact id, or --page")
 			}
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error { return runRefs(cmd, args, &f) },
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if page != "" {
+				return runPageRefs(cmd, page, &f)
+			}
+			return runRefs(cmd, args, &f)
+		},
 	}
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error { return usageError(cmd, err.Error()) })
 	cmd.Flags().StringVar(&f.root, "root", "", "project root (default: the git top level of the working directory)")
+	cmd.Flags().StringVar(&page, "page", "", "list the links into this page, by path or slug, instead of a fact's places")
 	cmd.Flags().BoolVar(&f.json, "json", false, "print the references as one JSON array")
 	return cmd
 }
 
 // refRow is one reference in the JSON output. Brief, Page, and Sentence are set for a brief hit.
 type refRow struct {
-	File     string `json:"file"`
-	Line     int    `json:"line"`
-	Item     string `json:"item"`
-	Kind     string `json:"kind"`
-	ID       string `json:"id"`
-	Section  string `json:"section,omitempty"`
-	Brief    string `json:"brief,omitempty"`
-	Page     string `json:"page,omitempty"`
-	Sentence string `json:"sentence,omitempty"`
+	File     string   `json:"file"`
+	Line     int      `json:"line"`
+	Item     string   `json:"item"`
+	Kind     string   `json:"kind"`
+	ID       string   `json:"id"`
+	Kinds    []string `json:"source_kinds,omitempty"`
+	Section  string   `json:"section,omitempty"`
+	Brief    string   `json:"brief,omitempty"`
+	Page     string   `json:"page,omitempty"`
+	Sentence string   `json:"sentence,omitempty"`
 }
 
 func runRefs(cmd *cobra.Command, ids []string, f *checkFlags) error {
@@ -69,11 +87,19 @@ func runRefs(cmd *cobra.Command, ids []string, f *checkFlags) error {
 			return exitError{code: exitCannotRun, msg: err.Error()}
 		}
 		total += len(hits)
-		if grouped && len(hits) > 0 {
-			text.WriteString(id + "\n")
+		kinds, err := p.SourceKinds(id)
+		if err != nil {
+			return exitError{code: exitCannotRun, msg: err.Error()}
+		}
+		if len(hits) > 0 {
+			text.WriteString(id)
+			if len(kinds) > 0 {
+				text.WriteString(" (" + strings.Join(kinds, ", ") + ")")
+			}
+			text.WriteString("\n")
 		}
 		for _, h := range hits {
-			rows = append(rows, refRow{h.File, h.Line, h.Item, h.Kind, id, h.Section, h.Brief, h.Page, h.Sentence})
+			rows = append(rows, refRow{h.File, h.Line, h.Item, h.Kind, id, kinds, h.Section, h.Brief, h.Page, h.Sentence})
 			text.WriteString(refLine(h, grouped))
 		}
 		switch {
@@ -144,4 +170,41 @@ func writeRefsJSON(w io.Writer, rows []refRow) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(rows)
+}
+
+// pageRefRow is one link into a page in the JSON output.
+type pageRefRow struct {
+	File string `json:"file"`
+	Line int    `json:"line"`
+	Kind string `json:"kind"`
+}
+
+func runPageRefs(cmd *cobra.Command, page string, f *checkFlags) error {
+	p, err := projectFor(f.root)
+	if err != nil {
+		return err
+	}
+	refs, listed, err := p.PageRefs(page)
+	if err != nil {
+		return exitError{code: exitCannotRun, msg: err.Error()}
+	}
+	if !listed {
+		return exitError{code: exitFindings, msg: fmt.Sprintf("%s is not a slug or path the outline lists", page)}
+	}
+	out := cmd.OutOrStdout()
+	if f.json {
+		rows := []pageRefRow{}
+		for _, r := range refs {
+			rows = append(rows, pageRefRow{r.File, r.Line, r.Kind})
+		}
+		enc := json.NewEncoder(out)
+		enc.SetIndent("", "  ")
+		return enc.Encode(rows)
+	}
+	for _, r := range refs {
+		if _, err := fmt.Fprintf(out, "%s:%d: %s\n", r.File, r.Line, r.Kind); err != nil {
+			return err
+		}
+	}
+	return nil
 }

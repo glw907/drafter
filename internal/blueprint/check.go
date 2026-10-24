@@ -26,15 +26,17 @@ const (
 	checkLock       = "lock"
 	checkConvention = "convention"
 	checkFraming    = "framing"
+	checkSentence   = "sentence-length"
 )
 
 // sectionRef matches a [[section-id]] reference in prose.
 var sectionRef = regexp.MustCompile(`\[\[([^\[\]]*)\]\]`)
 
 // Check validates the blueprints of the project offline. With no named files it checks every
-// blueprint under the blueprint root, the pairing of blueprints with the outline, the lock, and
-// the project's departures from the layout convention. With named files, each a repo-relative
-// slash path, it checks only those blueprints and the outline and lock entries of their pages.
+// blueprint under the blueprint root, the outline's tracks and types, the pairing of blueprints
+// with the outline, the lock, and the project's departures from the layout convention. With named
+// files, each a repo-relative slash path, it checks only those blueprints and the lock entries of
+// their pages.
 //
 // The shared plan checks run on each blueprint's view. A blueprint that fails to decode reports
 // its decode findings and the walk goes on to the next. The error means the command could not
@@ -64,8 +66,8 @@ func (p Project) Check(named []string) ([]plan.Finding, error) {
 	for _, rel := range files {
 		c.blueprint(rel)
 	}
-	c.outlineChecks()
 	if len(named) == 0 {
+		c.outlineChecks()
 		c.pairing()
 		c.convention()
 	}
@@ -139,12 +141,12 @@ func (c *projectCheck) blueprintData(rel string, data []byte) (Source, Page) {
 	if src == nil || plan.HasError(findings) {
 		return nil, Page{}
 	}
-	opts := plan.CheckOptions{Root: c.Root, FactsDir: c.FactsDir, Outline: c.l.plan}
+	opts := plan.CheckOptions{Root: c.Root, FactsDir: c.FactsDir, Outline: c.l.plan, Anchors: c.blueprintAnchors}
 	c.findings = append(c.findings, plan.Check(rel, src.View(entry, c.l.facts), opts)...)
 	switch b := src.(type) {
 	case *Markdown:
 		c.markdown(rel, b, entry)
-		c.exhaustive(rel, b)
+		c.prose(rel, b)
 	case *Blueprint:
 		c.references(rel, b)
 		c.sections(rel, b)
@@ -153,6 +155,35 @@ func (c *projectCheck) blueprintData(rel string, data []byte) (Source, Page) {
 	}
 	c.pageType(entry)
 	return src, entry
+}
+
+// blueprintAnchors returns the anchors of the blueprint for the managed page at pagePath: its
+// title and section headings, slugged as the drafted page will render them. It reports false when
+// the page has no blueprint that decodes, so a link to it is checked against the published page.
+func (c *projectCheck) blueprintAnchors(pagePath string) (map[string]bool, bool) {
+	entry, listed := c.l.pages[pagePath]
+	if !listed || !entry.Managed {
+		return nil, false
+	}
+	rel := c.Locate(pagePath)
+	data, err := os.ReadFile(c.abs(rel))
+	if err != nil {
+		return nil, false
+	}
+	src, _ := Load(rel, data)
+	if src == nil {
+		return nil, false
+	}
+	heads := src.SectionHeads()
+	headings := make([]string, len(heads))
+	for i, h := range heads {
+		headings[i] = h.Heading
+	}
+	anchors := map[string]bool{plan.HeadingSlugs("", []string{entry.Title})[0]: true}
+	for _, slug := range plan.HeadingSlugs(entry.Title, headings) {
+		anchors[slug] = true
+	}
+	return anchors, true
 }
 
 // markdown runs the checks only a markdown blueprint has, each finding at its line: the front
@@ -193,7 +224,7 @@ func (c *projectCheck) markdown(rel string, m *Markdown, entry Page) {
 		}
 	}
 	for _, line := range m.BareFences {
-		fault(line, "this code fence has no Code: bullet directly above it", "put a Code: bullet above the fence that says what the block shows")
+		fault(line, "this code fence has no Code: or Figure: bullet directly above it", "put a Code: or Figure: bullet above the fence that says what the block shows")
 	}
 
 	seen := map[string]int{}
@@ -246,27 +277,82 @@ func (c *projectCheck) track(rel string, f Front, entry Page) {
 	}
 }
 
-// exhaustive warns on each line of a markdown blueprint that claims a complete set: bullets and
-// steps, the three parts of a row, and the lines of the reader and constraints blocks.
-func (c *projectCheck) exhaustive(rel string, m *Markdown) {
-	warn := func(line int, text string) {
-		if claim := plan.ExhaustiveClaim(text); claim != "" {
-			c.findings = append(c.findings, plan.ExhaustiveFinding(rel, line, claim))
-		}
-	}
+// proseLine is one line of a blueprint's prose with its tags lifted out.
+type proseLine struct {
+	line int
+	text string
+}
+
+// prose warns on the prose of a markdown blueprint: each match of a claim of a complete set, one
+// finding apiece on its line, and each sentence over the project's sentence_words limit. The
+// reader block's lines are one run of prose and so are the constraints block's, so a sentence
+// wrapped across lines counts whole; every bullet, step, and row line is a run of its own. The
+// constraints block is read for length only: its job is to state limits, and a limit reads as a
+// claim.
+func (c *projectCheck) prose(rel string, m *Markdown) {
 	lines := strings.Split(strings.ReplaceAll(m.Text, "\r\n", "\n"), "\n")
-	for _, open := range []int{m.Reader.Line, m.Constraints.Line} {
+	// block returns the lines between a block's opening fence and its closing one.
+	block := func(open int) []proseLine {
+		var out []proseLine
 		for n := open + 1; open > 0 && n <= len(lines) && strings.TrimSpace(lines[n-1]) != ":::"; n++ {
-			warn(n, sourceTag.ReplaceAllString(factTag.ReplaceAllString(lines[n-1], ""), ""))
+			out = append(out, proseLine{n, sourceTag.ReplaceAllString(factTag.ReplaceAllString(lines[n-1], ""), "")})
 		}
+		return out
 	}
+	check := func(claims bool, ls ...proseLine) {
+		if claims {
+			for _, l := range ls {
+				for _, claim := range plan.ExhaustiveClaims(l.text) {
+					c.findings = append(c.findings, plan.ExhaustiveFinding(rel, l.line, claim))
+				}
+			}
+		}
+		c.longSentences(rel, ls)
+	}
+	check(true, block(m.Reader.Line)...)
+	check(false, block(m.Constraints.Line)...)
 	for _, s := range m.Sections {
 		for _, l := range s.Lines {
-			warn(l.Line, l.Text)
+			check(true, proseLine{l.Line, l.Text})
 		}
 		for _, r := range s.Rows {
-			warn(r.Line, strings.Join([]string{r.Symptom, r.Cause, r.Fix}, " "))
+			for _, l := range block(r.Line) {
+				l.text = rowPart.ReplaceAllString(l.text, "")
+				check(true, l)
+			}
 		}
+	}
+}
+
+// longSentences warns on each sentence of the run over the project's sentence_words limit, at the
+// line the sentence starts on. A code span counts as one word, and a sentence ends at a word that
+// ends in a period, a question mark, or an exclamation mark.
+func (c *projectCheck) longSentences(rel string, run []proseLine) {
+	limit := c.SentenceWords
+	if limit <= 0 {
+		return
+	}
+	words, start := 0, 0
+	for _, l := range run {
+		for w := range strings.FieldsSeq(codeSpan.ReplaceAllString(l.text, "x")) {
+			if words == 0 {
+				start = l.line
+			}
+			words++
+			if w = strings.TrimRight(w, `*_)"'`); w != "" && strings.ContainsRune(".?!", rune(w[len(w)-1])) {
+				c.longSentence(rel, start, words)
+				words = 0
+			}
+		}
+	}
+	c.longSentence(rel, start, words)
+}
+
+func (c *projectCheck) longSentence(rel string, line, words int) {
+	if words > c.SentenceWords {
+		c.add(rel, line, plan.SeverityWarning, checkSentence,
+			fmt.Sprintf("this sentence is %d words, over the %d the project sets", words, c.SentenceWords),
+			"split the sentence, or raise check.sentence_words")
 	}
 }
 

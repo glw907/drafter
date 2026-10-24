@@ -11,6 +11,6 @@ func newRootCmd() *cobra.Command {
 		Version:       version(),
 	}
 	cmd.AddCommand(newCheckPlanCmd(), newAnchorsCmd(), newConfigCmd(), newSpendCmd(), newCheckPromptsCmd(), newPageCmd(),
-		newCheckCmd(), newRefsCmd(), newOutlineCmd(), newExcerptCmd(), newConvertCmd(), newReadCmd(), newSeedCmd(), newGateCmd(), newInitCmd())
+		newCheckCmd(), newRefsCmd(), newOutlineCmd(), newExcerptCmd(), newConvertCmd(), newReadCmd(), newSeedCmd(), newGateCmd(), newInitCmd(), newStatusCmd())
 	return cmd
 }

@@ -273,9 +273,10 @@ func TestRefs(t *testing.T) {
 
 	out, _, code := run(t, "refs", "--root", root, "f:bbbbbb")
 	lines := strings.Split(strings.TrimSpace(out), "\n")
-	if code != 0 || len(lines) != 4 {
+	if code != 0 || len(lines) != 5 || lines[0] != "f:bbbbbb (code)" {
 		t.Fatalf("code %d, stdout %q", code, out)
 	}
+	lines = lines[1:]
 	for i, want := range []string{"(example)", "needs-admin (fact) in before-you-begin", "needs-admin-again (fact) in before-you-begin", "c-admin (sentence) in before-you-begin"} {
 		if !strings.HasPrefix(lines[i], "blueprints/docs/guide.blueprint.yaml:") || !strings.HasSuffix(lines[i], want) {
 			t.Errorf("line %d = %q, want a suffix %q", i, lines[i], want)
@@ -344,7 +345,7 @@ func TestRefsSeveralIDs(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("code %d, stderr %q", code, errs)
 		}
-		if !strings.HasPrefix(out, "bbbbbb\n  blueprints/docs/guide.blueprint.yaml:") || strings.Contains(out, "f:eeeeee") {
+		if !strings.HasPrefix(out, "bbbbbb (code)\n  blueprints/docs/guide.blueprint.yaml:") || strings.Contains(out, "f:eeeeee") {
 			t.Errorf("stdout %q", out)
 		}
 		if !strings.Contains(out, ": needs-admin (fact) in before-you-begin\n") {
@@ -360,7 +361,7 @@ func TestRefsSeveralIDs(t *testing.T) {
 
 	t.Run("an unknown id fails the run", func(t *testing.T) {
 		out, errs, code := run(t, "refs", "--root", root, "f:bbbbbb", "f:nothing")
-		if code != 1 || !strings.Contains(out, "f:bbbbbb\n") || !strings.Contains(errs, "fact f:nothing is not in the facts store") {
+		if code != 1 || !strings.Contains(out, "f:bbbbbb (code)\n") || !strings.Contains(errs, "fact f:nothing is not in the facts store") {
 			t.Errorf("code %d, stdout %q, stderr %q", code, out, errs)
 		}
 	})

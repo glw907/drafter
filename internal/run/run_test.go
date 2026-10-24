@@ -113,6 +113,22 @@ func TestStateRoundTrip(t *testing.T) {
 	}
 }
 
+func TestLoadStateWithoutPoll(t *testing.T) {
+	dir := t.TempDir()
+	old := `{"schema": 2, "pages": {"a": {"status": "running", "intents": [{"id": "i1", "batch_id": "msgbatch_1"}]}}}`
+	if err := os.WriteFile(filepath.Join(dir, "state.json"), []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s, err := LoadState(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := s.Pages["a"].Open()
+	if in == nil || in.BatchID != "msgbatch_1" || in.Poll != nil {
+		t.Errorf("open intent = %+v, want the batch and no poll", in)
+	}
+}
+
 func TestLoadStateErrors(t *testing.T) {
 	tests := []struct {
 		name    string

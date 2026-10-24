@@ -119,7 +119,8 @@ func atxHeading(line string) (int, string) {
 }
 
 // outlineChecks runs the checks on the outline's own declarations: its tracks, and each type's
-// anatomy. They run once per project check, whichever blueprints are named.
+// anatomy. They run only when no blueprint is named, since a fault in them is the outline's, not
+// a named page's.
 func (c *projectCheck) outlineChecks() {
 	o := c.l.outline
 	registers := map[string]registerFile{}

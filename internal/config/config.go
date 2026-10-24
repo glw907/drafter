@@ -26,10 +26,12 @@ type Config struct {
 	Seat           map[string]Seat
 	Facts          Facts
 	Blueprints     Blueprints
+	Check          Check
 	Editing        Editing
 	Register       map[string][]string
 	InlineFiles    []string
 	Root           string // the project root, empty outside a project
+	LocalFallback  string // the user-scope local config path read when the project has no drafter.local.toml
 
 	src     map[string]origin
 	capSets map[string][]string
@@ -108,6 +110,12 @@ type Blueprints struct {
 	Required  bool
 	Outline   string
 	BriefPath string
+}
+
+// Check holds the drafter check settings. SentenceWords is the longest sentence, in words, that a
+// markdown blueprint's prose lines may hold before the check warns; 0 turns the warning off.
+type Check struct {
+	SentenceWords int
 }
 
 // Editing holds the editing settings. Preferences is a slash path relative to the project root,
