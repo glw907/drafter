@@ -50,9 +50,11 @@ Then queue the document. `<file>` is relative to `<worktree>` and must be commit
 
 | What | Command |
 |---|---|
-| A blueprint, before its draft | `approval-queue blueprint <worktree> <title> <file> --notes <notes.json>` |
-| A drafted page | `approval-queue page <worktree> <title> <file> --pr <owner/repo#n> --notes <notes.json>` |
+| A blueprint, before its draft | `approval-queue blueprint <worktree> <title> <file> --description <description.md> --notes <notes.json>` |
+| A drafted page | `approval-queue page <worktree> <title> <file> --description <description.md> --pr <owner/repo#n> --notes <notes.json>` |
 | A code PR carrying blueprint and page edits | `approval-queue change <owner/repo#n> <title> --notes <notes.json>` |
+
+`--description` is required on `blueprint` and `page`, and the command refuses a queue without it. The file holds two or three paragraphs that Geoff reads under the title before the document: a background paragraph on the page's reader and job and what came before, then one or two on what this blueprint, or this draft, proposes. The title is sentence case with no closing punctuation and at most 80 characters. The command prints the queued link on stderr as `approval-queue: queued <id> at <url>`. A blueprint or page you queue again after a send-back shows "Revision N" on its own.
 
 Run the command under `setsid -f` with its stdout to a decision file, and watch that file. Never leave the wait to a background task alone: the command's exit trap deletes the queued item when the command dies. Each save Geoff makes in the review is a commit in the worktree, so do not edit the file while the review is open.
 
@@ -62,7 +64,7 @@ An approve prints `{"decision":"approve","file":...,"commit":...,"blob":...,"cal
 
 For a new page, or a change that adds or removes a section or changes the reader's path, draft only after Geoff approves the blueprint: `approval-queue approved <file> <blob>` must exit 0, with `<blob>` from `git rev-parse HEAD:<file>`. Then run `drafter page <blueprint>` without `--judge`. With no flag it runs the draft seat, the edit pass that applies the project's editing preferences, and the deterministic gate; `--judge` adds review seats and reads that spend credit this process does not use. Exit 0 means the page was accepted. On exit 3, rerun with `--resume <run-id>` and the same arguments; on exit 1, report the escalation; on exit 2 the run could not start, so fix the cause it names and run again.
 
-Fact-check the draft, settle it the same way, run the project's docs gate, and queue it with `approval-queue page`. Geoff's edits to the page are final: when one changes a claim, update the blueprint or the fact in the same PR. The PR merges after he approves the page.
+Fact-check the draft, settle it the same way, run the project's docs gate, and queue it with `approval-queue page ... --description <description.md>`, as the table above shows. Geoff's edits to the page are final: when one changes a claim, update the blueprint or the fact in the same PR. The PR merges after he approves the page.
 
 ## Page prose
 
