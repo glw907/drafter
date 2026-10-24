@@ -12,8 +12,84 @@
 
 ## Medium
 
+- [ ] **#69** Load `~/.config/drafter/<repo>.local.toml` as the fallback config layer `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  A fresh worktree has no `drafter.local.toml`, so `drafter page` exits 2 with "prompts is not set, and require_prompts in drafter.toml refuses the stock module", though the template sits in `~/.config/drafter`. Load it as a fallback layer, or name the template in the error. `internal/config/load.go:85` (record 60).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#68** List the plan's charter- and doc-sourced fact ids for the D1 audit `#feature` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  No tool says which ids a plan cites are charter- or doc-sourced, so the D1 audit (drop charter-sourced claims) runs by hand on every page; two authors did it (record 35).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#67** Read the briefs of pages with no blueprint in `drafter refs` `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  `drafter refs` reports "no blueprint places or cites" `f:ld6xam` though the page's existing brief cites it, because it reads briefs only for pages that have a blueprint. Pilot items 10 and 30 are half fixed (record 34).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#66** List inbound blueprint links when an outline removal retires a page `#feature` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  Retiring a page leaves inbound blueprint links (the add-cairn tutorial, replace-magic-links' See also), and no tool lists them on an outline removal; `drafter refs` is fact-based (record 33).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#65** Fix two links-check misreads: a `managed: false` crossLink and a cross-page anchor `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  The links warning flags an outline `crossLink` to a `managed: false` page as "names no page", and a cross-page anchor resolves against the published page, not the target's blueprint, so a link to a section a blueprint adds errors until the page is redrafted (record 31, 32).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#64** Check sentence length and hinges on blueprint lines `#feature` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  `drafter check` has no sentence-length or hinge check on blueprint lines. The register editor found 11 task sentences over 26 words in the sidebar blueprint, and the fold author wrote a throwaway script for it (record 30).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#63** Keep outline warnings out of a check run by blueprint name `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  A check by name still prints `outline.yaml` `types` warnings (the tutorial milestone, the symptom row) that belong to no named blueprint; two authors hit it (record 29).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#62** Report each exhaustive-word match at the word's line, and every match on a line `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  A warning inside `:::row` points at the `:::row` opening line, not the word's line, and the lint reports one match per line, which forces a fix, rerun, fix loop (record 27, 28).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#61** Let `:source[...]` hold a path with brackets `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  The parse stops at the first `]` and escaping doesn't help, so `preview/[token]` and `[...path]` can't be a source. Two authors dropped `:source` from their `Code:` bullets (record 23). `internal/blueprint/markdown.go`
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#60** Close the store check's gaps: doc-comment anchors, dotted pointers, route paths, figure sources `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  The `#name` check reads the anchor against the declaration without its doc comment, though `format.md` says the excerpt includes it; it skips dotted `#a.b` pointers (`f:8zdux6` is unverified) and bracket or parenthesis route paths that `drafter excerpt` resolves; and a figure's `:source` gets no existence check (record 21, 22, 24, 25).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#59** Require an anchor or content hash on every line pointer `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  An anchorless `path:N` or `path:A-B` pointer never detects drift: `f:ys1iq1` cited `types.ts:418` for a symbol at 430 and the preview blueprint had 11 stale ranges of which the check warned on 1. The excerpt's window also hides drift (`f:hdrzxd` moved 181 to 189 and passed), and an anchor in parentheses still isn't read (record 19, 20). Pilot 5 stays open.
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#58** Blueprint skill: tell the author how to resolve an exemplar, mint ids, edit in place, and find facts `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  The skill never says how an exemplar name resolves (`~/.config/drafter/cairn-cms.local.toml`, `inline_files`), names the mint command (one author hand-picked ids instead of `check-facts.mjs --mint`), says whether `sed` pointer swaps break "Edit tool only", or says to find facts by grepping each id the plan cites, not by heading. `claude/.claude/skills/blueprint/new-page.md` (record 10, 15, 16, 17).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#57** Blueprint skill: pick `**Background.**` or `:::constraints` for the introduction `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  `introductions.md` still describes a `**Background.**` paragraph while `new-page.md` says to use `:::constraints`. `claude/.claude/skills/blueprint/introductions.md` (record 9).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#56** Blueprint skill: close format.md's gaps on tables, code examples, `:::row`, and explanation bullets `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  `format.md` has no table form; shows `Code:` with a fence yet says "bare fence" (one fence per bullet, so a command and its output need two); doesn't say when `Code:` may omit `:source`; and is silent on `:::row` outside symptom pages and explanation bullets before the lead-in (`drafter check` accepts both). Add a sentence and an example for each. `claude/.claude/skills/blueprint/format.md` (record 8, 11, 12, 13, 14).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#55** Blueprint skill: hold the settle step's fix lines to the exhaustive-word rule `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  Both round-2 regressions in batch 2 were the session's fix lines, still too wide. Say a fix line meets the rule the authors follow, and that a finding that returns twice calls for a structural rewrite. `claude/.claude/skills/blueprint/review.md` (record 5).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#54** Blueprint skill: trace an engine question through code and design history before asking Geoff `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  Four question notes on engine intent (address collision against the resolver throw, `inFeeds`, D1's reach over design specs, an unset `PUBLIC_ORIGIN`) went to Geoff and were all answerable from specs, history, or code. Add to the Review section: send Geoff only product, taste, and scope. `claude/.claude/skills/blueprint/` (record 4).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#53** Blueprint skill: run the register editor before the fact-check and queueing `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  `docs-register.md` already lists the empty "own", yet it got through 10 times on the sidebar and 6 on the content model; only a fresh `cairn-register-editor` caught it, along with 11 task sentences over 26 words. Run it and apply its rewrites first. `claude/.claude/skills/blueprint/new-page.md` (record 3).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#52** Blueprint skill: say what to do when a folded section's target page has no blueprint `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  "Adds a section, approve the blueprint first" has no path for a target with none: folding one section into build-the-public-routes became a whole-page blueprint with 13 covers. `claude/.claude/skills/blueprint/new-page.md` (record 2).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
+
+- [ ] **#51** Blueprint skill: add a premise step before authoring a page `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  Nobody asked whether share-a-draft-preview earned a page until Geoff did, after the full flow ran on it. Add a step before step 1: who has work here that the scaffold, tutorial, or a reference page doesn't cover? An inherited outline entry is no evidence; when the case is weak, write a fold recommendation. `claude/.claude/skills/blueprint/new-page.md` (record 1).
+  Record: `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`
 - [ ] **#48** Narrow the `exhaustive` lint's `no` and `never` `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22)*
   On cairn's 585-line custom admin screen blueprint the lint gives about 70 warnings, and `no` and `never` are most of them: plain negation ("has no default", "makes no network call"), not a claim of a complete set. The whole-branch review dropped the digit counts and the verified fact bullets; whether to drop `no` and `never` too is Geoff's call. `internal/plan/exhaustive.go`
+  Batch 2: the lint gave 33 to 39 warnings per page, nearly all false: "no" before a code span or as a determiner, counts, "never" in `:::constraints`, and bold UI labels. Exempt those forms and add a per-line settled marker (record 26).
 - [ ] **#49** Give a `repro` figure block a markdown form `#feature` `#drafter` `#initiative:docs-system` *(2026-10-22)*
   A cairn page's figure is a `repro` fence, which names a story, alt text, and caption. In the markdown format a fence attaches only to a `Code:` bullet, so a `Figure:` bullet above a `repro` fence reads as a bare fence. The end-to-end check wrote the figure as a `Figure:` bullet with a `:source` and no fence. Decide whether a `Figure:` bullet takes a fence too. `internal/blueprint/markdown.go`
 - [ ] **#50** Warn on a second `:source` tag on one bullet `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-22)*
