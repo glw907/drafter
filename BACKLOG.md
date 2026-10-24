@@ -15,6 +15,12 @@
 
 ## Medium
 
+- [ ] **#80** Blueprint skill: mark which `drafter check` rows apply to markdown, and allow an in-place fact edit `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  format.md's "What `drafter check` checks" table is mostly YAML-era rows (`why`, `use`, `framing`, `recovery`, `reader-state`); say which apply to a markdown blueprint. The fact-edit rule should allow an exact in-place substitution with the Edit tool, never an append. Record B3-29 in `~/Projects/initiatives/docs-system/research/2026-10-22-extend-blueprints-batch-2-friction.md`.
+- [ ] **#79** Drift-check line pointers that carry no anchor span `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  A `path:lines` pointer with no anchor is never drift-checked: cairn-cms facts f:ivhuyc, f:gh4ckg, f:2p519o, and f:qd7iat had drifted 1 to 30 lines and still passed. Require an anchor on line pointers, or check the span's text. Facts about a dependency's behavior (gray-matter, js-yaml) have no excerptable source and rest on dated runs; a `run` or vendor tag would tell a checker why. Record B3-28.
+- [ ] **#78** `drafter refs`: count a published page's brief citations before the page has a blueprint `#bug` `#drafter` `#initiative:docs-system` *(2026-10-24)*
+  Before a page has a blueprint, `drafter refs <fact>` says "no blueprint places or cites it", so a fact correction looks free while the page's brief cites the fact five or more times. It also labels ordinary bullets `(example)`, a kind format.md never names. Record B3-27.
 - [ ] **#77** Blueprint skill: say what to do with neighbors' `outOfScope` lines when a page's `covers` narrows `#improvement` `#drafter` `#initiative:docs-system` *(2026-10-24)*
   Narrowing a page's `covers` leaves neighbors' `outOfScope` lines routing to it (outline.yaml 105, 127, 393); the brief should say whether to reword them. `claude/.claude/skills/blueprint/new-page.md`. Record B3-9.
 
